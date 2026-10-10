@@ -63,6 +63,8 @@ the fastest, and the reference for all bootstrap VMs:
 **In a web browser**, without any installation: open `bootstrap/js/ucf.html`,
 choose the folder `ucf`, then "Start".
 
+(There is a prebuild github page: https://ka-m-be.github.io/uCForth/build/ucf-web.html)
+
 **On Windows** (7 to 11), without any installation, in a command
 window in the folder `ucf`:
 
