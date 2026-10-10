@@ -1,0 +1,4 @@
+# ucf.scr and ucf.lst have CR LF at the end of each line, for DEBUG and
+# DOS: git must not change them.
+*.scr -text
+*.lst -text

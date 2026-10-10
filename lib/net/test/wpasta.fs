@@ -1,0 +1,12 @@
+\ wpasta.fs - host loader for the shared synthetic station tests
+ONLY FORTH DEFINITIONS ALSO FILES
+[DEFINED] T{ S" forth/test/tester.fs" ?INCLUDED
+ONLY FORTH ALSO FILES [DEFINED] BYTES S" lib/net/bytes.fs" ?INCLUDED
+ONLY FORTH ALSO FILES [DEFINED] SHA1 S" lib/sha1.fs" ?INCLUDED
+ONLY FORTH ALSO FILES [DEFINED] KDF1 S" lib/kdf1.fs" ?INCLUDED
+ONLY FORTH ALSO FILES [DEFINED] AES128 S" lib/aes128.fs" ?INCLUDED
+ONLY FORTH ALSO FILES [DEFINED] WPAKEY S" lib/net/wpakey.fs" ?INCLUDED
+ONLY FORTH ALSO FILES S" lib/net/test/stamock.fs" INCLUDED
+ONLY FORTH ALSO FILES S" lib/net/wifi.fs" INCLUDED
+ONLY FORTH ALSO FILES S" lib/net/wpasta.fs" INCLUDED
+ONLY FORTH ALSO FILES S" lib/net/test/wpavec.fs" INCLUDED

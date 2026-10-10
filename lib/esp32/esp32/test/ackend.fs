@@ -1,0 +1,49 @@
+\ ackend.fs - at most three measurements after diag.fs, same selected own AP
+\ The negative case changes only this board's receive address, not its
+\ transmitted source or peer. The second send uses restored defaults.
+ONLY FORTH  ALSO TEST-ACKCFG  ALSO ESP32-RADIO  ALSO ESP32-RADIO.I  DECIMAL
+VARIABLE END-NEG-IOR
+VARIABLE END-NEG-PMD
+VARIABLE END-POS-IOR
+VARIABLE END-POS-PMD
+VARIABLE END-BEFORE-IOR
+VARIABLE END-BEFORE-PMD
+VARIABLE END-ATTEMPTS
+VARIABLE END-RX-RETURNED
+VARIABLE END-RX-STARVED
+: END-SEND ( -- )
+  RX-NEXT @ RX-END = IF  1 END-RX-STARVED +!  THEN
+  DRAIN-TEST-RX END-RX-RETURNED +!
+  1 END-ATTEMPTS +!  DIAG-PACKET TRUE 7 TX-PREPARE  TX-EXECUTE ;
+: END-NEGATIVE ( -- )
+  RA-LOW @ >R  RA-ENABLE RA-MASK-HIGH BIC!
+  R@ 2 OR $10000 XOR RA-LOW !  RA-ENABLE RA-MASK-HIGH BIS!
+  ['] END-SEND CATCH END-NEG-IOR !  TX-LAST-PMD @ END-NEG-PMD !
+  R> DROP
+  TX-BLOCKED? 0= IF  DIAG-OWN RADIO-MAC!  THEN ;
+: END-POSITIVE ( -- )
+  TX-BLOCKED? IF  RADIO-STOP SETUP-DIAG  THEN
+  ['] END-SEND CATCH END-POS-IOR !  TX-LAST-PMD @ END-POS-PMD ! ;
+: END-CHECK ( -- )
+  ['] END-SEND CATCH END-BEFORE-IOR !  TX-LAST-PMD @ END-BEFORE-PMD !
+  END-BEFORE-IOR @ 0= IF
+    100 MS  END-NEGATIVE  100 MS  END-POSITIVE
+  THEN ;
+
+1 DIAG-CASE !  SETUP-DIAG
+0 END-ATTEMPTS !  0 END-RX-RETURNED !  0 END-RX-STARVED !
+END-CHECK
+." ackend: channel " DIAG-CHANNEL @ . ." attempts " END-ATTEMPTS @ .
+." initial ior " END-BEFORE-IOR @ .
+BASE @ HEX  ." PMD $" END-BEFORE-PMD @ .  BASE !
+: SHOW-END ( -- )
+  END-ATTEMPTS @ 1 > IF
+    ." negative ior " END-NEG-IOR @ .
+    BASE @ HEX  ." PMD $" END-NEG-PMD @ .  BASE !
+    ." restored ior " END-POS-IOR @ .
+    BASE @ HEX  ." PMD $" END-POS-PMD @ .  BASE ! CR
+  ELSE  ." following measurements not executed" CR  THEN ;
+SHOW-END
+." ackend: RX at end before sends " END-RX-STARVED @ .
+." beacons returned " END-RX-RETURNED @ . CR
+RADIO-STOP

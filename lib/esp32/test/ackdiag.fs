@@ -1,0 +1,14 @@
+\ ackdiag.fs - one change per ACK comparison; test-only, no TX start
+PACKAGE TEST-ACKCFG  ALSO ESP32-RADIO  ALSO ESP32-RADIO.I
+PUBLIC
+: DRAIN-TEST-RX ( -- u )
+  ?ON  BEACONS? 0= ABORT" TEST-ACKCFG: drain needs beacon-only mode"
+  0 #RX 1+ 0 DO  RADIO-RECEIVE ?DUP IF  2DROP 1+  THEN  LOOP ;
+: DIAG-CONFIG ( case -- )
+  DUP 0 4 WITHIN 0= ABORT" TEST-ACKCFG: case must be 0 to 3"
+  ?ON  ?CONFIG  TX-CTRL @ TX-START-BITS AND ABORT" TEST-ACKCFG: TX slot is busy"
+  DUP 2 = IF
+    TX-CONFIG @ $FFF INVERT AND 30 OR TX-CONFIG !
+  THEN
+  3 = IF  $10000000 TX-PLCP1 BIC!  THEN ;
+END-PACKAGE

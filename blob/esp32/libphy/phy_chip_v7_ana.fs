@@ -1,0 +1,2264 @@
+\ phy_chip_v7_ana.fs - package PHY-PHY-CHIP-V7-ANA: phy_chip_v7_ana.o of libphy.a (ESP32)
+\
+\ Made from phy_chip_v7_ana.S by s2fs.py, not by hand. Each function of C is a
+\ CODE word: its bytes are those of the compiler, at the same offsets of
+\ its section (L gives the address of an offset); its literals are at the
+\ start of the word, after a jump. The data come first, then the
+\ functions, each after those that it calls. The global symbols are
+\ PUBLIC, the static ones PRIVATE. lib/esp32/clink.fs explains the words.
+\
+\ 76 functions (74 global), 26 data objects.
+\ A function runs as C code with the windowed calls of the Xtensa: call
+\ it with CALL-C ( x1 .. xn n xt -- x ), never by its name alone.
+\
+\ Names of other packages: a literal waits until its package comes
+\ (LINK-SYMBOLS); a name outside the libraries until EXTERN gives it.
+\ Uses:
+\   PHY-PHY-CHIP-V7  bb_bss_cbw40 bt_tx_gain_cal_set chan14_mic_cfg
+\                    chan14_mic_en chip7_phy_init_ctrl
+\                    chip7_sleep_params chip_sleep_prot_dis
+\                    chip_sleep_prot_en chip_v7_set_chan_misc
+\                    disable_wifi_agc enable_wifi_agc
+\                    force_hw_set_freq_flag g_phyFuns i2cmst_reg_init
+\                    phy_byte_to_word phy_init_flag phy_wifi_bb_reset
+\                    re_entry reg_init_begin
+\   PHY-PHY-CHIP-V7-CAL  phy_dis_pwdet_one
+\ Outside the libraries (../README.md):
+\   __divdf3 __divsf3 __floatunsidf __truncdfsf2 esp_dport_access_reg_read
+\   ets_delay_us phy_enter_critical phy_exit_critical phy_printf
+\
+\ Needs XTENSA (asm/xtensa.fs), ASM (lib/esp32/asm.fs) and CLINK
+\ (lib/esp32/clink.fs) of ucf; the ESP32.
+
+PACKAGE PHY-PHY-CHIP-V7-ANA  ALSO ASM  ALSO CLINK   \ lib/package.fs
+EXPORTS   \ the PUBLIC words are symbols for the other packages
+
+\ ==== Data =============================================================
+
+\ ---- COMMON (.comm): data of C without a start value
+11 DATA: freq_i2c_addr
+20 DATA: bt_wifi_chan_data
+
+PRIVATE
+CREATE rodata.str1.4   \ .rodata.str1.4, 90 bytes
+  ," set_chan error! %d"  10 C,  0 C,
+  ," debug mode FAIL"  10 C,  0 C,  0 C,  0 C,  0 C,
+  ," error: pll_cal exceeds 2ms!!!"  10 C,  0 C,  0 C,
+  ," i=%d, "  0 C,  0 C,
+  ," 0x%x, "  0 C,  0 C,
+  10 C,  0 C,
+CREATE rodata   \ .rodata, 12 bytes
+  $00 C,  $01 C,  $00 C,  $01 C,  $00 C,  $01 C,  $00 C,  $01 C,
+  $30 C,  $80 C,  $08 C,  $71 C,
+CREATE rodata.bt_i2c_write_set   \ .rodata.bt_i2c_write_set, 36 bytes
+  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,   \ 9 jumps into bt_i2c_write_set
+CREATE rodata.bt_get_i2c_data   \ .rodata.bt_get_i2c_data, 44 bytes
+  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,  0 ,   \ 11 jumps into bt_get_i2c_data
+CREATE CSWTCH$169   \ .rodata.CSWTCH$169, 16 bytes
+  $00 C,  $00 C,  $D0 C,  $41 C,  $00 C,  $00 C,  $C0 C,  $41 C,  $00 C,  $00 C,
+  $20 C,  $42 C,  $00 C,  $00 C,  $00 C,  $42 C,
+CREATE CSWTCH$133   \ .rodata.CSWTCH$133, 48 bytes
+  $00 C,  $08 C,  $00 C,  $00 C,  $00 C,  $02 C,  $00 C,  $00 C,  $00 C,  $01 C,
+  $00 C,  $00 C,  $00 C,  $00 C,  $01 C,  $00 C,  $00 C,  $00 C,  $02 C,  $00 C,
+  $00 C,  $04 C,  $00 C,  $00 C,  $00 C,  $80 C,  $00 C,  $00 C,  $00 C,  $00 C,
+  $00 C,  $00 C,  $00 C,  $20 C,  $00 C,  $00 C,  $00 C,  $10 C,  $00 C,  $00 C,
+  $00 C,  $00 C,  $00 C,  $00 C,  $00 C,  $40 C,  $00 C,  $00 C,
+4 DATA: flag$5261   \ .bss.flag$5261
+PUBLIC
+1 DATA: bt_pwr_track_num   \ .bss.bt_pwr_track_num
+1 DATA: bt_pwr_freq_old   \ .bss.bt_pwr_freq_old
+1 DATA: bt_pwr_cap_sum_old   \ .bss.bt_pwr_cap_sum_old
+2 DATA: bt_pwr_cap_sum   \ .bss.bt_pwr_cap_sum
+1 DATA: dreg_1p2_set   \ .data.dreg_1p2_set
+  $26  1 dreg_1p2_set INIT
+1 DATA: btpwr_atten_offset   \ .bss.btpwr_atten_offset
+1 DATA: btpwr_tsen_flag   \ .bss.btpwr_tsen_flag
+1 DATA: btpwr_tsen_old   \ .bss.btpwr_tsen_old
+1 DATA: btpwr_tsen_init   \ .bss.btpwr_tsen_init
+2 DATA: rfpll_offset_delta   \ .bss.rfpll_offset_delta
+1 DATA: phy_wifi_pll_track_en   \ .data.phy_wifi_pll_track_en
+  $01  1 phy_wifi_pll_track_en INIT
+1 DATA: phy_bt_pll_track_en   \ .data.phy_bt_pll_track_en
+  $01  1 phy_bt_pll_track_en INIT
+1 DATA: phy_bt_power_track_en   \ .bss.phy_bt_power_track_en
+1 DATA: phy_sw_set_chan_en   \ .bss.phy_sw_set_chan_en
+1 DATA: phy_force_wifi_chan_en   \ .bss.phy_force_wifi_chan_en
+1 DATA: phy_freq_wifi_only   \ .bss.phy_freq_wifi_only
+2 DATA: phy_freq_offset   \ .bss.phy_freq_offset
+
+\ ==== Code =============================================================
+
+PRIVATE
+CODE i2c_bbpll_init$part$0   \ .phyiram.23 $4, static
+  $0 1 LITERALS
+    SYMBOL g_phyFuns
+$4 L:
+  A1 32 ENTRY,  A2 $0 L L32R,  A14 7 MOVI.N,  A13 A14 MOV.N,  A15 1 MOVI.N,
+  A12 2 MOVI.N,  A8 A2 0 L32I.N,  A11 4 MOVI,  A10 102 MOVI,  A8 A8 168 L32I,
+  A8 CALLX8,
+  A15 0 MOVI.N,  A14 A15 MOV.N,  A8 A2 0 L32I.N,  A13 2 MOVI.N,  A12 5 MOVI.N,
+  A11 4 MOVI.N,  A10 102 MOVI,  A8 A8 168 L32I,  A8 CALLX8,
+  A15 1 MOVI.N,  A14 6 MOVI.N,  A2 A2 0 L32I.N,  A13 7 MOVI.N,  A12 5 MOVI.N,
+  A11 4 MOVI.N,  A10 102 MOVI,  A2 A2 168 L32I,  A2 CALLX8,
+  RETW.N,
+$4C L:  END-CODE
+
+PUBLIC
+CODE i2c_bbpll_init   \ .phyiram.23 $50
+  $4C 1 LITERALS
+    SYMBOL chip7_phy_init_ctrl
+$50 L:
+  A1 32 ENTRY,  A8 $4C L L32R,  A8 A8 1 L8UI,  A8 1 $5F L BNEI,
+  FUNC i2c_bbpll_init$part$0 CALL8,
+$5F L:
+  RETW.N,
+$61 L:  END-CODE
+
+CODE get_i2c_read_mask   \ .iram1 $4
+  $0 1 LITERALS
+    SYMBOL CSWTCH$133
+$4 L:
+  A1 32 ENTRY,  A2 A2 -98 ADDI,  A8 A2 0 8 EXTUI,  A9 11 MOVI.N,  A2 0 MOVI.N,
+  A9 A8 $1C L BLTU,
+  A2 $0 L L32R,  A8 A8 A2 ADDX4,  A2 A8 0 L32I.N,
+$1C L:
+  RETW.N,
+$1E L:  END-CODE
+
+CODE pll_correct_dcap   \ .iram1 $50
+  $20 12 LITERALS
+    SYMBOL g_phyFuns  $3FF4E130 T,  $FFFF00FF T,  $3FF4E0C4 T,  $3FF4E0C0 T,
+    $FFFF00 T,  $3FF4E148 T,  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+$50 L:
+  A1 48 ENTRY,  A6 $20 L L32R,  A14 7 MOVI.N,  A5 A2 0 8 EXTUI,  A13 A14 MOV.N,
+  A12 0 MOVI.N,  A7 A6 0 L32I.N,  A11 1 MOVI,  A10 98 MOVI,  A4 A4 0 8 EXTUI,
+  A2 A7 164 L32I,  A2 CALLX8,
+  A10 $76 L BNEZ.N,
+$72 L:
+  A2 0 MOVI.N,  RETW.N,
+$76 L:
+  A2 A6 0 L32I.N,  A14 0 MOVI.N,  A13 7 MOVI.N,  A12 5 MOVI.N,  A11 1 MOVI.N,
+  A2 A2 164 L32I,  A10 98 MOVI,  A2 CALLX8,
+  A10 1 $B8 L BBSI,
+  A9 1 MOVI.N,  A2 A9 MOV.N,  A10 0 $BD L BBSI,
+  $72 L J,
+  2 ZEROS,
+$98 L:
+  A4 $24 L L32R,  A7 A7 8 SLLI,  A10 A4 MOV.N,  A8 $3C L L32R,  A8 CALLX8,
+  A3 $28 L L32R,  A10 A10 A3 AND,  A7 A10 A7 OR,  MEMW,  A7 A4 0 S32I.N,  RETW.N,
+  2 ZEROS,
+$B8 L:
+  A9 255 MOVI,  A2 A9 MOV.N,
+$BD L:
+  A6 $2C L L32R,  A7 -256 MOVI,  A10 A6 MOV.N,  A5 A5 A5 ADDX2,  A5 A5 0 8 EXTUI,
+  A9 A1 0 S32I,  A8 $40 L L32R,  A8 CALLX8,
+  A10 A10 A7 AND,  A5 A10 A5 OR,  A10 $30 L L32R,  MEMW,  A5 A6 0 S32I,
+  A8 $44 L L32R,  A8 CALLX8,
+  A8 A10 24 8 EXTUI,  A9 A1 0 L32I.N,  A7 A10 A9 ADD.N,  A8 A9 A8 ADD.N,
+  A7 A7 0 8 EXTUI,  A5 $34 L L32R,  A8 A8 24 SLLI,  A5 A10 A5 AND,  A5 A5 A7 OR,
+  A5 A5 A8 OR,  A8 $38 L L32R,  A10 A6 MOV.N,  MEMW,  A5 A8 0 S32I,  A8 $48 L L32R,
+  A8 CALLX8,
+  A5 $200 MOVI,  A5 A10 A5 OR,  A10 A6 MOV.N,  MEMW,  A5 A6 0 S32I.N,
+  A8 $4C L L32R,  A8 CALLX8,
+  A5 -513 MOVI,  A10 A10 A5 AND,  MEMW,  A10 A6 0 S32I.N,  A7 A3 0 S8I,  MEMW,
+  A4 $98 L BNEZ,
+  RETW.N,
+$13E L:  END-CODE
+
+CODE bb_rst_en_set   \ .iram1 $15C
+  $140 7 LITERALS
+    $3FF5D03C T,  $40000000 T,  $BFFFFFFF T,  $3FF5D040 T,  $7FFFFFFF T,
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+$15C L:
+  A1 32 ENTRY,  A3 $140 L L32R,  A2 A2 0 8 EXTUI,  A10 A3 MOV.N,  A8 $154 L L32R,
+  A8 CALLX8,
+  A8 A2 30 SLLI,  A4 $144 L L32R,  A2 A2 31 SLLI,  A8 A8 A4 AND,  A9 $148 L L32R,
+  A10 A10 A9 AND,  A8 A8 A10 OR,  A4 $14C L L32R,  A10 A4 A4 OR,  MEMW,
+  A8 A3 0 S32I,  A8 $158 L L32R,  A8 CALLX8,
+  A3 $150 L L32R,  A10 A10 A3 AND,  A2 A10 A2 OR,  MEMW,  A2 A4 0 S32I.N,  RETW.N,
+$1A4 L:  END-CODE
+
+CODE phy_dis_hw_set_freq   \ .iram1 $1C4
+  $1A4 8 LITERALS
+    $3FF4E168 T,  $3FF4E0C4 T,  $2000000 T,  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL ets_delay_us  SYMBOL esp_dport_access_reg_read
+$1C4 L:
+  A1 32 ENTRY,  A3 $1A4 L L32R,  A4 $100 MOVI,  A2 $1A8 L L32R,
+$1D0 L:
+  A10 A3 MOV.N,  A8 $1B0 L L32R,  A8 CALLX8,
+  A10 $20E L BLTZ,
+$1DB L:
+  A10 A2 A2 OR,  A8 $1B4 L L32R,  A8 CALLX8,
+  A3 $1AC L L32R,  A3 A10 A3 OR,  A10 A2 A2 OR,  MEMW,  A3 A2 0 S32I,
+  A8 $1B8 L L32R,  A8 CALLX8,
+  A3 -257 MOVI,  A3 A10 A3 AND,  A10 2 MOVI.N,  MEMW,  A3 A2 0 S32I.N,
+  A8 $1BC L L32R,  A8 CALLX8,
+  RETW.N,
+$20E L:
+  A10 A2 MOV.N,  A8 $1C0 L L32R,  A8 CALLX8,
+  A10 A4 $1D0 L BNONE,
+  $1DB L J,
+$21C L:  END-CODE
+
+CODE phy_force_wifi_chan   \ .iram1 $26C
+  $21C 20 LITERALS
+    SYMBOL phy_force_wifi_chan_en  SYMBOL force_hw_set_freq_flag  $3FF51040 T,
+    $60033C00 T,  $3FF5D008 T,  $20000000 T,  $3FF4E0C4 T,  $E7FFFFFF T,
+    $10000000 T,  SYMBOL phy_sw_set_chan_en  SYMBOL phy_enter_critical
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL phy_exit_critical
+$26C L:
+  A1 32 ENTRY,  A8 $244 L L32R,  A8 CALLX8,
+  A3 $21C L L32R,  A2 1 MOVI.N,  A7 A10 MOV.N,  A10 1 MOVI.N,  A6 100 MOVI,
+  A2 A3 0 S8I,  MEMW,  NOP.N,  NOP,  NOP,  NOP.N,  A3 $220 L L32R,  A2 A3 0 S8I,
+  MEMW,  FUNC bb_rst_en_set CALL8,
+  A2 -2 MOVI,  A3 $224 L L32R,  A10 A3 A3 OR,  A8 $248 L L32R,  A8 CALLX8,
+  A10 A10 A2 AND,  A2 $228 L L32R,  MEMW,  A10 A3 0 S32I.N,  NOP.N,  NOP.N,  NOP.N,
+  NOP.N,  MEMW,  A5 A2 0 L32I.N,  A4 $22C L L32R,  A3 $230 L L32R,  $2DB L J,
+$2CD L:
+  MEMW,  A8 A2 0 L32I.N,  A8 A8 A5 SUB,  A6 A8 $2DB L BGEU,
+  $379 L J,
+$2DB L:
+  A10 A4 A4 OR,  A8 $24C L L32R,  A8 CALLX8,
+  A10 A10 A3 AND,  A10 A10 29 3 EXTUI,  A10 $2CD L BNEZ,
+  $371 L J,
+  2 ZEROS,
+$2F2 L:
+  A4 $234 L L32R,  A2 -257 MOVI,  A10 A4 MOV.N,  A8 $250 L L32R,  A8 CALLX8,
+  A10 A10 A2 AND,  MEMW,  A10 A4 0 S32I.N,  A10 A4 MOV.N,  A8 $254 L L32R,
+  A8 CALLX8,
+  A2 $238 L L32R,  A3 A10 A2 AND,  A10 A4 MOV.N,  A2 $23C L L32R,  A2 A3 A2 OR,
+  A3 $100 MOVI,  MEMW,  A2 A4 0 S32I.N,  A8 $258 L L32R,  A8 CALLX8,
+  A10 A10 A3 OR,  A2 A4 MOV.N,  MEMW,  A10 A4 0 S32I.N,
+$336 L:
+  A10 A2 MOV.N,  A8 $25C L L32R,  A8 CALLX8,
+  A10 $358 L BGEZ,
+$341 L:
+  A10 A4 MOV.N,  A8 $260 L L32R,  A8 CALLX8,
+  A2 -257 MOVI,  A10 A10 A2 AND,  MEMW,  A10 A4 0 S32I.N,  $366 L J,
+  1 ZEROS,
+$358 L:
+  A10 A2 MOV.N,  A8 $264 L L32R,  A8 CALLX8,
+  A10 A3 $336 L BANY,
+  $341 L J,
+$366 L:
+  A10 A7 MOV.N,  A8 $268 L L32R,  A8 CALLX8,
+  RETW.N,
+  1 ZEROS,
+$371 L:
+  FUNC phy_dis_hw_set_freq CALL8,
+  $366 L J,
+  2 ZEROS,
+$379 L:
+  FUNC phy_dis_hw_set_freq CALL8,
+  A2 $240 L L32R,  A2 A2 0 L8UI,  A2 $366 L BNEZ,
+  $2F2 L J,
+$388 L:  END-CODE
+
+CODE phy_en_hw_set_freq   \ .iram1 $3A8
+  $388 8 LITERALS
+    SYMBOL force_hw_set_freq_flag  $3FF4E0C4 T,  $FDFFFFFF T,  $3FF5C07C T,
+    $FF00FFFF T,  $9C0000 T,  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read
+$3A8 L:
+  A1 32 ENTRY,  A2 $388 L L32R,  A2 A2 0 L8UI,  A2 $3CC L BNEZ,
+  A3 $38C L L32R,  A10 A3 A3 OR,  A8 $3A0 L L32R,  A8 CALLX8,
+  A2 $390 L L32R,  A10 A10 A2 AND,  MEMW,  A10 A3 0 S32I,
+$3CC L:
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A2 $394 L L32R,  A10 A2 A2 OR,  A8 $3A4 L L32R,
+  A8 CALLX8,
+  A8 $398 L L32R,  A10 A10 A8 AND,  A8 $39C L L32R,  A10 A10 A8 OR,  MEMW,
+  A10 A2 0 S32I.N,  RETW.N,
+$3F3 L:  END-CODE
+
+CODE ram_chip_i2c_readReg   \ .iram1 $434
+  $3F4 16 LITERALS
+    SYMBOL phy_init_flag  $3FF4E0C4 T,  SYMBOL CSWTCH$133  $3FF4E044 T,
+    $FFFC00FF T,  $3F000 T,  $FFD3800 T,  $2000000 T,  SYMBOL phy_enter_critical
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL phy_exit_critical
+$434 L:
+  A1 48 ENTRY,  A4 A4 0 8 EXTUI,  A8 $414 L L32R,  A8 CALLX8,
+  A3 A3 0 8 EXTUI,  A4 A1 0 S32I.N,  A5 A10 MOV.N,  A2 A2 0 8 EXTUI,  A6 1 MOVI.N,
+  A3 2 $451 L BLTUI,
+  A6 0 MOVI.N,
+$451 L:
+  A8 $3F4 L L32R,  A6 A6 0 8 EXTUI,  A4 A8 0 L8UI,  A4 $479 L BNEZ.N,
+  A6 $479 L BEQZ.N,
+  FUNC phy_dis_hw_set_freq CALL8,
+  A4 $3F8 L L32R,  A7 -257 MOVI,  A10 A4 A4 OR,  A8 $418 L L32R,  A8 CALLX8,
+  A10 A10 A7 AND,  MEMW,  A10 A4 0 S32I,
+$479 L:
+  A4 A2 -98 ADDI,  A4 A4 0 8 EXTUI,  A8 11 MOVI.N,  A7 -1 MOVI.N,
+  A8 A4 $491 L BLTU,
+  A8 $3FC L L32R,  A4 A4 A8 ADDX4,  A4 A4 0 L32I.N,  A7 A7 A4 XOR,
+$491 L:
+  A4 $400 L L32R,  A10 A4 MOV.N,  A8 $41C L L32R,  A8 CALLX8,
+  A8 $404 L L32R,  A9 A10 A8 AND,  A10 A4 MOV.N,  A8 $408 L L32R,  A8 A9 A8 OR,
+  MEMW,  A8 A4 0 S32I.N,  A8 $420 L L32R,  A8 CALLX8,
+  A10 A10 A7 AND,  A7 $40C L L32R,  A3 A3 A7 ADD.N,  A3 A3 2 SLLI,  A7 $410 L L32R,
+  MEMW,  A10 A4 0 S32I.N,
+$4C8 L:
+  A10 A3 MOV.N,  A8 $424 L L32R,  A8 CALLX8,
+  A10 A7 $4C8 L BANY,
+  A8 A1 0 L32I.N,  A4 A8 8 SLLI,  A2 A4 A2 OR,  MEMW,  A2 A3 0 S32I.N,
+$4E0 L:
+  A10 A3 MOV.N,  A8 $428 L L32R,  A8 CALLX8,
+  A2 A10 A7 AND,  A2 $4E0 L BNEZ,
+  A10 A3 MOV.N,  A8 $42C L L32R,  A8 CALLX8,
+  A4 $3F4 L L32R,  A3 A4 0 L8UI,  A4 1 MOVI.N,  A2 A4 A3 MOVEQZ,  A3 A2 0 8 EXTUI,
+  A2 A10 16 8 EXTUI,  A3 $50E L BEQZ.N,
+  A6 $50E L BEQZ.N,
+  FUNC phy_en_hw_set_freq CALL8,
+$50E L:
+  A10 A5 MOV.N,  A8 $430 L L32R,  A8 CALLX8,
+  RETW.N,
+$518 L:  END-CODE
+
+CODE ram_chip_i2c_writeReg   \ .iram1 $540
+  $518 10 LITERALS
+    SYMBOL phy_init_flag  $3FF4E0C4 T,  $FFD3800 T,  $2000000 T,  $1000000 T,
+    SYMBOL phy_enter_critical  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL phy_exit_critical
+$540 L:
+  A1 48 ENTRY,  A5 A5 0 8 EXTUI,  A8 $52C L L32R,  A8 CALLX8,
+  A3 A3 0 8 EXTUI,  A5 A1 0 S32I.N,  A7 A10 MOV.N,  A2 A2 0 8 EXTUI,
+  A4 A4 0 8 EXTUI,  A5 1 MOVI.N,  A3 2 $561 L BLTUI,
+  A5 0 MOVI,
+$561 L:
+  A8 $518 L L32R,  A5 A5 0 8 EXTUI,  A6 A8 0 L8UI,  A6 $589 L BNEZ.N,
+  A5 $589 L BEQZ.N,
+  FUNC phy_dis_hw_set_freq CALL8,
+  A6 $51C L L32R,  A10 A6 A6 OR,  A8 $530 L L32R,  A8 CALLX8,
+  A8 -257 MOVI,  A10 A10 A8 AND,  MEMW,  A10 A6 0 S32I,
+$589 L:
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A6 $520 L L32R,  A3 A3 A6 ADD,  A3 A3 2 SLLI,
+  A6 $524 L L32R,
+$59D L:
+  A10 A3 MOV.N,  A8 $534 L L32R,  A8 CALLX8,
+  A10 A6 $59D L BANY,
+  A8 $528 L L32R,  A4 A4 8 SLLI,  A2 A2 A8 OR,  A2 A4 A2 OR,  A4 A1 0 L32I.N,
+  A8 A4 16 SLLI,  A2 A2 A8 OR,  MEMW,  A2 A3 0 S32I.N,
+$5C1 L:
+  A10 A3 MOV.N,  A8 $538 L L32R,  A8 CALLX8,
+  A10 A10 A6 AND,  A10 $5C1 L BNEZ,
+  A8 $518 L L32R,  A3 1 MOVI.N,  A2 A8 0 L8UI,  A10 A3 A2 MOVEQZ,
+  A10 A10 0 8 EXTUI,  A10 $5E4 L BEQZ.N,
+  A5 $5E4 L BEQZ.N,
+  FUNC phy_en_hw_set_freq CALL8,
+$5E4 L:
+  A10 A7 MOV.N,  A8 $53C L L32R,  A8 CALLX8,
+  RETW.N,
+$5EE L:  END-CODE
+
+CODE phy_unforce_wifi_chan   \ .iram1 $624
+  $5F0 13 LITERALS
+    SYMBOL phy_force_wifi_chan_en  SYMBOL force_hw_set_freq_flag
+    SYMBOL phy_sw_set_chan_en  $3FF4E168 T,  $3FF4E0C4 T,  $E7FFFFFF T,
+    $3FF51040 T,  SYMBOL phy_enter_critical  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL phy_exit_critical
+$624 L:
+  A1 32 ENTRY,  A8 $60C L L32R,  A8 CALLX8,
+  A3 $5F0 L L32R,  A2 0 MOVI.N,  A5 A10 MOV.N,  A10 0 MOVI.N,  A2 A3 0 S8I,  MEMW,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A3 $5F4 L L32R,  A2 A3 0 S8I,  MEMW,
+  FUNC bb_rst_en_set CALL8,
+  A2 $5F8 L L32R,  A2 A2 0 L8UI,  A2 $691 L BNEZ.N,
+  A4 $100 MOVI,  A3 $5FC L L32R,  A2 $600 L L32R,
+$661 L:
+  A10 A3 MOV.N,  A8 $610 L L32R,  A8 CALLX8,
+  A10 $682 L BLTZ,
+$66C L:
+  A10 A2 MOV.N,  A8 $614 L L32R,  A8 CALLX8,
+  A3 $604 L L32R,  A10 A10 A3 AND,  MEMW,  A10 A2 0 S32I.N,  $691 L J,
+$682 L:
+  A10 A2 MOV.N,  A8 $618 L L32R,  A8 CALLX8,
+  A10 A4 $661 L BNONE,
+  $66C L J,
+  1 ZEROS,
+$691 L:
+  FUNC phy_en_hw_set_freq CALL8,
+  A3 $608 L L32R,  A2 1 MOVI.N,  A10 A3 MOV.N,  A8 $61C L L32R,  A8 CALLX8,
+  A10 A10 A2 OR,  MEMW,  A10 A3 0 S32I.N,  A10 A5 MOV.N,  A8 $620 L L32R,
+  A8 CALLX8,
+  RETW.N,
+$6B3 L:  END-CODE
+
+CODE wifi_track_pll_cap   \ .iram1 $6D8
+  $6B4 9 LITERALS
+    SYMBOL phy_wifi_pll_track_en  $3FF5D008 T,  SYMBOL phy_sw_set_chan_en
+    SYMBOL chip7_sleep_params  SYMBOL g_phyFuns  SYMBOL phy_force_wifi_chan_en
+    SYMBOL phy_enter_critical  SYMBOL esp_dport_access_reg_read
+    SYMBOL phy_exit_critical
+$6D8 L:
+  A1 48 ENTRY,  A8 $6CC L L32R,  A8 CALLX8,
+  A8 $6B4 L L32R,  A9 0 MOVI.N,  A2 A10 MOV.N,  A8 A8 0 L8UI,  A9 A1 0 S8I,  MEMW,
+  A8 $75C L BEQZ,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A10 $6B8 L L32R,  A8 $6D0 L L32R,  A8 CALLX8,
+  A10 29 $75C L BBSI,
+  A8 $6BC L L32R,  A8 A8 0 L8UI,  A8 $75C L BNEZ,
+  A9 13 MOVI.N,  A3 84 MOVI.N,  A8 $6C0 L L32R,  A8 A8 81 L8UI,  A8 A8 7 SEXT,
+  A9 A8 $729 L BLT,
+  A8 A8 A8 ADDX4,  A10 A8 7 ADDI.N,  A3 A10 0 8 EXTUI,
+$729 L:
+  FUNC phy_dis_hw_set_freq CALL8,
+  A12 1 MOVI.N,  A11 A1 MOV.N,  A10 A3 MOV.N,  FUNC pll_correct_dcap CALL8,
+  A10 A10 0 8 EXTUI,  A10 $751 L BEQZ.N,
+  A13 A1 0 L8UI,  A13 $751 L BEQZ.N,
+  A12 1 MOVI.N,  A11 A12 MOV.N,  A3 $6C4 L L32R,  A10 98 MOVI,  A3 A3 0 L32I.N,
+  A3 A3 160 L32I,  A3 CALLX8,
+$751 L:
+  A3 $6C8 L L32R,  A3 A3 0 L8UI,  A3 $75C L BNEZ.N,
+  FUNC phy_en_hw_set_freq CALL8,
+$75C L:
+  A10 A2 MOV.N,  A8 $6D4 L L32R,  A8 CALLX8,
+  RETW.N,
+$766 L:  END-CODE
+
+CODE phy_get_fetx_delay   \ .iram1 $774
+  $768 3 LITERALS
+    $3FF450D0 T,  $40000000 T,  SYMBOL esp_dport_access_reg_read
+$774 L:
+  A1 32 ENTRY,  A10 $768 L L32R,  A2 40 MOVI.N,  A8 $770 L L32R,  A8 CALLX8,
+  A8 $76C L L32R,  A10 A10 A8 AND,  A10 A10 30 2 EXTUI,  A8 0 MOVI.N,
+  A2 A8 A10 MOVNEZ,  RETW.N,
+$792 L:  END-CODE
+
+CODE get_temp_cal   \ .iram1 $798
+  $794 1 LITERALS
+    $92492493 T,
+$798 L:
+  A1 32 ENTRY,  A2 A2 0 8 EXTUI,  A3 A3 0 8 EXTUI,  A9 $794 L L32R,  A8 A2 A3 SUB,
+  A9 A8 A9 MULSH,  A2 A8 31 SRAI,  A8 A8 A9 ADD.N,  A8 A8 2 SRAI,  A8 A8 A2 SUB,
+  A2 24 MOVI.N,  A2 A8 $7C2 L BLT,
+  A8 A8 15 SEXT,  A2 -24 MOVI.N,  A2 A8 A2 MAX,
+$7C2 L:
+  RETW.N,
+$7C4 L:  END-CODE
+
+CODE btpwr_pll_track   \ .iram1 $7E8
+  $7C4 9 LITERALS
+    SYMBOL bt_pwr_freq_old  SYMBOL bt_pwr_track_num  $3FF4E0C4 T,  $3FF4E0C0 T,
+    SYMBOL bt_pwr_cap_sum  SYMBOL btpwr_atten_offset  SYMBOL bt_pwr_cap_sum_old
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+$7E8 L:
+  A1 32 ENTRY,  A3 $7C4 L L32R,  A2 A2 0 8 EXTUI,  A4 A3 0 L8UI,  A4 A2 $801 L BNE,
+  A9 $7C8 L L32R,  A8 A9 0 L8UI,  $84B L J,
+  1 ZEROS,
+$801 L:
+  A4 $7CC L L32R,  A10 A4 MOV.N,  A8 $7E0 L L32R,  A8 CALLX8,
+  A8 -256 MOVI,  A9 A2 A2 ADDX2,  A9 A9 0 8 EXTUI,  A10 A10 A8 AND,  A8 A10 A9 OR,
+  A10 $7D0 L L32R,  MEMW,  A8 A4 0 S32I.N,  A8 $7E4 L L32R,  A8 CALLX8,
+  A10 A10 24 SRAI,  A9 $7C8 L L32R,  A4 $7D4 L L32R,  A8 A9 0 L8UI,  A8 A8 1 ADDI.N,
+  A8 A8 0 8 EXTUI,  A11 A4 0 L16UI,  A10 A10 A11 ADD.N,  A10 A4 0 S16I,
+  A2 A3 0 S8I,  A8 A9 0 S8I,  MEMW,
+$84B L:
+  A3 15 MOVI.N,  NOP.N,  NOP.N,  NOP.N,  A2 $7D8 L L32R,  A2 A2 0 L8UI,
+  A3 A8 $8AF L BGEU,
+  A10 $7D4 L L32R,  A11 $7DC L L32R,  A8 A10 0 L16SI,  A8 A8 8 ADDI.N,
+  A8 A8 4 SRAI,  A4 A8 15 SEXT,  A3 A11 0 L8UI,  A3 A3 7 SEXT,  A3 A4 $8A4 L BEQ,
+  A4 2 $882 L BLTI,
+  A2 A8 3 SLLI,  A2 A2 0 8 EXTUI,  $890 L J,
+$882 L:
+  A2 0 MOVI.N,  A4 -1 $8A1 L BGEI,
+  A2 A8 A8 ADDX2,  A2 A2 1 SLLI,  A2 A2 0 8 EXTUI,
+$890 L:
+  A3 A2 7 SEXT,  A2 24 MOVI.N,  A2 A3 $8A1 L BLT,
+  A2 -18 MOVI,  A2 A3 A2 MAX,  A2 A2 0 8 EXTUI,
+$8A1 L:
+  A8 A11 0 S8I,
+$8A4 L:
+  A3 0 MOVI.N,  A3 A10 0 S16I,  A3 A9 0 S8I,  MEMW,
+$8AF L:
+  RETW.N,
+$8B1 L:  END-CODE
+
+CODE phy_bt_ifs_set   \ .iram1 $8D4
+  $8B4 8 LITERALS
+    $1FE000 T,  $1EA000 T,  $3FF450D0 T,  $40000000 T,  $3FF5103C T,  $FFE007FF T,
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+$8D4 L:
+  A1 32 ENTRY,  A10 $8BC L L32R,  A8 $8CC L L32R,  A8 CALLX8,
+  A2 $8C0 L L32R,  A10 A10 A2 AND,  A8 A10 30 2 EXTUI,  A3 $8C4 L L32R,
+  A10 A3 MOV.N,  A2 $8B8 L L32R,  A9 $8B4 L L32R,  A2 A9 A8 MOVNEZ,  A8 $8D0 L L32R,
+  A8 CALLX8,
+  A8 $8C8 L L32R,  A10 A10 A8 AND,  A2 A10 A2 OR,  MEMW,  A2 A3 0 S32I.N,  RETW.N,
+$90D L:  END-CODE
+
+CODE tsens_code_read   \ .iram1 $944
+  $910 13 LITERALS
+    $3FF4884C T,  $4000000 T,  $3FF48844 T,  $FBFFFFFF T,  $FEFFFFFF T,
+    $1000000 T,  $3FC00000 T,  SYMBOL esp_dport_access_reg_read
+    SYMBOL ets_delay_us  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read
+$944 L:
+  A1 32 ENTRY,  A3 $910 L L32R,  A10 A3 MOV.N,  A8 $92C L L32R,  A8 CALLX8,
+  A2 $914 L L32R,  A2 A10 A2 OR,  A10 1 MOVI.N,  MEMW,  A2 A3 0 S32I.N,
+  A8 $930 L L32R,  A8 CALLX8,
+  A10 $918 L L32R,  A8 $934 L L32R,  A8 CALLX8,
+  A4 A10 MOV.N,  A10 A3 A3 OR,  A8 $938 L L32R,  A8 CALLX8,
+  A8 $91C L L32R,  A8 A10 A8 AND,  A10 A3 MOV.N,  MEMW,  A8 A3 0 S32I,
+  A8 $93C L L32R,  A8 CALLX8,
+  A8 $920 L L32R,  A8 A10 A8 AND,  A10 A3 MOV.N,  MEMW,  A8 A3 0 S32I.N,
+  A8 $940 L L32R,  A8 CALLX8,
+  A8 $924 L L32R,  A10 A10 A8 OR,  A2 $928 L L32R,  A2 A4 A2 AND,  A2 A2 22 8 EXTUI,
+  MEMW,  A10 A3 0 S32I.N,  RETW.N,
+$9B6 L:  END-CODE
+
+CODE btpwr_tsens_track   \ .iram1 $9CC
+  $9B8 5 LITERALS
+    SYMBOL btpwr_tsen_old  SYMBOL btpwr_atten_offset  SYMBOL btpwr_tsen_flag
+    SYMBOL btpwr_tsen_init  $92492493 T,
+$9CC L:
+  A1 32 ENTRY,  FUNC tsens_code_read CALL8,
+  A12 $9B8 L L32R,  A9 1 MOVI.N,  A8 A12 0 L8UI,  A8 A10 A8 SUB,  A8 A8 5 ADDI.N,
+  A8 A8 0 16 EXTUI,  A2 $9C0 L L32R,  A9 A2 0 S8I,  MEMW,  A9 10 MOVI.N,  NOP.N,
+  NOP.N,  NOP.N,  A2 $9BC L L32R,  A2 A2 0 L8UI,  A9 A8 $A2B L BGEU,
+  A2 24 MOVI.N,  A8 $9C4 L L32R,  A9 A8 0 L8UI,  A11 A9 A10 SUB,  A8 A11 31 SRAI,
+  A9 $9C8 L L32R,  A9 A11 A9 MULSH,  A9 A11 A9 ADD.N,  A9 A9 2 SRAI,  A10 A12 0 S8I,
+  MEMW,  A8 A9 A8 SUB,  A2 A8 $A38 L BLT,
+  A8 A8 15 SEXT,  A2 -24 MOVI.N,  A2 A8 A2 MAX,  RETW.N,
+$A2B L:
+  A8 A2 7 SEXT,  A2 24 MOVI.N,  A2 A8 $A38 L BLT,
+  A2 -24 MOVI.N,  A2 A8 A2 MAX,
+$A38 L:
+  RETW.N,
+$A3A L:  END-CODE
+
+CODE bt_track_tx_power   \ .iram1 $A48
+  $A3C 3 LITERALS
+    SYMBOL btpwr_tsen_flag  SYMBOL btpwr_atten_offset  SYMBOL bt_tx_gain_cal_set
+$A48 L:
+  A1 32 ENTRY,  FUNC btpwr_tsens_track CALL8,
+  A3 A3 0 8 EXTUI,  A2 A2 0 8 EXTUI,  A10 A10 0 8 EXTUI,  A3 $A6C L BEQZ.N,
+  A8 $A3C L L32R,  A8 A8 0 L8UI,  A8 $A6C L BNEZ.N,
+  A11 A3 7 SEXT,  A10 A2 MOV.N,  FUNC btpwr_pll_track CALL8,
+  A10 A10 0 8 EXTUI,
+$A6C L:
+  A8 $A40 L L32R,  A3 A8 0 L8UI,  A3 A10 $A81 L BEQ,
+  A10 A8 0 S8I,  MEMW,  A8 $A44 L L32R,  A8 CALLX8,
+$A81 L:
+  RETW.N,
+$A83 L:  END-CODE
+
+CODE bt_track_pll_cap   \ .iram1 $AAC
+  $A84 10 LITERALS
+    SYMBOL phy_bt_pll_track_en  $3FF5D008 T,  SYMBOL phy_force_wifi_chan_en
+    SYMBOL phy_sw_set_chan_en  $3FF4E168 T,  SYMBOL phy_bt_power_track_en
+    SYMBOL phy_enter_critical  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL phy_exit_critical
+$AAC L:
+  A1 48 ENTRY,  A8 $A9C L L32R,  A8 CALLX8,
+  A8 $A84 L L32R,  A2 A10 MOV.N,  A8 A8 0 L8UI,  A8 $B0C L BEQZ,
+  A10 $A88 L L32R,  A8 $AA0 L L32R,  A8 CALLX8,
+  A10 29 $B0C L BBCI,
+  A8 $A8C L L32R,  A8 A8 0 L8UI,  A8 $B0C L BNEZ.N,
+  A3 $A90 L L32R,  A3 A3 0 L8UI,  A3 $B0C L BNEZ.N,
+  A10 $A94 L L32R,  A8 $AA4 L L32R,  A8 CALLX8,
+  A4 A10 24 7 EXTUI,  FUNC phy_dis_hw_set_freq CALL8,
+  A12 A3 MOV.N,  A11 A1 MOV.N,  A10 A4 A4 OR,  FUNC pll_correct_dcap CALL8,
+  A3 $A98 L L32R,  A10 A10 0 8 EXTUI,  A3 A3 0 L8UI,  A3 $B09 L BEQZ.N,
+  A11 A10 7 SEXT,  A10 A4 A4 OR,  FUNC bt_track_tx_power CALL8,
+$B09 L:
+  FUNC phy_en_hw_set_freq CALL8,
+$B0C L:
+  A10 A2 MOV.N,  A8 $AA8 L L32R,  A8 CALLX8,
+  RETW.N,
+$B16 L:  END-CODE
+
+CODE chan_to_freq   \ .iram1 $B28
+  $B18 4 LITERALS
+    $96C T,  $9B4 T,  SYMBOL rodata.str1.4  SYMBOL phy_printf
+$B28 L:
+  A1 32 ENTRY,  A11 A2 7 SEXT,  A11 $B40 L BEQZ.N,
+  A8 14 MOVI.N,  A8 A11 $B40 L BLT,
+  A2 $B1C L L32R,  A11 A8 $B5C L BEQ,
+  $B4F L J,
+  2 ZEROS,
+$B40 L:
+  A10 $B20 L L32R,  A8 $B24 L L32R,  A8 CALLX8,
+  A2 $B18 L L32R,  RETW.N,
+  1 ZEROS,
+$B4F L:
+  A2 $B18 L L32R,  A11 A11 -1 ADDI.N,  A11 A11 A11 ADDX4,  A11 A11 A2 ADD.N,
+  A2 A11 0 16 EXTUI,
+$B5C L:
+  RETW.N,
+$B5E L:  END-CODE
+
+CODE get_i2c_write_data   \ .iram1 $B60
+  $B60 ORIGIN
+  A1 32 ENTRY,  A9 A1 32 L32I.N,  A2 A2 0 8 EXTUI,  A9 A9 A2 ADD.N,  A7 A7 A2 ADD.N,
+  A8 A1 36 L32I.N,  A8 A8 A2 ADD.N,  A4 A9 0 S8I,  MEMW,  NOP.N,  NOP.N,  NOP.N,
+  NOP.N,  A10 A1 40 L32I.N,  A2 A10 A2 ADD.N,  A5 A8 0 S8I,  A3 A7 0 S8I,
+  A6 A2 0 S8I,  MEMW,  RETW.N,
+$B90 L:  END-CODE
+
+CODE i2c_write_master   \ .iram1 $BA0
+  $B90 4 LITERALS
+    $FFD3800 T,  $1000000 T,  $2000000 T,  SYMBOL esp_dport_access_reg_read
+$BA0 L:
+  A1 32 ENTRY,  A6 A6 0 8 EXTUI,  A6 $C10 L BEQZ,
+  A7 A6 -1 ADDI.N,  A7 A7 0 8 EXTUI,  A7 A7 1 ADDI.N,  A7 A3 A7 ADD.N,
+  A6 $B90 L L32R,  A11 A3 MOV.N,  A10 A7 A3 SUB,  A12 $B94 L L32R,  A10 $BED L LOOP,
+  A9 A2 0 L8UI,  A2 A2 1 ADDI.N,  A9 A9 A12 OR,  A8 A5 0 L8UI,  A5 A5 1 ADDI.N,
+  A8 A8 16 SLLI,  A13 A9 A8 OR,  A8 A11 0 L8UI,  A11 A11 1 ADDI.N,  A8 A8 A6 ADD.N,
+  A8 A8 2 SLLI,  A9 A4 0 L8UI,  A4 A4 1 ADDI.N,  A9 A9 8 SLLI,  A9 A13 A9 OR,  MEMW,
+  A9 A8 0 S32I.N,
+$BED L:
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A4 $B98 L L32R,
+$BF8 L:
+  A2 A3 0 L8UI,  A2 A2 A6 ADD.N,  A2 A2 2 SLLI,
+$C00 L:
+  A10 A2 MOV.N,  A8 $B9C L L32R,  A8 CALLX8,
+  A10 A4 $C00 L BANY,
+  A3 A3 1 ADDI.N,  A7 A3 $BF8 L BNE,
+$C10 L:
+  RETW.N,
+$C12 L:  END-CODE
+
+CODE ram_pbus_debugmode   \ .iram1 $C28
+  $C14 5 LITERALS
+    SYMBOL g_phyFuns  $3FF46094 T,  $14 SYMBOL+ rodata.str1.4
+    SYMBOL esp_dport_access_reg_read  SYMBOL phy_printf
+$C28 L:
+  A1 32 ENTRY,  A8 $C14 L L32R,  A10 1 MOVI.N,  A8 A8 0 L32I.N,  A8 A8 172 L32I,
+  A8 CALLX8,
+  A10 $C18 L L32R,  A8 $C20 L L32R,  A8 CALLX8,
+  A10 0 $C4D L BBSI,
+  A10 $C1C L L32R,  A8 $C24 L L32R,  A8 CALLX8,
+$C4D L:
+  RETW.N,
+$C4F L:  END-CODE
+
+CODE ram_pbus_force_test   \ .iram1 $C6C
+  $C50 7 LITERALS
+    $3FF46094 T,  $1FFFC T,  $FFFE0001 T,  $3FF460A0 T,
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read
+$C6C L:
+  A1 32 ENTRY,  A5 $C50 L L32R,  A2 A2 0 8 EXTUI,  A4 A4 0 16 EXTUI,  A10 A5 MOV.N,
+  A8 $C60 L L32R,  A8 CALLX8,
+  A3 A3 0 8 EXTUI,  A4 A4 6 SLLI,  A2 A2 2 SLLI,  A8 A3 15 SLLI,  A2 A4 A2 OR,
+  A2 A2 A8 OR,  A8 $C54 L L32R,  A2 A2 A8 AND,  A8 2 MOVI.N,  A8 A2 A8 OR,
+  A2 $C58 L L32R,  A10 A10 A2 AND,  A10 A8 A10 OR,  A2 $C5C L L32R,  MEMW,
+  A10 A5 0 S32I.N,
+$CAE L:
+  A10 A2 MOV.N,  A8 $C64 L L32R,  A8 CALLX8,
+  A10 $CAE L BLTZ,
+  A10 A5 MOV.N,  A8 $C68 L L32R,  A8 CALLX8,
+  A2 -3 MOVI.N,  A10 A10 A2 AND,  MEMW,  A10 A5 0 S32I.N,  RETW.N,
+$CCD L:  END-CODE
+
+CODE force_txrxoff   \ .iram1 $D08
+  $CD0 14 LITERALS
+    $3FF460A0 T,  $FFFFCFFF T,  $2000 T,  $FFFFF3FF T,  $800 T,
+    SYMBOL esp_dport_access_reg_read  SYMBOL ets_delay_us
+    SYMBOL esp_dport_access_reg_read  SYMBOL ets_delay_us
+    SYMBOL esp_dport_access_reg_read  SYMBOL ets_delay_us
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read
+$D08 L:
+  A1 32 ENTRY,  A2 A2 0 8 EXTUI,  A2 $D7D L BEQZ,
+  A2 $CD0 L L32R,  A10 A2 MOV.N,  A8 $CE4 L L32R,  A8 CALLX8,
+  A8 $CD4 L L32R,  A9 A10 A8 AND,  A10 1 MOVI.N,  A8 $CD8 L L32R,  A8 A9 A8 OR,
+  MEMW,  A8 A2 0 S32I.N,  A8 $CE8 L L32R,  A8 CALLX8,
+  A10 A2 MOV.N,  A8 $CEC L L32R,  A8 CALLX8,
+  A8 $CDC L L32R,  A9 A10 A8 AND,  A10 1 MOVI.N,  A8 $CE0 L L32R,  A8 A9 A8 OR,
+  MEMW,  A8 A2 0 S32I.N,  A8 $CF0 L L32R,  A8 CALLX8,
+  A10 A2 MOV.N,  A8 $CF4 L L32R,  A8 CALLX8,
+  A8 -769 MOVI,  A10 A10 A8 AND,  A8 $200 MOVI,  A10 A10 A8 OR,  MEMW,
+  A10 A2 0 S32I.N,  A10 1 MOVI,  A8 $CF8 L L32R,  A8 CALLX8,
+  RETW.N,
+  3 ZEROS,
+$D7D L:
+  A2 $CD0 L L32R,  A10 A2 A2 OR,  A8 $CFC L L32R,  A8 CALLX8,
+  A8 $CDC L L32R,  A8 A10 A8 AND,  A10 A2 MOV.N,  MEMW,  A8 A2 0 S32I,
+  A8 $D00 L L32R,  A8 CALLX8,
+  A8 -769 MOVI,  A8 A10 A8 AND,  A10 A2 MOV.N,  MEMW,  A8 A2 0 S32I.N,
+  A8 $D04 L L32R,  A8 CALLX8,
+  A8 $CD4 L L32R,  A10 A10 A8 AND,  MEMW,  A10 A2 0 S32I.N,  RETW.N,
+$DBD L:  END-CODE
+
+CODE bb_bss_cbw40_ana   \ .phyiram.21 $8
+  $0 2 LITERALS
+    SYMBOL g_phyFuns  SYMBOL chip7_sleep_params
+$8 L:
+  A1 48 ENTRY,  A14 2 MOVI.N,  A3 $4 L L32R,  A6 0 MOVI.N,  A6 A14 A2 MOVNEZ,
+  A6 A3 A6 ADD.N,  A13 A14 MOV.N,  A8 A6 84 L8UI,  A3 1 MOVI.N,  A13 A3 A2 MOVNEZ,
+  A13 A8 A13 SUB,  A9 3 MOVI.N,  A4 $0 L L32R,  A15 10 MOVI.N,  A12 A9 MOV.N,
+  A7 49 MOVI.N,  A9 A3 A2 MOVEQZ,  A8 A4 0 L32I.N,  A5 113 MOVI,  A11 A3 MOV.N,
+  A10 103 MOVI,  A13 A13 0 8 EXTUI,  A8 A8 160 L32I,  A5 A7 A2 MOVNEZ,  A7 5 MOVI.N,
+  A7 A15 A2 MOVEQZ,  A9 A1 4 S32I,  A14 A1 8 S32I,  A15 A1 0 S32I,  A8 CALLX8,
+  A12 4 MOVI.N,  A11 A3 MOV.N,  A10 103 MOVI,  A8 A4 0 L32I,  A13 A6 84 L8UI,
+  A6 A8 160 L32I,  A6 CALLX8,
+  A13 16 MOVI.N,  A11 A3 MOV.N,  A6 A4 0 L32I.N,  A10 103 MOVI,  A15 A1 0 L32I.N,
+  A12 A15 MOV.N,  A6 A6 160 L32I,  A6 CALLX8,
+  A9 A1 4 L32I.N,  A14 A1 8 L32I.N,  A2 $B5 L BNEZ.N,
+  A12 A3 MOV.N,  A11 A3 MOV.N,  A10 103 MOVI,  A2 $4 L L32R,  A6 A2 A9 ADD.N,
+  A2 -128 MOVI,  A13 A6 84 L8UI,  A13 A13 10 ADDI.N,  A13 A13 A2 OR,
+  A13 A13 0 8 EXTUI,  A7 A4 0 L32I.N,  A7 A7 160 L32I,  A7 CALLX8,
+  A11 A3 MOV.N,  A10 103 MOVI,  A14 A1 8 L32I.N,  A12 A14 MOV.N,  A13 A6 84 L8UI,
+  A13 A13 10 ADDI.N,  $EC L J,
+$B5 L:
+  A8 $4 L L32R,  A2 -128 MOVI,  A6 A8 A9 ADD.N,  A12 A3 MOV.N,  A11 A3 MOV.N,
+  A13 A6 84 L8UI,  A10 103 MOVI,  A13 A13 A7 SUB,  A13 A13 -4 ADDI,  A13 A13 A2 OR,
+  A7 A4 0 L32I.N,  A13 A13 0 8 EXTUI,  A7 A7 160 L32I,  A14 A1 8 S32I.N,  A7 CALLX8,
+  A11 A3 MOV.N,  A10 103 MOVI,  A14 A1 8 L32I.N,  A12 A14 MOV.N,  A13 A6 84 L8UI,
+  A13 A13 -4 ADDI,
+$EC L:
+  A13 A13 A2 OR,  A13 A13 0 8 EXTUI,  A2 A4 0 L32I.N,  A2 A2 160 L32I,  A2 CALLX8,
+  A13 A5 MOV.N,  A12 9 MOVI.N,  A2 A4 0 L32I.N,  A11 1 MOVI,  A10 103 MOVI,
+  A2 A2 160 L32I,  A2 CALLX8,
+  RETW.N,
+$10E L:  END-CODE
+
+CODE i2c_bt_filter_set   \ .phyiram.22 $8
+  $0 2 LITERALS
+    SYMBOL g_phyFuns  SYMBOL chip7_sleep_params
+$8 L:
+  A1 32 ENTRY,  A2 $0 L L32R,  A13 97 MOVI,  A12 11 MOVI.N,  A11 1 MOVI.N,
+  A10 103 MOVI,  A3 A2 0 L32I.N,  A3 A3 160 L32I,  A3 CALLX8,
+  A13 16 MOVI.N,  A12 12 MOVI.N,  A3 A2 0 L32I.N,  A11 1 MOVI.N,  A10 103 MOVI,
+  A3 A3 160 L32I,  A3 CALLX8,
+  A13 234 MOVI,  A12 15 MOVI.N,  A3 A2 0 L32I,  A11 1 MOVI,  A10 103 MOVI,
+  A3 A3 160 L32I,  A3 CALLX8,
+  A12 7 MOVI.N,  A11 1 MOVI.N,  A3 $4 L L32R,  A10 103 MOVI,  A8 A2 0 L32I.N,
+  A13 A3 88 L8UI,  A13 A13 -2 ADDI,  A13 A13 0 8 EXTUI,  A8 A8 160 L32I,  A8 CALLX8,
+  A12 8 MOVI.N,  A11 1 MOVI.N,  A8 A2 0 L32I.N,  A10 103 MOVI,  A13 A3 88 L8UI,
+  A8 A8 160 L32I,  A8 CALLX8,
+  A12 5 MOVI.N,  A11 1 MOVI.N,  A8 A2 0 L32I.N,  A10 103 MOVI,  A13 A3 89 L8UI,
+  A13 A13 -2 ADDI,  A13 A13 0 8 EXTUI,  A8 A8 160 L32I,  A8 CALLX8,
+  A12 6 MOVI.N,  A11 1 MOVI.N,  A2 A2 0 L32I.N,  A10 103 MOVI,  A2 A2 160 L32I,
+  A13 A3 89 L8UI,  A2 CALLX8,
+  RETW.N,
+$9E L:  END-CODE
+
+CODE phy_i2c_init   \ .phyiram.19 $3C
+  $0 15 LITERALS
+    SYMBOL g_phyFuns  SYMBOL dreg_1p2_set  SYMBOL chip7_phy_init_ctrl
+    SYMBOL phy_enter_critical  SYMBOL i2c_write_master  SYMBOL i2c_write_master
+    SYMBOL i2c_write_master  SYMBOL i2c_write_master  SYMBOL i2c_write_master
+    SYMBOL i2c_write_master  SYMBOL i2c_write_master  SYMBOL i2c_write_master
+    SYMBOL i2c_bt_filter_set  SYMBOL i2c_bbpll_init$part$0
+    SYMBOL phy_exit_critical
+$3C L:
+  A1 80 ENTRY,  A8 $C L L32R,  A8 CALLX8,
+  A2 $0 L L32R,  A12 10 MOVI.N,  A11 4 MOVI.N,  A5 107 MOVI,  A6 98 MOVI,
+  A3 A2 0 L32I.N,  A3 A3 152 L32I,  A10 A1 16 S32I,  A10 102 MOVI,  A3 CALLX8,
+  A4 A10 MOV.N,  A12 11 MOVI.N,  A3 A2 0 L32I.N,  A11 4 MOVI,  A10 102 MOVI,
+  A3 A3 152 L32I,  A3 CALLX8,
+  A7 A10 MOV.N,  A12 9 MOVI.N,  A2 A2 0 L32I.N,  A11 4 MOVI.N,  A10 102 MOVI,
+  A3 2 MOVI.N,  A2 A2 152 L32I,  A2 CALLX8,
+  A8 99 MOVI,  A2 1 MOVI.N,  A8 A1 12 S8I,  A8 -13 MOVI.N,  A15 3 MOVI.N,
+  A9 0 MOVI.N,  A12 A1 4 ADDI.N,  A8 A1 0 S8I,  A8 -88 MOVI,  A11 A1 8 ADDI.N,
+  A14 3 MOVI.N,  A13 A1 MOV.N,  A10 A1 20 S32I,  A10 A1 12 ADDI,  A8 A1 1 S8I,
+  A8 119 MOVI,  A9 A1 8 S8I,  A2 A1 4 S8I,  A5 A1 13 S8I,  A15 A1 5 S8I,
+  A6 A1 14 S8I,  A2 A1 10 S8I,  A15 A1 6 S8I,  A8 A1 2 S8I,  A3 A1 9 S8I,  MEMW,
+  A8 $10 L L32R,  A8 CALLX8,
+  A15 -49 MOVI,  A15 A4 A15 AND,  A13 16 MOVI.N,  A13 A15 A13 OR,  A15 8 MOVI.N,
+  A15 A1 4 S8I,  A15 0 MOVI.N,  A4 4 MOVI.N,  A9 7 MOVI.N,  A8 10 MOVI.N,
+  A13 A1 32 S32I.N,  A12 A1 4 ADDI.N,  A11 A1 8 ADDI.N,  A10 A1 12 ADDI.N,
+  A14 3 MOVI.N,  A15 A1 0 S8I,  A15 102 MOVI,  A13 A1 MOV.N,  A15 A1 14 S8I,  MEMW,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A15 A1 32 L32I.N,  A9 A1 1 S8I,  A9 A1 24 S32I.N,
+  A6 A1 12 S8I,  A2 A1 8 S8I,  A5 A1 13 S8I,  A8 A1 6 S8I,  A15 A1 2 S8I,
+  A8 A1 28 S32I,  A3 A1 9 S8I,  A4 A1 5 S8I,  A4 A1 10 S8I,  MEMW,  A8 $14 L L32R,
+  A8 CALLX8,
+  A15 -80 MOVI,  A13 -2 MOVI.N,  A7 A7 A13 AND,  A15 A1 0 S8I,  A15 5 MOVI.N,
+  A12 A1 4 ADDI.N,  A11 A1 8 ADDI.N,  A10 A1 12 ADDI.N,  A15 A1 5 S8I,  MEMW,
+  A15 8 MOVI.N,  A14 3 MOVI.N,  A13 A1 MOV.N,  NOP.N,  A8 A1 28 L32I.N,
+  A15 A1 1 S8I,  A15 102 MOVI,  A15 A1 14 S8I,  A15 11 MOVI.N,  A8 A1 4 S8I,
+  A6 A1 12 S8I,  A2 A1 8 S8I,  A5 A1 13 S8I,  A15 A1 6 S8I,  A7 A1 2 S8I,
+  A7 9 MOVI,  A3 A1 9 S8I,  A4 A1 10 S8I,  MEMW,  A8 $18 L L32R,  A8 CALLX8,
+  A15 6 MOVI.N,  A12 A1 4 ADDI.N,  A11 A1 8 ADDI.N,  A9 A1 24 L32I.N,
+  A10 A1 12 ADDI.N,  A14 2 MOVI.N,  A13 A1 A1 OR,  A15 A1 5 S8I,  A15 -72 MOVI,
+  A6 A1 12 S8I,  A2 A1 8 S8I,  A9 A1 0 S8I,  A5 A1 13 S8I,  A15 A1 1 S8I,
+  A7 A1 4 S8I,  A3 A1 9 S8I,  MEMW,  A8 $1C L L32R,  A8 CALLX8,
+  A15 0 MOVI.N,  A12 A1 4 ADDI.N,  A11 A1 8 ADDI.N,  A9 A1 24 L32I.N,
+  A10 A1 12 ADDI.N,  A14 2 MOVI.N,  A13 A1 MOV.N,  A15 A1 4 S8I,  A15 48 MOVI.N,
+  A9 A1 5 S8I,  A9 93 MOVI.N,  A15 A1 0 S8I,  A9 A1 1 S8I,  A6 A1 12 S8I,
+  A2 A1 8 S8I,  A5 A1 13 S8I,  A3 A1 9 S8I,  MEMW,  A8 $20 L L32R,  A8 CALLX8,
+  A12 A1 4 ADDI.N,  A11 A1 8 ADDI.N,  A10 A1 12 ADDI.N,  A8 A1 28 L32I.N,
+  A14 2 MOVI.N,  A13 A1 MOV.N,  A5 A1 13 S8I,  A5 116 MOVI,  A6 A1 12 S8I,
+  A6 -65 MOVI,  A5 A1 1 S8I,  A5 113 MOVI,  A2 A1 8 S8I,  A6 A1 0 S8I,  A6 104 MOVI,
+  A8 A1 5 S8I,  A4 A1 4 S8I,  A3 A1 9 S8I,  MEMW,  A8 $24 L L32R,  A8 CALLX8,
+  A15 0 MOVI.N,  A9 103 MOVI,  A8 106 MOVI,  A5 A1 0 S8I,  A5 3 MOVI.N,
+  A12 A1 4 ADDI.N,  A11 A1 8 ADDI.N,  A10 A1 12 ADDI.N,  A5 A1 9 S8I,  A5 99 MOVI,
+  A14 4 MOVI.N,  A13 A1 MOV.N,  A5 A1 1 S8I,  A5 8 MOVI.N,  A15 A1 5 S8I,
+  A15 102 MOVI,  A5 A1 7 S8I,  A5 33 MOVI.N,  A9 A1 12 S8I,  A2 A1 8 S8I,
+  A6 A1 13 S8I,  A8 A1 14 S8I,  A6 A1 2 S8I,  A15 A1 15 S8I,  A5 A1 3 S8I,
+  A5 -16 MOVI.N,  A8 A1 28 S32I.N,  A9 A1 24 S32I.N,  A7 A1 4 S8I,  A3 A1 10 S8I,
+  A3 A1 6 S8I,  A4 A1 11 S8I,  MEMW,  A8 $28 L L32R,  A8 CALLX8,
+  A14 4 MOVI.N,  A13 A1 MOV.N,  A12 A1 A14 ADD.N,  A9 A1 24 L32I.N,
+  A11 A1 8 ADDI.N,  A15 A1 20 L32I.N,  A5 A15 A5 AND,  A5 A5 A4 OR,  A10 $4 L L32R,
+  A8 A1 28 L32I.N,  A9 A1 12 S8I,  MEMW,  A9 11 MOVI.N,  NOP.N,  NOP.N,  NOP.N,
+  A15 A10 0 L8UI,  A10 A1 12 ADDI.N,  A9 A1 4 S8I,  A9 97 MOVI,  A2 A1 8 S8I,
+  A9 A1 0 S8I,  A9 102 MOVI,  A6 A1 13 S8I,  A6 3 MOVI,  A2 A1 5 S8I,  A2 -128 MOVI,
+  A8 A1 14 S8I,  A8 0 MOVI.N,  A2 A1 1 S8I,  A8 A1 6 S8I,  A15 A1 2 S8I,
+  A9 A1 15 S8I,  A6 A1 9 S8I,  A3 A1 10 S8I,  A4 A1 11 S8I,  A7 A1 7 S8I,
+  A5 A1 3 S8I,  MEMW,  A8 $2C L L32R,  A8 CALLX8,
+  A8 $30 L L32R,  A8 CALLX8,
+  A2 $8 L L32R,  A2 A2 1 L8UI,  A2 1 $305 L BNEI,
+  A8 $34 L L32R,  A8 CALLX8,
+$305 L:
+  A10 A1 16 L32I.N,  A8 $38 L L32R,  A8 CALLX8,
+  RETW.N,
+$30F L:  END-CODE
+
+CODE ram_pbus_force_mode   \ .text.ram_pbus_force_mode $4C
+  $0 19 LITERALS
+    $3FF4609C T,  $F7FFFFFF T,  $3FF46094 T,  $3FF00024 T,  $3FF5C02C T,
+    $FFFFFF T,  $32000000 T,  $800000 T,  $FF7FFFFF T,
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL ets_delay_us
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL ets_delay_us  SYMBOL esp_dport_access_reg_read
+$4C L:
+  A1 32 ENTRY,  A2 A2 0 8 EXTUI,  A2 $85 L BEQZ,
+  A4 $0 L L32R,  A10 A4 MOV.N,  A8 $24 L L32R,  A8 CALLX8,
+  A2 $4 L L32R,  A2 A10 A2 AND,  A3 $8 L L32R,  A10 A3 MOV.N,  MEMW,
+  A2 A4 0 S32I.N,  A8 $28 L L32R,  A8 CALLX8,
+  A2 1 MOVI.N,  A10 A10 A2 OR,  MEMW,  A10 A3 0 S32I.N,  RETW.N,
+  3 ZEROS,
+$85 L:
+  A3 $8 L L32R,  A10 A3 A3 OR,  A8 $2C L L32R,  A8 CALLX8,
+  A8 -2 MOVI.N,  A2 $0 L L32R,  A8 A10 A8 AND,  A10 A2 MOV.N,  MEMW,
+  A8 A3 0 S32I.N,  A8 $30 L L32R,  A8 CALLX8,
+  A3 2 MOVI.N,  A8 $4 L L32R,  A8 A10 A8 AND,  A10 $C L L32R,  MEMW,  A8 A2 0 S32I,
+  A8 $34 L L32R,  A8 CALLX8,
+  A10 A3 $114 L BNONE,
+  A10 1 MOVI,  A8 $38 L L32R,  A8 CALLX8,
+  A2 $10 L L32R,  A10 A2 MOV.N,  A8 $3C L L32R,  A8 CALLX8,
+  A4 $14 L L32R,  A8 A10 A4 AND,  A10 A2 MOV.N,  A4 $18 L L32R,  A4 A8 A4 OR,  MEMW,
+  A4 A2 0 S32I.N,  A8 $40 L L32R,  A8 CALLX8,
+  A4 $1C L L32R,  A4 A10 A4 OR,  A10 A3 MOV.N,  MEMW,  A4 A2 0 S32I,  A8 $44 L L32R,
+  A8 CALLX8,
+  A10 A2 MOV.N,  A8 $48 L L32R,  A8 CALLX8,
+  A3 $20 L L32R,  A10 A10 A3 AND,  MEMW,  A10 A2 0 S32I.N,
+$114 L:
+  RETW.N,
+$116 L:  END-CODE
+
+CODE ram_pbus_xpd_tx_on   \ .text.ram_pbus_xpd_tx_on $8
+  $0 2 LITERALS
+    SYMBOL rodata  SYMBOL g_phyFuns
+$8 L:
+  A1 48 ENTRY,  A4 $4 L L32R,  A12 1 MOVI.N,  A11 A12 MOV.N,  A10 0 MOVI.N,
+  A3 A3 0 16 EXTUI,  A8 $0 L L32R,  A2 A2 0 16 EXTUI,  A5 A4 0 L32I,
+  A15 A8 0 L16UI,  A14 A8 2 L16UI,  A13 A8 4 L16UI,  A9 A8 6 L16UI,  A8 A5 184 L32I,
+  A15 A1 0 S16I,  A14 A1 2 S16I,  A13 A1 4 S16I,  A9 A1 6 S16I,  MEMW,  A8 CALLX8,
+  A11 1 MOVI.N,  A10 A11 MOV.N,  A12 124 MOVI,  A8 A4 0 L32I.N,  A8 A8 184 L32I,
+  A8 CALLX8,
+  A10 A1 MOV.N,  A8 A4 0 L32I.N,  A8 A8 220 L32I,  A8 CALLX8,
+  A12 A3 MOV.N,  A11 2 MOVI.N,  A8 A4 0 L32I.N,  A10 1 MOVI.N,  A8 A8 184 L32I,
+  A8 CALLX8,
+  A2 8 $89 L BBCI,
+  A11 1 MOVI.N,  A3 A4 0 L32I.N,  A10 A11 MOV.N,  A8 A3 188 L32I,  A3 A3 184 L32I,
+  A8 CALLX8,
+  A12 2 MOVI.N,  A12 A10 A12 OR,  A11 1 MOVI.N,  A12 A12 0 16 EXTUI,  A10 A11 MOV.N,
+  A3 CALLX8,
+$89 L:
+  A8 A4 0 L32I.N,  A12 127 MOVI,  A11 1 MOVI.N,  A10 4 MOVI.N,  A8 A8 184 L32I,
+  A8 CALLX8,
+  A12 A2 MOV.N,  A11 1 MOVI.N,  A2 A4 0 L32I.N,  A10 5 MOVI.N,  A2 A2 184 L32I,
+  A2 CALLX8,
+  RETW.N,
+$A8 L:  END-CODE
+
+CODE i2c_xtal_init   \ .text.i2c_xtal_init $4
+  $0 1 LITERALS
+    SYMBOL g_phyFuns
+$4 L:
+  A1 32 ENTRY,  A2 $0 L L32R,  A13 99 MOVI,  A12 0 MOVI.N,  A11 3 MOVI.N,
+  A10 104 MOVI,  A8 A2 0 L32I.N,  A8 A8 160 L32I,  A8 CALLX8,
+  A13 128 MOVI,  A12 1 MOVI.N,  A2 A2 0 L32I.N,  A11 3 MOVI.N,  A10 104 MOVI,
+  A2 A2 160 L32I,  A2 CALLX8,
+  RETW.N,
+$30 L:  END-CODE
+
+CODE i2c_rfpll_init   \ .text.i2c_rfpll_init $4
+  $0 1 LITERALS
+    SYMBOL g_phyFuns
+$4 L:
+  A1 32 ENTRY,  A2 $0 L L32R,  A13 243 MOVI,  A12 1 MOVI.N,  A11 0 MOVI.N,
+  A10 99 MOVI,  A8 A2 0 L32I.N,  A8 A8 160 L32I,  A8 CALLX8,
+  A15 3 MOVI.N,  A14 1 MOVI.N,  A8 A2 0 L32I.N,  A12 A15 MOV.N,  A11 A14 MOV.N,
+  A13 2 MOVI.N,  A10 98 MOVI,  A8 A8 168 L32I,  A8 CALLX8,
+  A13 0 MOVI.N,  A12 8 MOVI,  A8 A2 0 L32I,  A11 1 MOVI.N,  A10 98 MOVI,
+  A8 A8 160 L32I,  A8 CALLX8,
+  A13 176 MOVI,  A12 10 MOVI.N,  A8 A2 0 L32I.N,  A11 1 MOVI.N,  A10 98 MOVI,
+  A8 A8 160 L32I,  A8 CALLX8,
+  A13 7 MOVI.N,  A12 9 MOVI,  A8 A2 0 L32I,  A11 1 MOVI.N,  A10 98 MOVI,
+  A8 A8 160 L32I,  A8 CALLX8,
+  A13 63 MOVI.N,  A12 0 MOVI.N,  A8 A2 0 L32I,  A11 1 MOVI,  A10 98 MOVI,
+  A8 A8 160 L32I,  A8 CALLX8,
+  A13 191 MOVI,  A12 4 MOVI.N,  A2 A2 0 L32I.N,  A11 1 MOVI.N,  A10 98 MOVI,
+  A2 A2 160 L32I,  A2 CALLX8,
+  RETW.N,
+$90 L:  END-CODE
+
+CODE ram_rfpll_reset   \ .text.ram_rfpll_reset $0
+  $0 ORIGIN
+  A1 32 ENTRY,  RETW.N,
+$5 L:  END-CODE
+
+CODE ram_restart_cal   \ .text.ram_restart_cal $4
+  $0 1 LITERALS
+    SYMBOL g_phyFuns
+$4 L:
+  A1 32 ENTRY,  A2 $0 L L32R,  A15 1 MOVI.N,  A14 6 MOVI.N,  A13 A14 MOV.N,
+  A11 A15 MOV.N,  A8 A2 0 L32I.N,  A12 0 MOVI,  A10 98 MOVI,  A8 A8 168 L32I,
+  A8 CALLX8,
+  A15 0 MOVI.N,  A14 5 MOVI.N,  A8 A2 0 L32I.N,  A13 A14 MOV.N,  A12 A15 MOV.N,
+  A11 1 MOVI.N,  A10 98 MOVI,  A8 A8 168 L32I,  A8 CALLX8,
+  A15 1 MOVI.N,  A14 5 MOVI.N,  A8 A2 0 L32I.N,  A13 A14 MOV.N,  A11 A15 MOV.N,
+  A12 0 MOVI.N,  A10 98 MOVI,  A8 A8 168 L32I,  A8 CALLX8,
+  A15 0 MOVI.N,  A14 6 MOVI.N,  A2 A2 0 L32I.N,  A13 A14 MOV.N,  A12 A15 MOV.N,
+  A11 1 MOVI,  A10 98 MOVI,  A2 A2 168 L32I,  A2 CALLX8,
+  RETW.N,
+$62 L:  END-CODE
+
+CODE ram_wait_rfpll_cal_end   \ .text.ram_wait_rfpll_cal_end $10
+  $0 4 LITERALS
+    SYMBOL g_phyFuns  $28 SYMBOL+ rodata.str1.4  SYMBOL ets_delay_us
+    SYMBOL phy_printf
+$10 L:
+  A1 32 ENTRY,  A3 $0 L L32R,  A2 100 MOVI,
+$19 L:
+  A10 20 MOVI.N,  A8 $8 L L32R,  A8 CALLX8,
+  A14 7 MOVI.N,  A8 A3 0 L32I.N,  A13 A14 MOV.N,  A12 A14 MOV.N,  A11 1 MOVI.N,
+  A10 98 MOVI,  A8 A8 164 L32I,  A8 CALLX8,
+  A8 A2 -1 ADDI.N,  A10 $4E L BNEZ.N,
+  A2 1 $48 L BNEI,
+  A10 $4 L L32R,  A8 $C L L32R,  A8 CALLX8,
+  RETW.N,
+  2 ZEROS,
+$48 L:
+  A2 A8 0 8 EXTUI,  $19 L J,
+$4E L:
+  RETW.N,
+$50 L:  END-CODE
+
+CODE ram_rfpll_set_freq   \ .text.ram_rfpll_set_freq $2C
+  $0 11 LITERALS
+    $47200000 T,  $0 T,  $40080000 T,  SYMBOL CSWTCH$169  $44800000 T,
+    $42000000 T,  $43800000 T,  SYMBOL __floatunsidf  SYMBOL __divdf3
+    SYMBOL __truncdfsf2  SYMBOL __divsf3
+$2C L:
+  A1 32 ENTRY,  A2 A2 10 SLLI,  A4 A4 15 SEXT,  A10 A2 A4 ADD.N,  A10 A10 2 SLLI,
+  A8 $1C L L32R,  A8 CALLX8,
+  A12 $4 L L32R,  A3 A3 0 8 EXTUI,  A3 A3 -1 ADDI.N,  A3 A3 0 8 EXTUI,
+  A13 $8 L L32R,  A8 $20 L L32R,  A8 CALLX8,
+  A8 $24 L L32R,  A8 CALLX8,
+  F1 A10 WFR,  A2 $0 L L32R,  F0 A2 WFR,  A3 4 $78 L BGEUI,
+  A2 $C L L32R,  A3 A3 A2 ADDX4,  A2 $10 L L32R,  F2 A2 WFR,  F0 A3 0 LSI,
+  F0 F0 F2 MUL.S,
+$78 L:
+  A11 F0 RFR,  A10 F1 RFR,  A8 $28 L L32R,  A8 CALLX8,
+  A2 $14 L L32R,  F0 A10 WFR,  F2 A2 WFR,  F1 F0 F2 SUB.S,  A2 $18 L L32R,
+  A3 F1 0 UTRUNC.S,  F2 A2 WFR,  A3 A3 0 8 EXTUI,  F0 A3 0 FLOAT.S,  A3 A5 0 S8I,
+  F1 F1 F0 SUB.S,  F0 F1 F2 MUL.S,  A3 F0 0 UTRUNC.S,  A3 A3 0 8 EXTUI,
+  F1 A3 0 FLOAT.S,  A3 A5 1 S8I,  F0 F0 F1 SUB.S,  F0 F0 F2 MUL.S,
+  A3 F0 0 UTRUNC.S,  A3 A5 2 S8I,  MEMW,  RETW.N,
+$C5 L:  END-CODE
+
+CODE get_lna_vga_dcap_val   \ .text.get_lna_vga_dcap_val $C
+  $0 3 LITERALS
+    SYMBOL g_phyFuns  $24168E19 T,  $27932B49 T,
+$C L:
+  A1 32 ENTRY,  A2 A2 0 16 EXTUI,  A4 A2 A2 ADDX2,  A9 $4 L L32R,  A4 A4 3 SLLI,
+  A8 -340 MOVI,  A8 A4 A8 ADD.N,  A10 A8 31 SRAI,  A5 $0 L L32R,  A8 A8 A9 MULSH,
+  A12 0 MOVI.N,  A8 A8 5 SRAI,  A10 A8 A10 SUB,  A9 A5 0 L32I.N,  A11 15 MOVI.N,
+  A4 A4 A2 SUB,  A4 A4 29 ADDI,  A8 A9 44 L32I.N,  A8 CALLX8,
+  A9 A4 31 SRAI,  A12 0 MOVI.N,  A8 $8 L L32R,  A11 15 MOVI.N,  A4 A4 A8 MULSH,
+  A4 A4 5 SRAI,  A2 A5 0 L32I.N,  A2 A2 44 L32I.N,  A10 A3 0 S16I,  MEMW,
+  A10 A4 A9 SUB,  A2 CALLX8,
+  A10 A3 2 S16I,  MEMW,  RETW.N,
+$68 L:  END-CODE
+
+CODE chip_v7_rxmax_ext_ana   \ .text.chip_v7_rxmax_ext_ana $C
+  $0 3 LITERALS
+    $FFF8 T,  SYMBOL g_phyFuns  SYMBOL get_lna_vga_dcap_val
+$C L:
+  A1 48 ENTRY,  A4 $4 L L32R,  A13 7 MOVI.N,  A14 0 MOVI.N,  A12 5 MOVI.N,
+  A11 1 MOVI.N,  A3 A4 0 L32I,  A10 98 MOVI,  A2 A2 0 8 EXTUI,  A3 A3 164 L32I,
+  A3 CALLX8,
+  A11 A1 MOV.N,  A8 $8 L L32R,  A8 CALLX8,
+  A8 A1 0 L16UI,  A13 A8 15 SEXT,  A3 A1 2 L16UI,  A5 A3 15 SEXT,  A2 3 $66 L BLTUI,
+  A2 8 MOVI.N,  A13 A2 $48 L BLT,
+  A2 $0 L L32R,
+$48 L:
+  A8 A2 A8 ADD.N,  A13 64 MOVI.N,  A13 A8 A13 OR,  A13 A13 0 8 EXTUI,
+  A2 A4 0 L32I.N,  A12 4 MOVI.N,  A11 0 MOVI.N,  A10 100 MOVI,  A2 A2 160 L32I,
+  A2 CALLX8,
+  $80 L J,
+  2 ZEROS,
+$66 L:
+  A9 A4 0 L32I.N,  A8 64 MOVI.N,  A13 A13 A8 OR,  A13 A13 0 8 EXTUI,  A12 4 MOVI.N,
+  A8 A9 160 L32I,  A11 0 MOVI.N,  A10 100 MOVI,  A8 CALLX8,
+  A2 2 $8D L BNEI,
+$80 L:
+  A13 8 MOVI.N,  A5 A13 $88 L BLT,
+  A13 $0 L L32R,
+$88 L:
+  A3 A13 A3 ADD.N,  A5 A3 15 SEXT,
+$8D L:
+  A13 64 MOVI.N,  A13 A5 A13 OR,  A2 A4 0 L32I.N,  A13 A13 0 8 EXTUI,  A12 7 MOVI.N,
+  A11 0 MOVI.N,  A10 100 MOVI,  A2 A2 160 L32I,  A2 CALLX8,
+  RETW.N,
+$A6 L:  END-CODE
+
+CODE phy_freq_correct_opt   \ .text.phy_freq_correct_opt $1C
+  $0 7 LITERALS
+    SYMBOL g_phyFuns  SYMBOL phy_freq_offset  $3FF5C400 T,  $FFF8FFFF T,
+    $3FF4E054 T,  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read
+$1C L:
+  A1 32 ENTRY,  A2 $0 L L32R,  A10 1 MOVI,  A3 $4 L L32R,  A2 A2 0 L32I,
+  A11 A3 0 L16SI,  A2 A2 248 L32I,  A2 CALLX8,
+  A3 $8 L L32R,  A10 A3 A3 OR,  A8 $14 L L32R,  A8 CALLX8,
+  A8 $C L L32R,  A8 A10 A8 AND,  A2 $10 L L32R,  A10 A2 A2 OR,  MEMW,  A8 A3 0 S32I,
+  A8 $18 L L32R,  A8 CALLX8,
+  A8 -256 MOVI,  A10 A10 A8 AND,  A8 200 MOVI,  A10 A10 A8 OR,  MEMW,
+  A10 A2 0 S32I.N,  RETW.N,
+$6B L:  END-CODE
+
+CODE chip_v7_adc_wr_dly   \ .text.chip_v7_adc_wr_dly $4
+  $0 1 LITERALS
+    SYMBOL g_phyFuns
+$4 L:
+  A1 48 ENTRY,  A8 $0 L L32R,  A3 A3 0 8 EXTUI,  A13 A3 2 SLLI,  A2 A2 0 8 EXTUI,
+  A4 A4 0 8 EXTUI,  A9 A8 0 L32I.N,  A13 A13 A2 OR,  A4 A4 4 SLLI,  A5 A5 0 8 EXTUI,
+  A13 A13 A4 OR,  A5 A5 6 SLLI,  A2 A9 160 L32I,  A13 A13 A5 OR,  A13 A13 0 8 EXTUI,
+  A12 8 MOVI.N,  A11 4 MOVI.N,  A8 A1 0 S32I.N,  A10 102 MOVI,  A2 CALLX8,
+  A7 A7 0 8 EXTUI,  A6 A6 0 8 EXTUI,  A8 A1 0 L32I.N,  A7 A7 2 SLLI,  A15 A7 A6 OR,
+  A15 A15 0 8 EXTUI,  A14 0 MOVI.N,  A2 A8 0 L32I.N,  A13 3 MOVI.N,  A12 9 MOVI.N,
+  A11 4 MOVI.N,  A10 102 MOVI,  A2 A2 168 L32I,  A2 CALLX8,
+  RETW.N,
+$62 L:  END-CODE
+
+CODE i2c_bbtop_init   \ .text.i2c_bbtop_init $4
+  $0 1 LITERALS
+    SYMBOL g_phyFuns
+$4 L:
+  A1 32 ENTRY,  A2 $0 L L32R,  A13 33 MOVI.N,  A12 8 MOVI.N,  A11 4 MOVI,
+  A10 102 MOVI,  A8 A2 0 L32I.N,  A8 A8 160 L32I,  A8 CALLX8,
+  A13 132 MOVI,  A12 9 MOVI.N,  A8 A2 0 L32I,  A11 4 MOVI,  A10 102 MOVI,
+  A8 A8 160 L32I,  A8 CALLX8,
+  A13 113 MOVI,  A12 9 MOVI.N,  A8 A2 0 L32I,  A11 1 MOVI,  A10 103 MOVI,
+  A8 A8 160 L32I,  A8 CALLX8,
+  A13 97 MOVI,  A12 11 MOVI.N,  A2 A2 0 L32I.N,  A11 1 MOVI.N,  A10 103 MOVI,
+  A2 A2 160 L32I,  A2 CALLX8,
+  RETW.N,
+$58 L:  END-CODE
+
+CODE i2c_rftx_init   \ .text.i2c_rftx_init $4
+  $0 1 LITERALS
+    SYMBOL g_phyFuns
+$4 L:
+  A1 32 ENTRY,  A2 $0 L L32R,  A13 136 MOVI,  A12 3 MOVI.N,  A11 2 MOVI.N,
+  A10 107 MOVI,  A8 A2 0 L32I.N,  A8 A8 160 L32I,  A8 CALLX8,
+  A13 6 MOVI.N,  A12 4 MOVI.N,  A8 A2 0 L32I.N,  A11 2 MOVI.N,  A10 107 MOVI,
+  A8 A8 160 L32I,  A8 CALLX8,
+  A13 8 MOVI.N,  A12 5 MOVI.N,  A8 A2 0 L32I,  A11 2 MOVI,  A10 107 MOVI,
+  A8 A8 160 L32I,  A8 CALLX8,
+  A13 248 MOVI,  A12 6 MOVI.N,  A8 A2 0 L32I.N,  A11 2 MOVI.N,  A10 107 MOVI,
+  A8 A8 160 L32I,  A8 CALLX8,
+  A13 93 MOVI.N,  A12 7 MOVI.N,  A8 A2 0 L32I,  A11 2 MOVI.N,  A10 107 MOVI,
+  A8 A8 160 L32I,  A8 CALLX8,
+  A13 116 MOVI,  A12 10 MOVI.N,  A2 A2 0 L32I.N,  A11 2 MOVI.N,  A10 107 MOVI,
+  A2 A2 160 L32I,  A2 CALLX8,
+  RETW.N,
+$78 L:  END-CODE
+
+CODE i2c_bias_init   \ .text.i2c_bias_init $8
+  $0 2 LITERALS
+    SYMBOL g_phyFuns  SYMBOL dreg_1p2_set
+$8 L:
+  A1 32 ENTRY,  A2 $0 L L32R,  A12 2 MOVI.N,  A11 A12 MOV.N,  A13 104 MOVI,
+  A10 106 MOVI,  A8 A2 0 L32I.N,  A8 A8 160 L32I,  A8 CALLX8,
+  A12 0 MOVI.N,  A11 2 MOVI.N,  A8 $4 L L32R,  A10 106 MOVI,  A2 A2 0 L32I.N,
+  A13 A8 0 L8UI,  A2 A2 160 L32I,  A2 CALLX8,
+  RETW.N,
+$37 L:  END-CODE
+
+CODE rfpll_1p2_opt   \ .text.rfpll_1p2_opt $C
+  $0 3 LITERALS
+    $8 SYMBOL+ rodata  SYMBOL g_phyFuns  SYMBOL dreg_1p2_set
+$C L:
+  A1 48 ENTRY,  A5 $0 L L32R,  A2 0 MOVI.N,  A3 A1 MOV.N,  A4 A2 MOV.N,
+  A11 A5 0 L8UI,  A10 A5 1 L8UI,  A9 A5 2 L8UI,  A8 A5 3 L8UI,  A5 $4 L L32R,
+  A11 A1 0 S8I,  A10 A1 1 S8I,  A9 A1 2 S8I,  A8 A1 3 S8I,  MEMW,
+$36 L:
+  A12 A2 MOV.N,  A11 1 MOVI,  A10 98 MOVI,  A2 A2 A11 ADD,  A8 A5 0 L32I,
+  A8 A8 152 L32I,  A8 CALLX8,
+  A9 A4 1 ADDI.N,  A8 A3 0 L8UI,  A3 A3 1 ADDI,  A8 A10 $58 L BEQ,
+  A4 A9 0 8 EXTUI,
+$58 L:
+  A2 4 $36 L BNEI,
+  A4 $79 L BEQZ.N,
+  A2 A5 0 L32I.N,  A4 42 MOVI.N,  A13 42 MOVI.N,  A12 0 MOVI.N,  A11 2 MOVI.N,
+  A3 $8 L L32R,  A10 106 MOVI,  A2 A2 160 L32I,  A4 A3 0 S8I,  MEMW,  A2 CALLX8,
+$79 L:
+  RETW.N,
+$7B L:  END-CODE
+
+CODE get_rf_freq_cap   \ .text.get_rf_freq_cap $C
+  $0 3 LITERALS
+    SYMBOL g_phyFuns  SYMBOL chip7_phy_init_ctrl  SYMBOL chip_v7_rxmax_ext_ana
+$C L:
+  A1 32 ENTRY,  A6 $0 L L32R,  A2 A2 0 16 EXTUI,  A3 A3 15 SEXT,  A8 A6 0 L32I.N,
+  A8 A8 224 L32I,  A8 CALLX8,
+  A13 A4 MOV.N,  A12 A3 MOV.N,  A9 $4 L L32R,  A10 A2 MOV.N,  A8 A6 0 L32I.N,
+  A11 A9 1 L8UI,  A8 A8 240 L32I,  A8 CALLX8,
+  A10 A4 MOV.N,  A4 A6 0 L32I.N,  A4 A4 232 L32I,  A4 CALLX8,
+  A4 A6 0 L32I.N,  A4 A4 228 L32I,  A4 CALLX8,
+  A4 A6 0 L32I.N,  A4 A4 236 L32I,  A4 CALLX8,
+  A10 0 MOVI.N,  A8 $8 L L32R,  A8 CALLX8,
+  A4 A6 0 L32I.N,  A14 0 MOVI.N,  A13 7 MOVI.N,  A12 5 MOVI.N,  A11 1 MOVI.N,
+  A4 A4 164 L32I,  A10 98 MOVI,  A4 CALLX8,
+  A12 2 MOVI.N,  A11 1 MOVI.N,  A10 A5 0 S8I,  MEMW,  A10 98 MOVI,  NOP.N,  NOP.N,
+  NOP.N,  A4 A6 0 L32I.N,  A4 A4 152 L32I,  A4 CALLX8,
+  A4 A10 MOV.N,  A14 0 MOVI.N,  A6 A6 0 L32I.N,  A13 3 MOVI.N,  A12 6 MOVI.N,
+  A11 1 MOVI.N,  A10 98 MOVI,  A6 A6 164 L32I,  A6 CALLX8,
+  A6 -16 MOVI.N,  A8 A4 A6 AND,  A6 -128 MOVI,  A10 A10 A6 OR,  A10 A8 A10 OR,
+  A10 A5 1 S8I,  MEMW,  RETW.N,
+$AF L:  END-CODE
+
+CODE correct_rfpll_offset   \ .text.correct_rfpll_offset $2C
+  $0 11 LITERALS
+    SYMBOL rfpll_offset_delta  SYMBOL phy_freq_wifi_only  $3FF4E0C4 T,
+    $3FF4E0C0 T,  $FFFFFF T,  $FF000000 T,  $3FF4E148 T,
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+$2C L:
+  A1 48 ENTRY,  A3 A3 0 8 EXTUI,  A2 A2 15 SEXT,  A3 $45 L BNEZ.N,
+  A2 A2 A2 ADDX8,  A2 A2 2 SRAI,  A2 A2 15 SEXT,  A2 A1 8 S32I.N,  $53 L J,
+$45 L:
+  A2 A2 A2 ADDX2,  A2 A2 A2 ADDX8,  A2 A2 3 SRAI,  A2 A2 15 SEXT,  A2 A1 8 S32I.N,
+$53 L:
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A2 $0 L L32R,  A4 A1 8 L32I.N,  A3 A2 0 L16SI,
+  A4 A3 $69 L BNE,
+  $131 L J,
+$69 L:
+  A3 A4 A3 SUB,  A2 85 MOVI.N,  A8 $4 L L32R,  A4 14 MOVI.N,  A5 0 MOVI.N,
+  A7 -256 MOVI,  A6 $200 MOVI,  A12 A8 0 L8UI,  A2 A4 A12 MOVNEZ,  A2 A1 0 S32I.N,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A2 $8 L L32R,  A3 A1 4 S32I.N,  A3 1 MOVI.N,
+$92 L:
+  A10 A2 MOV.N,  A4 A3 MOV.N,  A12 $AD L BEQZ.N,
+  A8 12 MOVI,  A4 253 MOVI,  A8 A5 $AD L BLTU,
+  A9 A5 4 SLLI,  A9 A9 A5 SUB,  A9 A9 37 ADDI,  A4 A9 0 8 EXTUI,
+$AD L:
+  A8 $1C L L32R,  A8 CALLX8,
+  A10 A10 A7 AND,  A9 A10 A4 OR,  A10 $C L L32R,  A5 A5 1 ADDI.N,  A5 A5 0 8 EXTUI,
+  MEMW,  A9 A2 0 S32I,  A8 $20 L L32R,  A8 CALLX8,
+  A4 $10 L L32R,  A9 A10 A4 AND,  A8 $14 L L32R,  A10 A10 A8 AND,  A4 A1 4 L32I.N,
+  A9 A9 A4 ADD.N,  A10 A9 A10 OR,  A8 $18 L L32R,  MEMW,  A10 A8 0 S32I.N,
+  A10 A2 MOV.N,  A8 $24 L L32R,  A8 CALLX8,
+  A9 A10 A6 OR,  A10 A2 MOV.N,  MEMW,  A9 A2 0 S32I.N,  A8 $28 L L32R,  A8 CALLX8,
+  A9 -513 MOVI,  A10 A10 A9 AND,  A8 A3 3 ADDI.N,  A4 A1 0 L32I.N,  A3 A8 0 8 EXTUI,
+  MEMW,  A10 A2 0 S32I.N,  A4 A5 $126 L BEQ,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A8 $4 L L32R,  A12 A8 0 L8UI,  $92 L J,
+$126 L:
+  A3 A1 8 L32I.N,  A2 $0 L L32R,  A3 A2 0 S16I,  MEMW,
+$131 L:
+  RETW.N,
+$133 L:  END-CODE
+
+CODE wr_rf_freq_mem   \ .text.wr_rf_freq_mem $14
+  $0 5 LITERALS
+    $3FF4E0C4 T,  $3FF4E148 T,  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+$14 L:
+  A1 48 ENTRY,  A2 A2 0 8 EXTUI,  A2 A2 A2 ADDX2,  A5 A3 12 ADDI.N,  A4 $0 L L32R,
+  A2 A2 0 8 EXTUI,  A7 -256 MOVI,  A6 $200 MOVI,  A5 A1 0 S32I.N,
+$2D L:
+  A10 A4 MOV.N,  NOP.N,  NOP.N,  NOP.N,  A5 A3 0 L32I.N,  A8 $8 L L32R,  A8 CALLX8,
+  A10 A10 A7 AND,  A9 A10 A2 OR,  A10 A4 MOV.N,  A8 $4 L L32R,  A2 A2 1 ADDI.N,
+  A3 A3 4 ADDI.N,  A2 A2 0 8 EXTUI,  MEMW,  A9 A4 0 S32I,  MEMW,  A5 A8 0 S32I,
+  A8 $C L L32R,  A8 CALLX8,
+  A9 A10 A6 OR,  A10 A4 MOV.N,  A5 -513 MOVI,  MEMW,  A9 A4 0 S32I.N,
+  A8 $10 L L32R,  A8 CALLX8,
+  A10 A10 A5 AND,  A8 A1 0 L32I.N,  MEMW,  A10 A4 0 S32I.N,  A8 A3 $2D L BNE,
+  RETW.N,
+$83 L:  END-CODE
+
+CODE write_freq_mem_all   \ .text.write_freq_mem_all $10
+  $0 4 LITERALS
+    SYMBOL chip7_sleep_params  SYMBOL phy_freq_wifi_only  SYMBOL phy_byte_to_word
+    SYMBOL wr_rf_freq_mem
+$10 L:
+  A1 64 ENTRY,  A4 $0 L L32R,  A3 A4 0 L32I.N,  A4 24 MOVI.N,  A3 A4 A3 AND,
+  A3 16 $23 L BEQI,
+  $A8 L J,
+$23 L:
+  A7 14 MOVI.N,  A6 $4 L L32R,  A5 12 MOVI.N,  A4 0 MOVI.N,  A3 A6 0 L8UI,
+  A6 85 MOVI.N,  A6 A7 A3 MOVNEZ,  A6 A1 20 S32I.N,
+$36 L:
+  A3 $51 L BEQZ.N,
+  A3 84 MOVI.N,  A6 12 MOVI.N,  A8 $3F0 MOVI,  A3 A1 16 S32I.N,  A6 A4 $59 L BLTU,
+  A8 A5 A5 ADDX2,  A5 A1 16 S32I.N,  A8 A8 2 SLLI,  $59 L J,
+  2 ZEROS,
+$51 L:
+  A8 A4 A4 ADDX2,  A4 A1 16 S32I.N,  A8 A8 2 SLLI,
+$59 L:
+  A3 A8 12 ADDI.N,  A6 A2 A8 ADD.N,  A7 A1 MOV.N,  A3 A2 A3 ADD.N,
+$61 L:
+  A10 A6 MOV.N,  A8 $8 L L32R,  A8 CALLX8,
+  A10 A7 0 S32I.N,  A6 A6 4 ADDI.N,  A7 A7 4 ADDI.N,  A3 A6 $61 L BNE,
+  A11 A1 MOV.N,  NOP.N,  A10 A1 16 L32I.N,  A4 A4 1 ADDI.N,  A8 $C L L32R,
+  A8 CALLX8,
+  A5 A5 5 ADDI.N,  A3 A4 0 8 EXTUI,  A6 A1 20 L32I.N,  A5 A5 0 8 EXTUI,
+  A3 A6 $99 L BGEU,
+  A6 $4 L L32R,  A3 A6 0 L8UI,  $36 L J,
+  3 ZEROS,
+$99 L:
+  A2 $0 L L32R,  A3 A2 0 L32I.N,  A2 8 MOVI.N,  A2 A3 A2 OR,  A3 $0 L L32R,
+  A2 A3 0 S32I.N,
+$A8 L:
+  RETW.N,
+$AA L:  END-CODE
+
+CODE get_rfrx_dcap_bt   \ .text.get_rfrx_dcap_bt $4
+  $0 1 LITERALS
+    SYMBOL g_phyFuns
+$4 L:
+  A1 32 ENTRY,  A4 $0 L L32R,  A12 A2 0 8 EXTUI,  A11 0 MOVI.N,  A10 100 MOVI,
+  A2 A4 0 L32I.N,  A2 A2 152 L32I,  A2 CALLX8,
+  A3 A10 MOV.N,  A10 A10 0 4 EXTUI,  A2 A4 0 L32I.N,  A12 1 MOVI.N,  A11 15 MOVI.N,
+  A10 A10 -5 ADDI,  A2 A2 44 L32I.N,  A2 CALLX8,
+  A2 -16 MOVI.N,  A2 A3 A2 AND,  A2 A2 A10 OR,  A2 A2 0 8 EXTUI,  RETW.N,
+$3A L:  END-CODE
+
+PRIVATE
+CODE get_rf_freq_init$part$2   \ .text.get_rf_freq_init$part$2 $28, static
+  $0 10 LITERALS
+    $96C T,  $9B4 T,  SYMBOL phy_freq_wifi_only  SYMBOL g_phyFuns  $960 T,
+    SYMBOL chip7_sleep_params  SYMBOL get_rf_freq_cap  SYMBOL get_rfrx_dcap_bt
+    SYMBOL get_rfrx_dcap_bt  SYMBOL wr_rf_freq_mem
+$28 L:
+  A1 80 ENTRY,  A3 $C L L32R,  A15 0 MOVI.N,  A14 7 MOVI.N,  A5 85 MOVI.N,
+  A13 A14 MOV.N,  A4 $8 L L32R,  A12 A15 MOV.N,  A11 1 MOVI.N,  A10 98 MOVI,
+  A6 12 MOVI.N,  A2 A3 0 L32I.N,  A7 A4 0 L8UI,  A4 14 MOVI.N,  A4 A5 A7 MOVEQZ,
+  A7 0 MOVI.N,  A2 A2 168 L32I,  A4 A1 32 S32I.N,  A2 CALLX8,
+  A14 7 MOVI.N,  A13 A14 MOV.N,  A15 0 MOVI.N,  A2 A3 0 L32I.N,  A12 2 MOVI,
+  A11 1 MOVI,  A10 98 MOVI,  A2 A2 168 L32I,  A2 CALLX8,
+  A12 0 MOVI.N,  A11 3 MOVI.N,  A2 A3 0 L32I.N,  A10 104 MOVI,  A2 A2 152 L32I,
+  A2 CALLX8,
+  A2 A10 MOV.N,  A12 5 MOVI.N,  A4 A3 0 L32I.N,  A11 4 MOVI.N,  A10 102 MOVI,
+  A4 A4 152 L32I,  A4 CALLX8,
+  A10 A10 16 SLLI,  A4 A2 24 SLLI,  A10 A4 A10 OR,  A13 110 MOVI,  A2 $0 L L32R,
+  A5 A13 MOV.N,  A10 A1 36 S32I.N,
+$A0 L:
+  A14 84 MOVI.N,  NOP.N,  NOP.N,  NOP.N,  A8 $8 L L32R,  A4 A8 0 L8UI,
+  A4 $C1 L BEQZ.N,
+  A8 12 MOVI.N,  A4 $4 L L32R,  A8 A7 $CA L BLTU,
+  A4 A2 MOV.N,  A14 A6 MOV.N,  $CA L J,
+  2 ZEROS,
+$C1 L:
+  A8 $10 L L32R,  A14 A7 A7 OR,  A4 A7 A8 ADD,
+$CA L:
+  A11 1 MOVI.N,  A13 A5 MOV.N,  A9 A3 0 L32I.N,  A12 A11 MOV.N,  A10 98 MOVI,
+  A7 A7 A11 ADD.N,  A2 A2 5 ADDI.N,  A9 A9 160 L32I,  A14 A1 40 S32I,  A9 CALLX8,
+  A13 A1 15 ADDI.N,  A12 A1 12 ADDI.N,  A11 0 MOVI.N,  A10 A4 A4 OR,  A8 $18 L L32R,
+  A8 CALLX8,
+  A10 4 MOVI.N,  A5 A1 15 L8UI,  A8 $1C L L32R,  A8 CALLX8,
+  A4 A10 MOV.N,  A10 7 MOVI.N,  A8 $20 L L32R,  A8 CALLX8,
+  A8 A1 36 L32I.N,  A10 A10 8 SLLI,  A4 A4 A8 OR,  A9 A4 A10 OR,  A11 A1 MOV.N,
+  A14 A1 40 L32I.N,  A10 A14 MOV.N,  A12 A1 12 L8UI,  A12 A12 16 SLLI,
+  A4 A1 13 L8UI,  A4 A4 8 SLLI,  A4 A12 A4 OR,  A14 A1 16 L8UI,  A14 A14 8 SLLI,
+  A12 A1 15 L8UI,  A14 A14 A12 OR,  A12 A1 14 L8UI,  A4 A4 A12 OR,  A4 A1 4 S32I.N,
+  A4 A7 0 8 EXTUI,  A14 A1 0 S32I.N,  A9 A1 8 S32I,  A8 $24 L L32R,  A8 CALLX8,
+  A8 A6 5 ADDI.N,  A6 A8 0 8 EXTUI,  A8 A1 32 L32I.N,  A4 A8 $155 L BGEU,
+  $A0 L J,
+$155 L:
+  A3 $14 L L32R,  A2 16 MOVI.N,  A4 A3 0 L32I.N,  A2 A4 A2 OR,  A2 A3 0 S32I.N,
+  RETW.N,
+$163 L:  END-CODE
+
+PUBLIC
+CODE get_rf_freq_init   \ .text.get_rf_freq_init $8
+  $0 2 LITERALS
+    SYMBOL chip7_sleep_params  SYMBOL get_rf_freq_init$part$2
+$8 L:
+  A1 32 ENTRY,  A8 $0 L L32R,  A8 A8 0 L32I.N,  A8 4 $19 L BBSI,
+  A8 $4 L L32R,  A8 CALLX8,
+$19 L:
+  RETW.N,
+$1B L:  END-CODE
+
+CODE bt_i2c_read_set   \ .text.bt_i2c_read_set $30
+  $0 12 LITERALS
+    $3FF4E14C T,  $FFF0FFFF T,  $FFFF00FF T,  $FFEFFFFF T,  $3FF4E150 T,
+    $FFFDFFFF T,  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read
+$30 L:
+  A1 48 ENTRY,  A8 A7 MOV.N,  A7 $0 L L32R,  A8 A8 0 8 EXTUI,  A10 A7 MOV.N,
+  A2 A2 0 8 EXTUI,  A2 A2 0 4 EXTUI,  A8 A1 4 S32I,  A8 $18 L L32R,  A8 CALLX8,
+  A2 A2 16 SLLI,  A3 A3 0 8 EXTUI,  A4 A4 0 8 EXTUI,  A9 $4 L L32R,  A4 A4 8 SLLI,
+  A10 A10 A9 AND,  A10 A2 A10 OR,  A6 A6 0 8 EXTUI,  MEMW,  A10 A7 0 S32I.N,
+  A10 A7 MOV.N,  A8 $1C L L32R,  A8 CALLX8,
+  A11 -256 MOVI,  A10 A10 A11 AND,  A10 A10 A3 OR,  MEMW,  A10 A7 0 S32I.N,
+  A10 A7 MOV.N,  A5 A5 0 8 EXTUI,  A11 A1 0 S32I,  A8 $20 L L32R,  A8 CALLX8,
+  A2 $8 L L32R,  A10 A10 A2 AND,  A4 A10 A4 OR,  A10 A7 A7 OR,  MEMW,  A4 A7 0 S32I,
+  A8 $24 L L32R,  A8 CALLX8,
+  A9 A6 0 1 EXTUI,  A9 A9 20 SLLI,  A2 $C L L32R,  A10 A10 A2 AND,  A9 A9 A10 OR,
+  A2 $10 L L32R,  A10 A2 MOV.N,  MEMW,  A9 A7 0 S32I.N,  A8 $28 L L32R,  A8 CALLX8,
+  A8 A1 4 L32I.N,  A8 A8 0 1 EXTUI,  A8 A8 17 SLLI,  A9 $14 L L32R,  A10 A10 A9 AND,
+  A8 A8 A10 OR,  A10 A2 MOV.N,  MEMW,  A8 A2 0 S32I.N,  A8 $2C L L32R,  A8 CALLX8,
+  A11 A1 0 L32I.N,  A10 A10 A11 AND,  A5 A10 A5 OR,  MEMW,  A5 A2 0 S32I.N,  RETW.N,
+$F1 L:  END-CODE
+
+CODE bt_i2c_read_mem   \ .text.bt_i2c_read_mem $34
+  $0 13 LITERALS
+    $48 SYMBOL+ rodata.str1.4  $3FF4E0C4 T,  $3FF4E0C0 T,
+    $50 SYMBOL+ rodata.str1.4  $58 SYMBOL+ rodata.str1.4  SYMBOL phy_printf
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL phy_printf  SYMBOL phy_printf  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL phy_printf
+$34 L:
+  A1 32 ENTRY,  A10 $0 L L32R,  A11 0 MOVI.N,  A8 $14 L L32R,  A8 CALLX8,
+  A7 1 MOVI.N,  A6 -256 MOVI,  A3 $4 L L32R,  A5 $8 L L32R,  $57 L J,
+  2 ZEROS,
+$52 L:
+  A7 A7 1 ADDI.N,  A7 A7 0 8 EXTUI,
+$57 L:
+  A2 A7 -1 ADDI.N,  A2 A2 0 8 EXTUI,  A4 0 MOVI.N,  A10 A3 MOV.N,  A2 A4 $68 L BEQ,
+  A2 1 $9A L BEQI,
+  A4 2 MOVI.N,
+$68 L:
+  A8 $18 L L32R,  A8 CALLX8,
+  A10 A10 A6 AND,  A8 A10 A4 OR,  MEMW,  A8 A3 0 S32I.N,  A10 A5 MOV.N,
+  A8 $1C L L32R,  A8 CALLX8,
+  A11 A10 MOV.N,  A10 $C L L32R,  A8 $20 L L32R,  A8 CALLX8,
+  A7 3 $52 L BNEI,
+  A10 $10 L L32R,  A8 $24 L L32R,  A8 CALLX8,
+  RETW.N,
+$9A L:
+  A10 A3 MOV.N,  A8 $28 L L32R,  A8 CALLX8,
+  A10 A10 A6 AND,  A2 A10 A2 OR,  MEMW,  A2 A3 0 S32I.N,  A10 A5 MOV.N,
+  A8 $2C L L32R,  A8 CALLX8,
+  A11 A10 MOV.N,  A10 $C L L32R,  A8 $30 L L32R,  A8 CALLX8,
+  $52 L J,
+$C3 L:  END-CODE
+
+CODE bt_i2c_write_set   \ .text.bt_i2c_write_set $C0
+  $0 48 LITERALS
+    $3FF4E0C4 T,  $FFFF83FF T,  $3FF4E100 T,  $3FF4E104 T,  $3FF4E108 T,
+    SYMBOL rodata.bt_i2c_write_set  $3FF4E0D8 T,  $FFFF T,  $3FF4E0DC T,
+    $3FF4E0E0 T,  $3FF4E0E4 T,  $3FF4E0E8 T,  $3FF4E0EC T,  $3FF4E0F0 T,
+    $3FF4E0F4 T,  $3FF4E10C T,  $3FF4E110 T,  $3FF4E128 T,  $3FF4E12C T,
+    $3FF4E0D0 T,  $3FF4E11C T,  $3FF4E0D4 T,  $3FF4E120 T,  $3FF4E124 T,
+    $3FF4E0C8 T,  $3FF4E0CC T,  $3FF4E114 T,  $3FF4E118 T,  $3FF4E164 T,
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read
+$C0 L:
+  A1 64 ENTRY,  A7 A1 12 S32I.N,  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A7 $0 L L32R,
+  A10 A7 MOV.N,  A3 A1 16 S32I.N,  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A3 A1 68 L8UI,
+  A4 A1 20 S32I.N,  A4 A3 0 5 EXTUI,  A4 A4 10 SLLI,  A3 A1 0 S32I.N,
+  A5 A1 8 S32I.N,  A6 A1 24 S32I,  A8 $74 L L32R,  A8 CALLX8,
+  A3 $4 L L32R,  A10 A10 A3 AND,  A10 A4 A10 OR,  A4 A1 0 L32I.N,  MEMW,
+  A10 A7 0 S32I.N,  A4 $624 L BEQZ,
+  A3 0 MOVI.N,  A6 A3 MOV.N,  NOP.N,  NOP.N,  A4 A1 72 L32I,  A7 A1 0 L32I.N,
+$114 L:
+  A5 A4 0 L8UI,  A5 1 $122 L BNEI,
+  A3 SSL,  A5 A5 SLL,  A6 A6 A5 ADD.N,
+$122 L:
+  A3 A3 1 ADDI.N,  A5 A3 0 8 EXTUI,  A4 A4 1 ADDI.N,  A5 A7 $114 L BLTU,
+  $602 L J,
+  1 ZEROS,
+$130 L:
+  A3 A7 0 8 EXTUI,  A2 A3 3 SRLI,  A2 $140 L BEQZ.N,
+  A2 1 $174 L BEQI,
+  $1A8 L J,
+  2 ZEROS,
+$140 L:
+  A10 $8 L L32R,  A8 $78 L L32R,  A8 CALLX8,
+  A9 A7 2 SLLI,  A9 SSL,  A3 A5 SLL,  A2 A6 0 L8UI,  A3 A4 A3 XOR,  A2 A2 0 4 EXTUI,
+  A10 A3 A10 AND,  A9 SSL,  A2 A2 SLL,  A8 $8 L L32R,  A2 A10 A2 OR,  MEMW,
+  A2 A8 0 S32I.N,  $1DA L J,
+  2 ZEROS,
+$174 L:
+  A2 $C L L32R,  A3 A3 0 3 EXTUI,  A10 A2 MOV.N,  A8 $7C L L32R,  A8 CALLX8,
+  A3 A3 2 SLLI,  A9 A6 0 L8UI,  A3 SSL,  A11 A5 SLL,  A11 A4 A11 XOR,
+  A9 A9 0 4 EXTUI,  A10 A11 A10 AND,  A3 SSL,  A3 A9 SLL,  A3 A10 A3 OR,  MEMW,
+  A3 A2 0 S32I.N,  $1DA L J,
+$1A8 L:
+  A10 $10 L L32R,  A3 A3 0 3 EXTUI,  A8 $80 L L32R,  A8 CALLX8,
+  A3 A3 2 SLLI,  A3 SSL,  A9 A5 SLL,  A2 A6 0 L8UI,  A9 A4 A9 XOR,  A2 A2 0 4 EXTUI,
+  A10 A9 A10 AND,  A3 SSL,  A3 A2 SLL,  A9 $10 L L32R,  A3 A10 A3 OR,  MEMW,
+  A3 A9 0 S32I.N,
+$1DA L:
+  A7 A7 1 ADDI.N,  A6 A6 1 ADDI.N,  NOP.N,  NOP.N,  A11 A1 4 L32I.N,
+  A11 A7 $1EA L BEQ,
+  $130 L J,
+$1EA L:
+  A6 A1 16 L32I.N,  A7 0 MOVI.N,  A3 A6 MOV.N,  A4 A7 MOV.N,  A2 8 MOVI.N,
+  A5 A1 20 L32I.N,  A6 A5 A5 OR,  A5 A3 A3 OR,
+$1FC L:
+  A3 A4 1 SRLI,  A2 A3 $205 L BGEU,
+  $2B8 L J,
+$205 L:
+  A8 $14 L L32R,  A3 A3 A8 ADDX4,  A3 A3 0 L32I.N,  A3 JX,
+  1 ZEROS,
+$211 L:
+  A3 $18 L L32R,  A10 A3 MOV.N,  A8 $84 L L32R,  A8 CALLX8,
+  A12 A7 4 SLLI,  A9 $1C L L32R,  A8 -1 MOVI.N,  A12 SSL,  A4 A9 SLL,  A4 A8 A4 XOR,
+  A10 A4 A10 AND,  A11 A6 0 L8UI,  A11 A11 8 SLLI,  A9 A5 0 L8UI,  A4 A11 A9 OR,
+  A12 SSL,  A4 A4 SLL,  A10 A4 A10 OR,  MEMW,  A10 A3 0 S32I.N,  $2F5 L J,
+  2 ZEROS,
+$24F L:
+  A3 $20 L L32R,  $258 L J,
+$255 L:
+  A3 $24 L L32R,
+$258 L:
+  A10 A3 MOV.N,  A8 $88 L L32R,  A8 CALLX8,
+  A4 A4 0 1 EXTUI,  A4 A4 4 SLLI,  A11 A6 0 L8UI,  A8 -1 MOVI.N,  A12 A11 8 SLLI,
+  A11 $1C L L32R,  A4 SSL,  A9 A11 SLL,  A9 A8 A9 XOR,  A10 A9 A10 AND,
+  A11 A5 0 L8UI,  A11 A12 A11 OR,  A4 SSL,  A9 A11 SLL,  A10 A9 A10 OR,  MEMW,
+  A10 A3 0 S32I.N,  $2F5 L J,
+$294 L:
+  A3 $28 L L32R,  $258 L J,
+$29A L:
+  A3 $2C L L32R,  $258 L J,
+$2A0 L:
+  A3 $30 L L32R,  $258 L J,
+$2A6 L:
+  A3 $34 L L32R,  $258 L J,
+$2AC L:
+  A3 $38 L L32R,  $258 L J,
+$2B2 L:
+  A3 $3C L L32R,  $258 L J,
+$2B8 L:
+  A10 $40 L L32R,  A4 A4 0 1 EXTUI,  A8 $8C L L32R,  A8 CALLX8,
+  A11 A4 4 SLLI,  A8 -1 MOVI.N,  A9 A6 0 L8UI,  A4 A9 8 SLLI,  A9 $1C L L32R,
+  A11 SSL,  A3 A9 SLL,  A3 A8 A3 XOR,  A10 A3 A10 AND,  A9 A5 0 L8UI,  A9 A4 A9 OR,
+  A11 SSL,  A4 A9 SLL,  A10 A4 A10 OR,  A9 $40 L L32R,  MEMW,  A10 A9 0 S32I.N,
+$2F5 L:
+  A7 A7 1 ADDI.N,  A4 A7 0 8 EXTUI,  A6 A6 1 ADDI.N,  A5 A5 1 ADDI.N,
+  A11 A1 0 L32I.N,  A4 A11 $306 L BGEU,
+  $1FC L J,
+$306 L:
+  A2 0 MOVI.N,  A3 A1 12 L32I.N,  A5 A2 MOV.N,  A7 A11 MOV.N,  A4 A1 8 L32I.N,
+$310 L:
+  A10 $44 L L32R,  A8 $90 L L32R,  A8 CALLX8,
+  A8 1 MOVI.N,  A2 SSL,  A6 A8 SLL,  A8 A3 0 L8UI,  A9 -1 MOVI.N,  A6 A9 A6 XOR,
+  A8 A8 4 1 EXTUI,  A10 A10 A6 AND,  A11 $44 L L32R,  A2 SSL,  A8 A8 SLL,
+  A8 A8 A10 OR,  A10 $48 L L32R,  MEMW,  A8 A11 0 S32I.N,  A8 $94 L L32R,
+  A8 CALLX8,
+  A6 A6 A10 AND,  A8 A5 3 SRLI,  A10 A4 0 L8UI,  A10 A10 4 1 EXTUI,  A2 SSL,
+  A10 A10 SLL,  A10 A10 A6 OR,  A6 $48 L L32R,  MEMW,  A10 A6 0 S32I.N,
+  A8 $36E L BEQZ.N,
+  A8 1 $3C9 L BEQI,
+  $427 L J,
+$36E L:
+  A10 $4C L L32R,  A6 A2 2 SLLI,  A8 $98 L L32R,  A8 CALLX8,
+  A9 15 MOVI.N,  A11 -1 MOVI,  A8 A3 0 L8UI,  A6 SSL,  A5 A9 SLL,  A5 A11 A5 XOR,
+  A8 A8 A9 AND,  A10 A10 A5 AND,  A9 $4C L L32R,  A6 SSL,  A8 A8 SLL,  A8 A8 A10 OR,
+  A10 $50 L L32R,  MEMW,  A8 A9 0 S32I,  A8 $9C L L32R,  A8 CALLX8,
+  A10 A5 A10 AND,  A5 A4 0 L8UI,  A5 A5 0 4 EXTUI,  A6 SSL,  A5 A5 SLL,
+  A10 A5 A10 OR,  A11 $50 L L32R,  MEMW,  A10 A11 0 S32I.N,  $48C L J,
+$3C9 L:
+  A10 $54 L L32R,  A6 15 MOVI.N,  A8 $A0 L L32R,  A8 CALLX8,
+  A8 A5 0 3 EXTUI,  A5 A8 2 SLLI,  A11 A3 0 L8UI,  A9 -1 MOVI.N,  A5 SSL,
+  A8 A6 SLL,  A6 A9 A8 XOR,  A11 A11 0 4 EXTUI,  A10 A10 A6 AND,  A8 $54 L L32R,
+  A5 SSL,  A11 A11 SLL,  A11 A11 A10 OR,  A10 $58 L L32R,  MEMW,  A11 A8 0 S32I.N,
+  A8 $A4 L L32R,  A8 CALLX8,
+  A10 A6 A10 AND,  A6 A4 0 L8UI,  A6 A6 0 4 EXTUI,  A5 SSL,  A8 A6 SLL,
+  A10 A8 A10 OR,  A9 $58 L L32R,  MEMW,  A10 A9 0 S32I.N,  $48C L J,
+  2 ZEROS,
+$427 L:
+  A6 $5C L L32R,  A5 A5 0 3 EXTUI,  A10 A6 MOV.N,  A8 $A8 L L32R,  A8 CALLX8,
+  A5 A5 2 SLLI,  A8 A3 0 L8UI,  A11 15 MOVI.N,  A5 SSL,  A9 A11 SLL,  A11 -1 MOVI.N,
+  A9 A11 A9 XOR,  A8 A8 0 4 EXTUI,  A10 A9 A10 AND,  A5 SSL,  A8 A8 SLL,
+  A8 A10 A8 OR,  MEMW,  A8 A6 0 S32I.N,  A10 A6 A6 OR,  A8 $AC L L32R,  A8 CALLX8,
+  A5 A5 16 ADDI,  A8 15 MOVI.N,  A5 SSL,  A9 A8 SLL,  A8 A4 0 L8UI,  A11 -1 MOVI.N,
+  A9 A11 A9 XOR,  A8 A8 0 4 EXTUI,  A10 A9 A10 AND,  A5 SSL,  A5 A8 SLL,
+  A5 A10 A5 OR,  MEMW,  A5 A6 0 S32I.N,
+$48C L:
+  A2 A2 1 ADDI.N,  A5 A2 0 8 EXTUI,  A3 A3 1 ADDI.N,  A4 A4 1 ADDI.N,
+  A5 A7 $49B L BGEU,
+  $310 L J,
+$49B L:
+  A5 A1 12 L32I.N,  A2 0 MOVI.N,  A8 A5 MOV.N,  A4 A1 8 L32I.N,  A5 A4 MOV.N,
+  A4 A8 MOV.N,  A6 A1 24 L32I.N,  A3 A1 64 L32I,
+$4AC L:
+  A7 A4 0 L8UI,  A7 A7 2 SRLI,  A7 1 $504 L BEQI,
+  A7 $4C8 L BEQZ.N,
+  A7 2 $4BD L BNEI,
+  $540 L J,
+$4BD L:
+  A7 3 $4C3 L BNEI,
+  $549 L J,
+$4C3 L:
+  $57F L J,
+  2 ZEROS,
+$4C8 L:
+  A10 $60 L L32R,  A8 $B0 L L32R,  A8 CALLX8,
+  A8 255 MOVI,  A7 A4 0 L8UI,  A7 A7 0 2 EXTUI,  A7 A7 3 SLLI,  A7 SSL,  A11 A8 SLL,
+  A9 A3 0 L8UI,  A8 -1 MOVI.N,  A11 A8 A11 XOR,  A7 SSL,  A7 A9 SLL,
+  A10 A11 A10 AND,  A9 $60 L L32R,  A7 A10 A7 OR,  MEMW,  A7 A9 0 S32I.N,  $57F L J,
+  2 ZEROS,
+$504 L:
+  A10 $64 L L32R,  A8 $B4 L L32R,  A8 CALLX8,
+  A8 255 MOVI,  A7 A4 0 L8UI,  A7 A7 0 2 EXTUI,  A7 A7 3 SLLI,  A7 SSL,  A11 A8 SLL,
+  A9 A3 0 L8UI,  A8 -1 MOVI.N,  A11 A8 A11 XOR,  A7 SSL,  A7 A9 SLL,
+  A10 A11 A10 AND,  A9 $64 L L32R,  A7 A10 A7 OR,  MEMW,  A7 A9 0 S32I.N,  $57F L J,
+  2 ZEROS,
+$540 L:
+  A7 $68 L L32R,  $54C L J,
+  3 ZEROS,
+$549 L:
+  A7 $6C L L32R,
+$54C L:
+  A10 A7 MOV.N,  A8 $B8 L L32R,  A8 CALLX8,
+  A11 255 MOVI,  A8 -1 MOVI.N,  A9 A4 0 L8UI,  A9 A9 0 2 EXTUI,  A9 A9 3 SLLI,
+  A9 SSL,  A12 A11 SLL,  A11 A3 0 L8UI,  A12 A8 A12 XOR,  A10 A12 A10 AND,  A9 SSL,
+  A9 A11 SLL,  A9 A10 A9 OR,  MEMW,  A9 A7 0 S32I.N,
+$57F L:
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A7 A5 0 L8UI,  A7 A7 2 SRLI,  A7 1 $5A4 L BEQI,
+  A7 $59C L BEQZ.N,
+  A7 2 $5AC L BEQI,
+  A7 3 $5B5 L BEQI,
+  $5EB L J,
+  1 ZEROS,
+$59C L:
+  A7 $60 L L32R,  $5B8 L J,
+  2 ZEROS,
+$5A4 L:
+  A7 $64 L L32R,  $5B8 L J,
+  2 ZEROS,
+$5AC L:
+  A7 $68 L L32R,  $5B8 L J,
+  3 ZEROS,
+$5B5 L:
+  A7 $6C L L32R,
+$5B8 L:
+  A10 A7 MOV.N,  A8 $BC L L32R,  A8 CALLX8,
+  A11 255 MOVI,  A8 -1 MOVI.N,  A9 A5 0 L8UI,  A9 A9 0 2 EXTUI,  A9 A9 3 SLLI,
+  A9 SSL,  A12 A11 SLL,  A11 A6 0 L8UI,  A12 A8 A12 XOR,  A10 A12 A10 AND,  A9 SSL,
+  A9 A11 SLL,  A9 A10 A9 OR,  MEMW,  A9 A7 0 S32I.N,
+$5EB L:
+  A2 A2 1 ADDI.N,  A2 A2 0 8 EXTUI,  A4 A4 1 ADDI.N,  A5 A5 1 ADDI.N,
+  A9 A1 0 L32I.N,  A6 A6 1 ADDI.N,  A3 A3 1 ADDI.N,  A2 A9 $600 L BGEU,
+  $4AC L J,
+$600 L:
+  RETW.N,
+$602 L:
+  A11 A1 0 L32I.N,  A7 A2 MOV.N,  A3 A11 -1 ADDI.N,  A3 A3 0 8 EXTUI,
+  A3 A3 1 ADDI.N,  A2 $70 L L32R,  A5 15 MOVI.N,  A4 -1 MOVI.N,  A3 A1 4 S32I.N,
+  MEMW,  A6 A2 0 S32I.N,  A2 0 MOVI.N,  A6 A7 MOV.N,  A7 A2 MOV.N,  $130 L J,
+$624 L:
+  A2 $70 L L32R,  A3 A1 0 L32I.N,  MEMW,  A3 A2 0 S32I.N,  RETW.N,
+  rodata.bt_i2c_write_set  $211 L!+  $24F L!+  $255 L!+  $294 L!+  $29A L!+  $2A0 L!+
+  $2A6 L!+  $2AC L!+  $2B2 L!+  DROP   \ the table of jumps
+$630 L:  END-CODE
+
+CODE bt_i2c_set_wifi_data   \ .text.bt_i2c_set_wifi_data $20
+  $0 8 LITERALS
+    $3FF4E130 T,  $3FF4E134 T,  $3FF4E138 T,  $3FF4E13C T,  $3FF4E140 T,
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read
+$20 L:
+  A1 48 ENTRY,  A3 A3 0 8 EXTUI,  A3 $100 L BEQZ,
+  A3 A3 -1 ADDI.N,  A3 A3 0 8 EXTUI,  A3 A3 1 ADDI.N,  A7 A2 MOV.N,  A3 A1 0 S32I.N,
+  A2 0 MOVI.N,  A5 255 MOVI,  A4 -1 MOVI,
+$3C L:
+  A3 A2 0 8 EXTUI,  A6 A3 2 SRLI,  A6 1 $80 L BEQI,
+  A6 $50 L BEQZ.N,
+  A6 2 $B4 L BEQI,
+  A6 3 $BC L BEQI,
+  $C2 L J,
+$50 L:
+  A10 $0 L L32R,  A8 $14 L L32R,  A8 CALLX8,
+  A12 A2 3 SLLI,  A12 SSL,  A8 A5 SLL,  A6 A7 0 L8UI,  A8 A4 A8 XOR,
+  A10 A8 A10 AND,  A12 SSL,  A6 A6 SLL,  A6 A10 A6 OR,  A3 $0 L L32R,  MEMW,
+  A6 A3 0 S32I.N,  $F0 L J,
+  1 ZEROS,
+$80 L:
+  A10 $4 L L32R,  A8 $18 L L32R,  A8 CALLX8,
+  A8 A3 0 2 EXTUI,  A8 A8 3 SLLI,  A6 A7 0 L8UI,  A8 SSL,  A12 A5 SLL,
+  A12 A4 A12 XOR,  A10 A12 A10 AND,  A8 SSL,  A8 A6 SLL,  A3 $4 L L32R,
+  A8 A10 A8 OR,  MEMW,  A8 A3 0 S32I.N,  $F0 L J,
+  2 ZEROS,
+$B4 L:
+  A6 $8 L L32R,  $C5 L J,
+  2 ZEROS,
+$BC L:
+  A6 $C L L32R,  $C5 L J,
+$C2 L:
+  A6 $10 L L32R,
+$C5 L:
+  A10 A6 MOV.N,  A8 $1C L L32R,  A8 CALLX8,
+  A8 A3 0 2 EXTUI,  A8 A8 3 SLLI,  A12 A7 0 L8UI,  A8 SSL,  A13 A5 SLL,
+  A13 A4 A13 XOR,  A10 A13 A10 AND,  A8 SSL,  A8 A12 SLL,  A8 A10 A8 OR,  MEMW,
+  A8 A6 0 S32I.N,
+$F0 L:
+  A2 A2 1 ADDI.N,  A7 A7 1 ADDI.N,  NOP.N,  NOP.N,  A3 A1 0 L32I.N,
+  A2 A3 $100 L BEQ,
+  $3C L J,
+$100 L:
+  RETW.N,
+$102 L:  END-CODE
+
+CODE phy_wifi_pll_track   \ .text.phy_wifi_pll_track $4
+  $0 1 LITERALS
+    SYMBOL phy_wifi_pll_track_en
+$4 L:
+  A1 32 ENTRY,  A8 $0 L L32R,  A2 A8 0 S8I,  MEMW,  RETW.N,
+$12 L:  END-CODE
+
+CODE phy_bt_pll_track   \ .text.phy_bt_pll_track $8
+  $0 2 LITERALS
+    SYMBOL phy_bt_pll_track_en  SYMBOL phy_bt_ifs_set
+$8 L:
+  A1 32 ENTRY,  A8 $0 L L32R,  A2 A8 0 S8I,  MEMW,  A8 $4 L L32R,  A8 CALLX8,
+  RETW.N,
+$1C L:  END-CODE
+
+CODE tsens_read_init   \ .text.tsens_read_init $28
+  $0 10 LITERALS
+    $3FF4884C T,  $FF00FFFF T,  $20000 T,  $2000000 T,  $FEFFFFFF T,  $1000000 T,
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+$28 L:
+  A1 32 ENTRY,  A2 $0 L L32R,  A10 A2 MOV.N,  A8 $18 L L32R,  A8 CALLX8,
+  A8 $4 L L32R,  A9 A10 A8 AND,  A10 A2 A2 OR,  A8 $8 L L32R,  A8 A9 A8 OR,  MEMW,
+  A8 A2 0 S32I,  A8 $1C L L32R,  A8 CALLX8,
+  A8 $C L L32R,  A8 A10 A8 OR,  A10 A2 MOV.N,  MEMW,  A8 A2 0 S32I,  A8 $20 L L32R,
+  A8 CALLX8,
+  A8 $10 L L32R,  A8 A10 A8 AND,  A10 A2 MOV.N,  MEMW,  A8 A2 0 S32I.N,
+  A8 $24 L L32R,  A8 CALLX8,
+  A8 $14 L L32R,  A10 A10 A8 OR,  MEMW,  A10 A2 0 S32I.N,  RETW.N,
+$85 L:  END-CODE
+
+CODE phy_bt_power_track   \ .text.phy_bt_power_track $8
+  $0 2 LITERALS
+    SYMBOL phy_bt_power_track_en  SYMBOL tsens_read_init
+$8 L:
+  A1 32 ENTRY,  A8 $0 L L32R,  A2 A8 0 S8I,  MEMW,  A8 $4 L L32R,  A8 CALLX8,
+  RETW.N,
+$1C L:  END-CODE
+
+CODE bt_get_i2c_data   \ .text.bt_get_i2c_data $8
+  $0 2 LITERALS
+    SYMBOL g_phyFuns  SYMBOL rodata.bt_get_i2c_data
+$8 L:
+  A1 48 ENTRY,  A8 $0 L L32R,  A15 1 MOVI.N,  A14 7 MOVI.N,  A11 A15 MOV.N,
+  A13 A14 MOV.N,  A7 A1 0 S32I.N,  A12 0 MOVI.N,  A10 98 MOVI,  NOP.N,  NOP.N,
+  A7 A8 0 L32I.N,  A9 A7 168 L32I,  A8 A1 8 S32I.N,  NOP.N,  NOP.N,  NOP.N,  NOP.N,
+  A7 A1 52 L8UI,  A9 CALLX8,
+  A11 1 MOVI.N,  A12 0 MOVI.N,  A10 98 MOVI,  A8 A1 8 L32I.N,  A8 A8 0 L32I,
+  A8 A8 152 L32I,  A8 CALLX8,
+  A8 159 MOVI,  A11 0 MOVI.N,  A10 A10 A8 AND,  A7 A11 $56 L BNE,
+  $44E L J,
+$56 L:
+  A8 32 MOVI.N,  A8 A10 A8 OR,  A9 A11 MOV.N,  A8 A1 4 S32I,
+$60 L:
+  A12 10 MOVI.N,  NOP.N,  NOP.N,  NOP.N,  A8 A1 56 L32I.N,  A10 A8 A11 ADD.N,
+  A8 A11 MOV.N,  A9 A10 0 S8I,  MEMW,  A12 A11 $7A L BGEU,
+  $3A5 L J,
+$7A L:
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A13 $4 L L32R,  A12 A11 A13 ADDX4,
+  A12 A12 0 L32I.N,  A12 JX,
+$8D L:
+  A8 A2 A11 ADD.N,  A15 A1 48 L32I.N,  A12 A3 A11 ADD.N,  A13 99 MOVI,
+  A14 A4 A11 ADD.N,  A9 A8 0 S8I,  A8 15 MOVI.N,  A13 A12 0 S8I,  MEMW,
+  A12 A15 A11 ADD.N,  A13 A6 A11 ADD.N,  NOP.N,  NOP.N,  A15 A1 0 L32I.N,
+  A14 A1 12 S32I.N,  A14 A5 A11 ADD.N,  A11 A15 A11 ADD.N,  NOP.N,  NOP.N,
+  A15 A1 12 L32I.N,  A9 A15 0 S8I,  A8 A14 0 S8I,  A9 A13 0 S8I,  A9 A12 0 S8I,
+  A8 A11 0 S8I,  A8 1 MOVI.N,  A8 A10 0 S8I,  MEMW,  A7 2 $D6 L BLTUI,
+  $3C0 L J,
+$D6 L:
+  RETW.N,
+$D8 L:
+  A10 A2 A8 ADD.N,  A11 1 MOVI.N,  A15 A1 0 L32I.N,  A12 A3 A8 ADD.N,  A13 98 MOVI,
+  A14 A5 A8 ADD.N,  A11 A10 0 S8I,  A10 A4 A8 ADD.N,  A13 A12 0 S8I,  MEMW,
+  A12 A15 A8 ADD.N,  A13 A6 A8 ADD.N,  NOP.N,  NOP.N,  A15 A1 48 L32I.N,
+  A8 A15 A8 ADD.N,  A10 A1 12 S32I.N,  A10 16 MOVI.N,  NOP.N,  NOP.N,  NOP.N,
+  A15 A1 12 L32I.N,  A11 A15 0 S8I,  A10 A14 0 S8I,  A9 A13 0 S8I,  A10 A12 0 S8I,
+  A9 A8 0 S8I,  MEMW,  A7 3 $120 L BLTUI,
+  $3CD L J,
+$120 L:
+  RETW.N,
+$122 L:
+  A10 A2 A8 ADD.N,  A11 1 MOVI.N,  A15 A1 0 L32I.N,  A14 A4 A8 ADD.N,
+  A13 A5 A8 ADD.N,  A12 A6 A8 ADD.N,  A11 A10 0 S8I,  A10 A3 A8 ADD.N,  A11 98 MOVI,
+  A11 A10 0 S8I,  A11 A15 A8 ADD.N,  A15 2 MOVI.N,  A10 17 MOVI.N,  A15 A14 0 S8I,
+  A10 A13 0 S8I,  MEMW,  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A14 A1 48 L32I.N,
+  A8 A14 A8 ADD.N,  A9 A12 0 S8I,  A10 A11 0 S8I,  A9 A8 0 S8I,  MEMW,
+  A7 4 $166 L BLTUI,
+  $3DA L J,
+$166 L:
+  RETW.N,
+$168 L:
+  A10 A2 A8 ADD.N,  A9 A10 0 S8I,  A11 99 MOVI,  A10 A3 A8 ADD.N,  A13 A4 A8 ADD.N,
+  A12 A5 A8 ADD.N,  A11 A10 0 S8I,  MEMW,  A11 A6 A8 ADD.N,  NOP.N,  NOP.N,  NOP.N,
+  A15 A1 0 L32I.N,  A10 A15 A8 ADD.N,  A15 7 MOVI.N,  A9 A13 0 S8I,  A9 A12 0 S8I,
+  MEMW,  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A14 A1 48 L32I.N,  A8 A14 A8 ADD.N,
+  A15 A11 0 S8I,  A9 A10 0 S8I,  A15 A8 0 S8I,  MEMW,  A7 5 $1B1 L BLTUI,
+  $3E8 L J,
+$1B1 L:
+  RETW.N,
+$1B3 L:
+  A10 A2 A8 ADD.N,  A15 A1 0 L32I.N,  A11 99 MOVI,  A14 A4 A8 ADD.N,
+  A13 A5 A8 ADD.N,  A12 A6 A8 ADD.N,  A9 A10 0 S8I,  A10 A3 A8 ADD.N,
+  A11 A10 0 S8I,  A11 A15 A8 ADD.N,  A15 3 MOVI.N,  A10 22 MOVI.N,  A15 A14 0 S8I,
+  A10 A13 0 S8I,  MEMW,  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A14 A1 48 L32I.N,
+  A8 A14 A8 ADD.N,  A9 A12 0 S8I,  A10 A11 0 S8I,  A9 A8 0 S8I,  MEMW,
+  A7 6 $1F5 L BLTUI,
+  $3F5 L J,
+$1F5 L:
+  RETW.N,
+$1F7 L:
+  A10 A2 A8 ADD.N,  A15 A1 0 L32I.N,  A11 99 MOVI,  A14 A4 A8 ADD.N,
+  A13 A5 A8 ADD.N,  A12 A6 A8 ADD.N,  A9 A10 0 S8I,  A10 A3 A8 ADD.N,
+  A11 A10 0 S8I,  A11 A15 A8 ADD.N,  A15 5 MOVI.N,  A10 20 MOVI.N,  A15 A14 0 S8I,
+  A10 A13 0 S8I,  MEMW,  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A14 A1 48 L32I.N,
+  A8 A14 A8 ADD.N,  A9 A12 0 S8I,  A10 A11 0 S8I,  A9 A8 0 S8I,  MEMW,
+  A7 7 $239 L BLTUI,
+  $402 L J,
+$239 L:
+  RETW.N,
+$23B L:
+  A10 A2 A8 ADD.N,  A15 A1 0 L32I.N,  A11 99 MOVI,  A14 A4 A8 ADD.N,
+  A13 A5 A8 ADD.N,  A12 A6 A8 ADD.N,  A9 A10 0 S8I,  A10 A3 A8 ADD.N,
+  A11 A10 0 S8I,  A11 A15 A8 ADD.N,  A15 4 MOVI.N,  A10 21 MOVI.N,  A15 A14 0 S8I,
+  A10 A13 0 S8I,  MEMW,  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A14 A1 48 L32I.N,
+  A8 A14 A8 ADD.N,  A9 A12 0 S8I,  A10 A11 0 S8I,  A9 A8 0 S8I,  MEMW,
+  A7 8 $27D L BLTUI,
+  $410 L J,
+$27D L:
+  RETW.N,
+$27F L:
+  A10 A2 A8 ADD.N,  A9 A10 0 S8I,  A12 99 MOVI,  A10 A3 A8 ADD.N,  A14 A4 A8 ADD.N,
+  A15 A5 A8 ADD.N,  A12 A10 0 S8I,  A11 1 MOVI.N,  A10 23 MOVI.N,  A13 A6 A8 ADD.N,
+  A9 A14 0 S8I,  A15 A1 12 S32I.N,  NOP.N,  NOP.N,  NOP.N,  NOP.N,
+  A14 A1 48 L32I.N,  A15 A1 0 L32I.N,  A12 A15 A8 ADD.N,  A15 A14 A8 ADD.N,
+  A8 8 MOVI.N,  A14 A1 12 L32I.N,  A11 A14 0 S8I,  A10 A13 0 S8I,  A11 A12 0 S8I,
+  A10 A15 0 S8I,  MEMW,  A8 A7 $2C4 L BGEU,
+  $41D L J,
+$2C4 L:
+  RETW.N,
+$2C6 L:
+  A10 A2 A8 ADD.N,  A11 1 MOVI.N,  A14 A1 0 L32I.N,  A12 98 MOVI,  A15 A4 A8 ADD.N,
+  A13 A5 A8 ADD.N,  A11 A10 0 S8I,  A11 A3 A8 ADD.N,  A10 2 MOVI.N,  A12 A11 0 S8I,
+  MEMW,  A11 A14 A8 ADD.N,  A12 A6 A8 ADD.N,  NOP.N,  NOP.N,  A14 A1 48 L32I.N,
+  A15 A1 12 S32I.N,  A15 A14 A8 ADD.N,  NOP.N,  NOP.N,  NOP.N,  A8 A1 12 L32I.N,
+  A9 A8 0 S8I,  A8 9 MOVI.N,  A10 A13 0 S8I,  MEMW,  NOP.N,  NOP.N,  NOP.N,  NOP.N,
+  A13 A1 4 L32I.N,  A13 A12 0 S8I,  A10 A11 0 S8I,  A13 A15 0 S8I,  MEMW,
+  A8 A7 $31D L BGEU,
+  $428 L J,
+$31D L:
+  RETW.N,
+$31F L:
+  A10 A2 A8 ADD.N,  A9 A10 0 S8I,  A11 A3 A8 ADD.N,  A15 100 MOVI,  A14 A4 A8 ADD.N,
+  A13 A5 A8 ADD.N,  A15 A11 0 S8I,  MEMW,  A12 A6 A8 ADD.N,  A10 24 MOVI.N,  NOP.N,
+  NOP.N,  A15 A1 0 L32I.N,  A11 A15 A8 ADD.N,  A15 A1 48 L32I.N,  A8 A15 A8 ADD.N,
+  A15 4 MOVI.N,  A15 A14 0 S8I,  A10 A13 0 S8I,  A9 A12 0 S8I,  A10 A11 0 S8I,
+  A9 A8 0 S8I,  MEMW,  A8 10 MOVI.N,  A8 A7 $35F L BGEU,
+  $434 L J,
+$35F L:
+  RETW.N,
+$361 L:
+  A10 A2 A8 ADD.N,  A15 A1 0 L32I.N,  A14 100 MOVI,  A13 A4 A8 ADD.N,
+  A12 A5 A8 ADD.N,  A11 A6 A8 ADD.N,  A9 A10 0 S8I,  A10 A3 A8 ADD.N,
+  A14 A10 0 S8I,  MEMW,  A10 A15 A8 ADD.N,  NOP.N,  NOP.N,  NOP.N,
+  A15 A1 48 L32I.N,  A14 A15 A8 ADD.N,  A15 7 MOVI.N,  A8 11 MOVI.N,  A15 A13 0 S8I,
+  A13 25 MOVI.N,  A13 A12 0 S8I,  A9 A11 0 S8I,  A13 A10 0 S8I,  A9 A14 0 S8I,
+  MEMW,  A8 A7 $3A3 L BGEU,
+  $441 L J,
+$3A3 L:
+  RETW.N,
+$3A5 L:
+  A10 A2 A8 ADD.N,  A9 A10 0 S8I,  A8 A3 A8 ADD.N,  A11 A11 1 ADDI.N,
+  A11 A11 0 8 EXTUI,  A9 A8 0 S8I,  MEMW,  A11 A7 $3BD L BGEU,
+  $60 L J,
+$3BD L:
+  RETW.N,
+  1 ZEROS,
+$3C0 L:
+  A8 A1 56 L32I.N,  A9 A8 1 S8I,  MEMW,  A8 1 MOVI.N,  $D8 L J,
+$3CD L:
+  A8 A1 56 L32I.N,  A9 A8 2 S8I,  MEMW,  A8 2 MOVI.N,  $122 L J,
+$3DA L:
+  A8 A1 56 L32I.N,  A9 A8 3 S8I,  MEMW,  A8 3 MOVI.N,  $168 L J,
+  1 ZEROS,
+$3E8 L:
+  A8 A1 56 L32I.N,  A9 A8 4 S8I,  MEMW,  A8 4 MOVI.N,  $1B3 L J,
+$3F5 L:
+  A8 A1 56 L32I.N,  A9 A8 5 S8I,  MEMW,  A8 5 MOVI.N,  $1F7 L J,
+$402 L:
+  A8 A1 56 L32I.N,  A9 A8 6 S8I,  MEMW,  A8 6 MOVI.N,  $23B L J,
+  1 ZEROS,
+$410 L:
+  A8 A1 56 L32I.N,  A9 A8 7 S8I,  MEMW,  A8 7 MOVI.N,  $27F L J,
+$41D L:
+  A10 A1 56 L32I.N,  A9 A10 8 S8I,  MEMW,  $2C6 L J,
+$428 L:
+  A11 A1 56 L32I.N,  A9 A11 9 S8I,  MEMW,  $31F L J,
+  1 ZEROS,
+$434 L:
+  A8 A1 56 L32I.N,  A9 A8 10 S8I,  MEMW,  A8 10 MOVI.N,  $361 L J,
+$441 L:
+  A10 A1 56 L32I.N,  A11 A8 MOV.N,  A9 A10 11 S8I,  MEMW,  $3A5 L J,
+$44E L:
+  RETW.N,
+  rodata.bt_get_i2c_data  $8D L!+  $D8 L!+  $122 L!+  $168 L!+  $1B3 L!+  $1F7 L!+
+  $23B L!+  $27F L!+  $2C6 L!+  $31F L!+  $361 L!+  DROP   \ the table of jumps
+$450 L:  END-CODE
+
+CODE write_wifi_chan_data   \ .text.write_wifi_chan_data $20
+  $0 8 LITERALS
+    SYMBOL freq_i2c_addr  SYMBOL bt_wifi_chan_data  $3FF4E0C4 T,  $3FF4E0C0 T,
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL get_lna_vga_dcap_val  SYMBOL bt_i2c_set_wifi_data
+$20 L:
+  A1 48 ENTRY,  A2 A2 0 8 EXTUI,  A2 A2 A2 ADDX2,  A2 A2 0 8 EXTUI,  A4 A2 3 ADDI.N,
+  A3 $8 L L32R,  A7 A1 A1 OR,  A4 A4 0 8 EXTUI,  A6 -256 MOVI,  A5 $C L L32R,
+$3D L:
+  A10 A3 MOV.N,  A8 $10 L L32R,  A8 CALLX8,
+  A10 A10 A6 AND,  A10 A10 A2 OR,  MEMW,  A10 A3 0 S32I.N,  A10 A5 MOV.N,
+  A8 $14 L L32R,  A8 CALLX8,
+  A2 A2 1 ADDI.N,  A2 A2 0 8 EXTUI,  A10 A7 0 S32I.N,  A7 A7 4 ADDI.N,
+  A2 A4 $3D L BNE,
+  A11 A1 12 ADDI.N,  A5 23 MOVI.N,  NOP.N,  A2 A1 0 L32I.N,  A10 A2 0 8 EXTUI,
+  A8 $18 L L32R,  A8 CALLX8,
+  A13 15 MOVI.N,  A15 $4 L L32R,  A14 19 MOVI.N,  A12 A15 MOV.N,  A11 11 MOVI.N,
+  A4 A1 4 L32I,  A3 A1 8 L32I,  A10 $0 L L32R,  A11 $C5 L LOOP,
+  A8 A10 0 L8UI,  A13 A8 $C1 L BGEU,
+  A9 A8 3 SLLI,  A9 SSR,  A9 A2 SRL,  A14 A8 $B2 L BGEU,
+  A9 A8 3 SLLI,  A6 A9 MOV.N,  A6 SSR,  A6 A3 SRL,  A9 SSR,  A9 A4 SRL,
+  A5 A8 $B8 L BLTU,
+$B2 L:
+  A9 A9 0 8 EXTUI,  $BB L J,
+$B8 L:
+  A9 A6 0 8 EXTUI,
+$BB L:
+  A9 A12 0 S8I,  MEMW,
+$C1 L:
+  A10 A10 1 ADDI.N,  A12 A12 1 ADDI.N,
+$C5 L:
+  NOP.N,  NOP.N,  A2 A15 9 L8UI,  A3 -16 MOVI.N,  A4 A2 A3 AND,  A11 11 MOVI.N,
+  A10 A15 MOV.N,  A2 A1 12 L8UI,  A2 A4 A2 OR,  A2 A2 0 8 EXTUI,  A3 A2 A3 AND,
+  A4 A1 14 L8UI,  A3 A3 A4 OR,  A2 A15 9 S8I,  A3 A15 10 S8I,  MEMW,  A8 $1C L L32R,
+  A8 CALLX8,
+  RETW.N,
+$F8 L:  END-CODE
+
+CODE set_chan_freq_hw_init   \ .text.set_chan_freq_hw_init $30
+  $0 12 LITERALS
+    SYMBOL bt_wifi_chan_data  SYMBOL chip7_sleep_params  $2000 T,
+    SYMBOL freq_i2c_addr  $60033D38 T,  $C800000 T,
+    SYMBOL get_rf_freq_init$part$2  SYMBOL bt_get_i2c_data
+    SYMBOL bt_i2c_write_set  SYMBOL write_wifi_chan_data
+    SYMBOL esp_dport_access_reg_read  SYMBOL i2cmst_reg_init
+$30 L:
+  A1 128 ENTRY,  A4 $4 L L32R,  A2 A4 0 L32I,  A2 4 $44 L BBSI,
+  A8 $18 L L32R,  A8 CALLX8,
+  A2 A4 0 L32I.N,
+$44 L:
+  A3 $8 L L32R,  A2 A3 $4D L BNONE,
+  $D4 L J,
+$4D L:
+  A2 11 MOVI.N,  A6 A1 16 ADDI,  A7 $C L L32R,  A5 A1 27 ADDI,  A15 A1 49 ADDI,
+  A14 A1 38 ADDI,  A13 A7 MOV.N,  A12 A1 60 ADDI,  A11 A1 71 ADDI,  A10 A1 82 ADDI,
+  A2 A1 4 S32I.N,  A6 A1 8 S32I.N,  A5 A1 0 S32I.N,  A8 $1C L L32R,  A8 CALLX8,
+  A15 A1 49 ADDI,  A14 A1 38 ADDI,  A13 A7 MOV.N,  A2 A1 4 S32I.N,  A12 A1 60 ADDI,
+  A11 A1 71 ADDI,  A10 A1 82 ADDI,  A6 A1 8 S32I.N,  A5 A1 0 S32I.N,  A8 $20 L L32R,
+  A8 CALLX8,
+  A8 A2 MOV.N,  A9 A1 38 ADDI,  A2 $0 L L32R,  A8 $AA L LOOP,
+  A10 A9 0 L8UI,  A9 A9 1 ADDI.N,  A10 A2 0 S8I,  MEMW,  A2 A2 1 ADDI.N,
+$AA L:
+  A10 12 MOVI.N,  A8 $24 L L32R,  A8 CALLX8,
+  A5 $10 L L32R,  A10 A5 MOV.N,  A8 $28 L L32R,  A8 CALLX8,
+  A10 A10 0 16 EXTUI,  A2 $14 L L32R,  A10 A10 A2 OR,  A2 A4 0 L32I.N,  A3 A2 A3 OR,
+  MEMW,  A10 A5 0 S32I,  A3 A4 0 S32I,
+$D4 L:
+  A8 $2C L L32R,  A8 CALLX8,
+  RETW.N,
+$DC L:  END-CODE
+
+CODE rf_init   \ .text.rf_init $24
+  $0 9 LITERALS
+    SYMBOL re_entry  SYMBOL phy_init_flag  SYMBOL g_phyFuns  SYMBOL rodata
+    SYMBOL i2c_bias_init  SYMBOL reg_init_begin  SYMBOL rfpll_1p2_opt
+    SYMBOL phy_i2c_init  SYMBOL set_chan_freq_hw_init
+$24 L:
+  A1 48 ENTRY,  A8 $10 L L32R,  A8 CALLX8,
+  A10 0 MOVI.N,  A8 $14 L L32R,  A8 CALLX8,
+  A8 $18 L L32R,  A8 CALLX8,
+  A8 $1C L L32R,  A8 CALLX8,
+  A2 $0 L L32R,  A2 A2 0 L8UI,  A2 $52 L BEQZ.N,
+  A2 $4 L L32R,  A2 A2 0 L8UI,  A2 $9E L BNEZ,
+$52 L:
+  A2 $8 L L32R,  A8 A2 0 L32I,  A8 A8 192 L32I,  A8 CALLX8,
+  A10 A1 MOV.N,  A8 $C L L32R,  A14 A2 0 L32I.N,  A13 A8 0 L16UI,  A12 A8 2 L16UI,
+  A11 A8 4 L16UI,  A9 A8 6 L16UI,  A8 A14 220 L32I,  A13 A1 0 S16I,  A12 A1 2 S16I,
+  A11 A1 4 S16I,  A9 A1 6 S16I,  MEMW,  A8 CALLX8,
+  A8 A2 0 L32I.N,  A8 A8 212 L32I,  A8 CALLX8,
+  A8 A2 0 L32I.N,  A8 A8 204 L32I,  A8 CALLX8,
+  A2 A2 0 L32I.N,  A2 A2 196 L32I,  A2 CALLX8,
+$9E L:
+  A11 4 MOVI.N,  A10 2 MOVI.N,  A8 $20 L L32R,  A8 CALLX8,
+  RETW.N,
+$AA L:  END-CODE
+
+CODE check_rfpll_write_i2c   \ .text.check_rfpll_write_i2c $1C
+  $0 7 LITERALS
+    SYMBOL freq_i2c_addr  SYMBOL g_phyFuns  $50 SYMBOL+ rodata.str1.4
+    $58 SYMBOL+ rodata.str1.4  SYMBOL bt_get_i2c_data  SYMBOL phy_printf
+    SYMBOL phy_printf
+$1C L:
+  A1 128 ENTRY,  A2 A1 16 ADDI,  A2 A1 8 S32I.N,  A2 11 MOVI.N,  A5 A1 82 ADDI,
+  A15 A1 49 ADDI,  A14 A1 38 ADDI,  A2 A1 4 S32I.N,  A2 A1 27 ADDI,  A12 A1 60 ADDI,
+  A11 A1 71 ADDI,  A10 A5 MOV.N,  A13 $0 L L32R,  A4 A5 MOV.N,  A3 A1 60 ADDI,
+  A2 A1 0 S32I.N,  A8 $10 L L32R,  A8 CALLX8,
+  A2 A1 71 ADDI,  A7 $4 L L32R,  A6 $8 L L32R,
+$55 L:
+  A8 A7 0 L32I.N,  A11 A4 0 L8UI,  A4 A4 1 ADDI.N,  A12 A3 0 L8UI,  A3 A3 1 ADDI,
+  A10 A2 0 L8UI,  A2 A2 1 ADDI,  A8 A8 152 L32I,  A8 CALLX8,
+  A11 A10 MOV.N,  A10 A6 MOV.N,  A8 $14 L L32R,  A8 CALLX8,
+  A5 A2 $55 L BNE,
+  A10 $C L L32R,  A8 $18 L L32R,  A8 CALLX8,
+  RETW.N,
+$86 L:  END-CODE
+
+CODE phy_hw_set_freq_enable   \ .text.phy_hw_set_freq_enable $40
+  $0 16 LITERALS
+    SYMBOL flag$5261  $3FF4E168 T,  $3FF4E0C4 T,  $2000000 T,
+    SYMBOL force_hw_set_freq_flag  $FDFFFFFF T,  $3FF5C07C T,  $FF00FFFF T,
+    $9C0000 T,  SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL ets_delay_us
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read
+$40 L:
+  A1 32 ENTRY,  A2 A2 0 8 EXTUI,  A5 $0 L L32R,  A2 $AD L BNEZ,
+  A2 A5 0 L32I.N,  A2 $A7 L BNEZ,
+  A4 $100 MOVI,  A3 $4 L L32R,  A2 $8 L L32R,
+$5A L:
+  A10 A3 MOV.N,  A8 $24 L L32R,  A8 CALLX8,
+  A10 $99 L BLTZ,
+$65 L:
+  A10 A2 MOV.N,  A8 $28 L L32R,  A8 CALLX8,
+  A3 $C L L32R,  A3 A10 A3 OR,  A10 A2 MOV.N,  MEMW,  A3 A2 0 S32I,  A8 $2C L L32R,
+  A8 CALLX8,
+  A3 -257 MOVI,  A3 A10 A3 AND,  A10 2 MOVI.N,  MEMW,  A3 A2 0 S32I.N,
+  A8 $30 L L32R,  A8 CALLX8,
+  A2 A5 0 L32I.N,  $A7 L J,
+$99 L:
+  A10 A2 MOV.N,  A8 $34 L L32R,  A8 CALLX8,
+  A10 A4 $5A L BNONE,
+  $65 L J,
+$A7 L:
+  A2 A2 1 ADDI.N,  A2 A5 0 S32I.N,  RETW.N,
+$AD L:
+  A2 A5 0 L32I.N,  A2 1 $F8 L BNEI,
+  A2 $10 L L32R,  A2 A2 0 L8UI,  A2 $D1 L BNEZ.N,
+  A3 $8 L L32R,  A10 A3 MOV.N,  A8 $38 L L32R,  A8 CALLX8,
+  A2 $14 L L32R,  A10 A10 A2 AND,  MEMW,  A10 A3 0 S32I,
+$D1 L:
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A3 $18 L L32R,  A10 A3 A3 OR,  A8 $3C L L32R,
+  A8 CALLX8,
+  A2 $1C L L32R,  A10 A10 A2 AND,  A2 $20 L L32R,  A10 A10 A2 OR,  A2 A5 0 L32I.N,
+  MEMW,  A10 A3 0 S32I.N,
+$F8 L:
+  A2 A2 -1 ADDI.N,  A2 A5 0 S32I.N,  RETW.N,
+$FE L:  END-CODE
+
+CODE set_chan_freq_sw_start   \ .text.set_chan_freq_sw_start $70
+  $0 28 LITERALS
+    SYMBOL phy_sw_set_chan_en  $3FF4E0C4 T,  $E7FFFFFF T,  $10000000 T,
+    $FFF0FFFF T,  $FF0FFFFF T,  SYMBOL phy_force_wifi_chan_en
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL phy_dis_hw_set_freq  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL correct_rfpll_offset
+    SYMBOL write_wifi_chan_data  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL ets_delay_us
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL ets_delay_us  SYMBOL pll_correct_dcap  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL phy_en_hw_set_freq
+$70 L:
+  A1 64 ENTRY,  A5 $4 L L32R,  A6 1 MOVI,  A10 A5 A5 OR,  A4 A4 0 8 EXTUI,
+  A3 A3 15 SEXT,  A8 $0 L L32R,  A2 A2 0 8 EXTUI,  A6 A8 0 S8I,  MEMW,
+  A8 $1C L L32R,  A8 CALLX8,
+  A10 A10 16 4 EXTUI,  A10 A1 16 S32I.N,  A10 A5 MOV.N,  A8 $20 L L32R,  A8 CALLX8,
+  A10 A10 20 4 EXTUI,  A10 A1 20 S32I.N,  A8 $24 L L32R,  A8 CALLX8,
+  A10 A5 MOV.N,  A8 $28 L L32R,  A8 CALLX8,
+  A8 -257 MOVI,  A10 A10 A8 AND,  MEMW,  A10 A5 0 S32I.N,  A10 A5 MOV.N,
+  A8 A1 24 S32I.N,  A8 $2C L L32R,  A8 CALLX8,
+  A9 $8 L L32R,  A7 A10 A9 AND,  A10 A5 MOV.N,  A6 $C L L32R,  A6 A7 A6 OR,
+  A7 0 MOVI.N,  MEMW,  A6 A5 0 S32I,  A8 $30 L L32R,  A8 CALLX8,
+  A9 $10 L L32R,  A6 A10 A9 AND,  A10 A5 MOV.N,  MEMW,  A6 A5 0 S32I,
+  A8 $34 L L32R,  A8 CALLX8,
+  A11 A4 MOV.N,  A6 $14 L L32R,  A4 A10 A6 AND,  A10 A3 MOV.N,  A3 A2 1 SLLI,  MEMW,
+  A4 A5 0 S32I.N,  A8 $38 L L32R,  A8 CALLX8,
+  A10 A2 MOV.N,  A8 $3C L L32R,  A8 CALLX8,
+  A10 A5 MOV.N,  A4 A3 0 8 EXTUI,  A8 $40 L L32R,  A8 CALLX8,
+  A3 -256 MOVI,  A10 A10 A3 AND,  A3 A4 A10 OR,  MEMW,  A3 A5 0 S32I.N,
+  A6 12 MOVI.N,  A4 $100 MOVI,  $13C L J,
+$13A L:
+  A7 A10 MOV.N,
+$13C L:
+  A10 A5 MOV.N,  A8 $44 L L32R,  A8 CALLX8,
+  A10 A10 A4 OR,  MEMW,  A10 A5 0 S32I.N,  A10 2 MOVI.N,  A8 $48 L L32R,  A8 CALLX8,
+  A3 A5 MOV.N,
+$156 L:
+  A10 A3 MOV.N,  A8 $4C L L32R,  A8 CALLX8,
+  A10 $190 L BGEZ,
+$161 L:
+  A10 A5 MOV.N,  A8 $50 L L32R,  A8 CALLX8,
+  A8 -257 MOVI,  A10 A10 A8 AND,  MEMW,  A10 A5 0 S32I.N,  A10 40 MOVI.N,
+  A8 $54 L L32R,  A8 CALLX8,
+  A12 1 MOVI.N,  A11 A1 MOV.N,  A10 A2 MOV.N,  A8 $58 L L32R,  A8 CALLX8,
+  A10 A10 0 8 EXTUI,  A10 $1A0 L BNEZ.N,
+  $1BD L J,
+$190 L:
+  A10 A3 MOV.N,  A8 $5C L L32R,  A8 CALLX8,
+  A10 A4 $156 L BANY,
+  $161 L J,
+  2 ZEROS,
+$1A0 L:
+  A3 A10 7 SEXT,  A3 1 $1AC L BNEI,
+  A8 A7 7 SEXT,  A8 -1 $1BD L BEQI,
+$1AC L:
+  A3 -1 $1B5 L BNEI,
+  A7 A7 7 SEXT,  A7 1 $1BD L BEQI,
+$1B5 L:
+  A6 A6 -1 ADDI.N,  A6 A6 0 8 EXTUI,  A6 $13A L BNEZ,
+$1BD L:
+  A9 $0 L L32R,  A2 0 MOVI.N,  A10 A5 A5 OR,  A2 A9 0 S8I,  MEMW,  A8 $60 L L32R,
+  A8 CALLX8,
+  A2 $10 L L32R,  A10 A10 A2 AND,  A3 A1 16 L32I.N,  A2 A3 16 SLLI,  A2 A10 A2 OR,
+  A10 A5 MOV.N,  MEMW,  A2 A5 0 S32I,  A8 $64 L L32R,  A8 CALLX8,
+  A8 A1 20 L32I.N,  A2 A8 20 SLLI,  A6 $14 L L32R,  A10 A10 A6 AND,  A2 A10 A2 OR,
+  A10 A5 MOV.N,  MEMW,  A2 A5 0 S32I.N,  A8 $68 L L32R,  A8 CALLX8,
+  A9 $8 L L32R,  A10 A10 A9 AND,  A2 $18 L L32R,  MEMW,  A10 A5 0 S32I.N,  NOP.N,
+  NOP.N,  NOP.N,  NOP.N,  A2 A2 0 L8UI,  A2 $229 L BNEZ.N,
+  A8 $6C L L32R,  A8 CALLX8,
+$229 L:
+  RETW.N,
+$22B L:  END-CODE
+
+CODE set_channel_rfpll_freq   \ .text.set_channel_rfpll_freq $3C
+  $0 15 LITERALS
+    $96C T,  $9B4 T,  SYMBOL chip7_sleep_params  SYMBOL g_phyFuns
+    SYMBOL rodata.str1.4  $3FF5D008 T,  $20000000 T,  $3FF4E168 T,  $3FF4E0C4 T,
+    SYMBOL phy_printf  SYMBOL esp_dport_access_reg_read
+    SYMBOL set_chan_freq_sw_start  SYMBOL esp_dport_access_reg_read
+    SYMBOL write_wifi_chan_data  SYMBOL esp_dport_access_reg_read
+$3C L:
+  A1 32 ENTRY,  A5 $8 L L32R,  A2 A2 0 8 EXTUI,  A3 A3 0 8 EXTUI,  A4 A4 15 SEXT,
+  A5 A5 0 L32I.N,  A5 4 $68 L BBSI,
+  A10 A2 7 SEXT,  A12 A4 MOV.N,  A2 $C L L32R,  A11 A3 MOV.N,  A2 A2 0 L32I.N,
+  A2 A2 244 L32I,  A2 CALLX8,
+  A2 A10 MOV.N,  RETW.N,
+  2 ZEROS,
+$68 L:
+  A11 A2 7 SEXT,  A11 $79 L BEQZ.N,
+  A2 14 MOVI.N,  A2 A11 $79 L BLT,
+  A11 A2 $A8 L BEQ,
+  $8D L J,
+  1 ZEROS,
+$79 L:
+  A10 $10 L L32R,  A7 12 MOVI.N,  A8 $24 L L32R,  A8 CALLX8,
+  A6 A7 MOV.N,  A2 $0 L L32R,  $AF L J,
+  1 ZEROS,
+$8D L:
+  A11 A11 -1 ADDI.N,  A11 A11 A11 ADDX4,  A2 A11 0 16 EXTUI,  A5 $0 L L32R,
+  A6 A2 12 ADDI.N,  A6 A6 0 16 EXTUI,  A2 A2 A5 ADD.N,  A2 A2 0 16 EXTUI,
+  A7 A6 0 8 EXTUI,  $AF L J,
+$A8 L:
+  A7 84 MOVI.N,  A2 $4 L L32R,  A6 A7 MOV.N,
+$AF L:
+  A10 $14 L L32R,  A8 $28 L L32R,  A8 CALLX8,
+  A5 $18 L L32R,  A10 A10 A5 AND,  A10 A10 29 3 EXTUI,  A5 $1C L L32R,
+  A10 $D4 L BNEZ.N,
+  A12 A3 MOV.N,  A11 A4 MOV.N,  A10 A7 MOV.N,  A8 $2C L L32R,  A8 CALLX8,
+  RETW.N,
+$D4 L:
+  A10 A5 MOV.N,  A8 $30 L L32R,  A8 CALLX8,
+  A10 $D4 L BLTZ,
+  A10 A7 A7 OR,  A8 $34 L L32R,  A8 CALLX8,
+  A4 $20 L L32R,  A3 -256 MOVI,  A10 A4 MOV.N,  A8 $38 L L32R,  A8 CALLX8,
+  A6 A6 1 SLLI,  A10 A10 A3 AND,  A6 A6 0 8 EXTUI,  A6 A6 A10 OR,  MEMW,
+  A6 A4 0 S32I.N,  RETW.N,
+$109 L:  END-CODE
+
+CODE chip_v7_set_chan_nomac   \ .text.chip_v7_set_chan_nomac $48
+  $0 18 LITERALS
+    $60033C00 T,  SYMBOL phy_freq_offset  SYMBOL chip7_sleep_params
+    SYMBOL phy_dis_pwdet_one  SYMBOL chip7_phy_init_ctrl  SYMBOL g_phyFuns
+    SYMBOL chan14_mic_en  SYMBOL disable_wifi_agc  SYMBOL phy_enter_critical
+    SYMBOL set_channel_rfpll_freq  SYMBOL bb_bss_cbw40  SYMBOL bb_bss_cbw40
+    SYMBOL chip_v7_set_chan_misc  SYMBOL phy_exit_critical  SYMBOL chan14_mic_cfg
+    SYMBOL chan14_mic_cfg  SYMBOL phy_wifi_bb_reset  SYMBOL enable_wifi_agc
+$48 L:
+  A1 48 ENTRY,  A6 $8 L L32R,  A2 A2 0 8 EXTUI,  A5 A2 7 SEXT,  A3 A3 0 8 EXTUI,
+  A4 A3 7 SEXT,  A7 $0 L L32R,  MEMW,  A7 A7 0 L32I.N,  A7 1 MOVI.N,  A2 A6 81 S8I,
+  MEMW,  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A2 $C L L32R,  A7 A2 0 S8I,  MEMW,  NOP.N,
+  NOP.N,  NOP,  NOP.N,  A2 $4 L L32R,  A7 A2 0 L16SI,  A8 $1C L L32R,  A8 CALLX8,
+  A8 $20 L L32R,  A8 CALLX8,
+  A12 A7 MOV.N,  A2 A10 MOV.N,  A7 $10 L L32R,  A10 A5 MOV.N,  A11 A7 1 L8UI,
+  A8 $24 L L32R,  A8 CALLX8,
+  A7 A10 MOV.N,  A4 4 $C1 L BLTI,
+  A10 A6 83 L8UI,  A10 A10 7 SEXT,  A8 $28 L L32R,  A8 CALLX8,
+  A12 A4 MOV.N,  $E5 L J,
+  3 ZEROS,
+$C1 L:
+  A12 A6 83 L8UI,  A12 A12 7 SEXT,  A12 A4 $E5 L BEQ,
+  A10 A4 MOV.N,  A4 A1 0 S32I.N,  A8 $2C L L32R,  A8 CALLX8,
+  A3 A6 83 S8I,  MEMW,  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A12 A1 0 L32I,
+$E5 L:
+  A11 A7 MOV.N,  A10 A5 MOV.N,  A3 $14 L L32R,  A3 A3 0 L32I.N,  A3 A3 100 L32I,
+  A3 CALLX8,
+  A10 A5 MOV.N,  A8 $30 L L32R,  A8 CALLX8,
+  A10 A2 MOV.N,  A8 $34 L L32R,  A8 CALLX8,
+  A2 $18 L L32R,  A2 A2 0 L8UI,  A2 $124 L BEQZ.N,
+  A2 14 MOVI.N,  A5 A2 $11C L BNE,
+  A10 1 MOVI.N,  A8 $38 L L32R,  A8 CALLX8,
+  $124 L J,
+$11C L:
+  A10 0 MOVI.N,  A8 $3C L L32R,  A8 CALLX8,
+$124 L:
+  A8 $40 L L32R,  A8 CALLX8,
+  A8 $44 L L32R,  A8 CALLX8,
+  RETW.N,
+$132 L:  END-CODE
+
+CODE chip_v7_set_chan   \ .text.chip_v7_set_chan $C
+  $0 3 LITERALS
+    SYMBOL chip_sleep_prot_en  SYMBOL chip_v7_set_chan_nomac
+    SYMBOL chip_sleep_prot_dis
+$C L:
+  A1 32 ENTRY,  A8 $0 L L32R,  A8 CALLX8,
+  A10 A2 0 8 EXTUI,  A11 A3 0 8 EXTUI,  A11 A11 7 SEXT,  A10 A10 7 SEXT,
+  A8 $4 L L32R,  A8 CALLX8,
+  A8 $8 L L32R,  A8 CALLX8,
+  RETW.N,
+$2F L:  END-CODE
+
+CODE chip_v7_set_chan_offset   \ .text.chip_v7_set_chan_offset $20
+  $0 8 LITERALS
+    SYMBOL phy_freq_offset  SYMBOL chip7_phy_init_ctrl  SYMBOL chip7_sleep_params
+    SYMBOL phy_enter_critical  SYMBOL phy_freq_correct_opt
+    SYMBOL set_channel_rfpll_freq  SYMBOL bb_bss_cbw40  SYMBOL phy_exit_critical
+$20 L:
+  A1 32 ENTRY,  A8 $C L L32R,  A8 CALLX8,
+  A3 $4 L L32R,  A2 A2 15 SEXT,  A5 A10 MOV.N,  A4 $0 L L32R,  A8 A3 78 L8UI,
+  A2 A4 0 S16I,  MEMW,  A8 $59 L BEQZ.N,
+  NOP.N,  NOP,  NOP,  NOP,  A8 A3 79 L8UI,  A8 A8 7 SEXT,  A2 A8 A2 ADDX8,
+  A2 A4 0 S16I,  MEMW,
+$59 L:
+  A8 $10 L L32R,  A8 CALLX8,
+  A2 $8 L L32R,  A10 A2 81 L8UI,  A10 A10 7 SEXT,  A12 A4 0 L16SI,  A11 A3 1 L8UI,
+  A8 $14 L L32R,  A8 CALLX8,
+  A10 A2 83 L8UI,  A10 A10 7 SEXT,  A8 $18 L L32R,  A8 CALLX8,
+  A10 A5 MOV.N,  A8 $1C L L32R,  A8 CALLX8,
+  RETW.N,
+$8A L:  END-CODE
+
+CODE chip_v7_set_chan_ana   \ .text.chip_v7_set_chan_ana $C
+  $0 3 LITERALS
+    SYMBOL chip7_phy_init_ctrl  SYMBOL chip7_sleep_params
+    SYMBOL set_channel_rfpll_freq
+$C L:
+  A1 32 ENTRY,  A8 $0 L L32R,  A2 A2 0 8 EXTUI,  A12 0 MOVI,  A10 A2 7 SEXT,
+  A11 A8 1 L8UI,  A8 $8 L L32R,  A8 CALLX8,
+  A8 $4 L L32R,  A2 A8 81 S8I,  MEMW,  RETW.N,
+$2F L:  END-CODE
+
+CODE freq_write_wifi_chan   \ .text.freq_write_wifi_chan $30
+  $0 12 LITERALS
+    $3FF4E0C4 T,  $E7FFFFFF T,  $10000000 T,  SYMBOL esp_dport_access_reg_read
+    SYMBOL write_wifi_chan_data  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL ets_delay_us
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+$30 L:
+  A1 32 ENTRY,  A4 $0 L L32R,  A2 A2 0 8 EXTUI,  A10 A4 MOV.N,  A8 $C L L32R,
+  A8 CALLX8,
+  A5 $4 L L32R,  A8 A10 A5 AND,  A10 A2 MOV.N,  A2 A2 1 SLLI,  A3 $8 L L32R,
+  A2 A2 0 8 EXTUI,  A3 A8 A3 OR,  MEMW,  A3 A4 0 S32I,  A8 $10 L L32R,  A8 CALLX8,
+  A10 A4 MOV.N,  A8 $14 L L32R,  A8 CALLX8,
+  A3 -256 MOVI,  A10 A10 A3 AND,  A2 A2 A10 OR,  MEMW,  A2 A4 0 S32I,  A10 A4 A4 OR,
+  A8 $18 L L32R,  A8 CALLX8,
+  A3 $100 MOVI,  A10 A10 A3 OR,  MEMW,  A10 A4 0 S32I.N,  A10 2 MOVI.N,
+  A8 $1C L L32R,  A8 CALLX8,
+  A2 A4 MOV.N,
+$96 L:
+  A10 A2 MOV.N,  A8 $20 L L32R,  A8 CALLX8,
+  A10 $C6 L BGEZ,
+$A1 L:
+  A10 A4 MOV.N,  A8 $24 L L32R,  A8 CALLX8,
+  A2 -257 MOVI,  A10 A10 A2 AND,  MEMW,  A10 A4 0 S32I.N,  A10 A4 MOV.N,
+  A8 $28 L L32R,  A8 CALLX8,
+  A10 A10 A5 AND,  MEMW,  A10 A4 0 S32I.N,  RETW.N,
+$C6 L:
+  A10 A2 MOV.N,  A8 $2C L L32R,  A8 CALLX8,
+  A10 A3 $96 L BANY,
+  $A1 L J,
+$D4 L:  END-CODE
+
+CODE phy_unforce_chan   \ .text.phy_unforce_chan $18
+  $0 6 LITERALS
+    SYMBOL chip7_sleep_params  $96C T,  SYMBOL phy_enter_critical
+    SYMBOL freq_write_wifi_chan  SYMBOL phy_en_hw_set_freq
+    SYMBOL phy_exit_critical
+$18 L:
+  A1 32 ENTRY,  A8 $8 L L32R,  A8 CALLX8,
+  A8 $0 L L32R,  A9 13 MOVI.N,  A2 A10 MOV.N,  A10 84 MOVI.N,  A8 A8 81 L8UI,
+  A9 A8 $40 L BLTU,
+  A10 A8 -1 ADDI.N,  A10 A10 A10 ADDX4,  A8 $4 L L32R,  A10 A10 A8 ADD.N,
+  A10 A10 -96 ADDI,  A10 A10 0 8 EXTUI,
+$40 L:
+  A8 $C L L32R,  A8 CALLX8,
+  A8 $10 L L32R,  A8 CALLX8,
+  A10 A2 MOV.N,  A8 $14 L L32R,  A8 CALLX8,
+  RETW.N,
+$56 L:  END-CODE
+
+CODE phy_force_chan   \ .text.phy_force_chan $10
+  $0 4 LITERALS
+    SYMBOL phy_enter_critical  SYMBOL phy_dis_hw_set_freq
+    SYMBOL freq_write_wifi_chan  SYMBOL phy_exit_critical
+$10 L:
+  A1 32 ENTRY,  A8 $0 L L32R,  A8 CALLX8,
+  A3 A10 MOV.N,  A2 A2 0 8 EXTUI,  A8 $4 L L32R,  A8 CALLX8,
+  A10 A2 MOV.N,  A8 $8 L L32R,  A8 CALLX8,
+  A10 A3 MOV.N,  A8 $C L L32R,  A8 CALLX8,
+  RETW.N,
+$36 L:  END-CODE
+
+CODE phy_set_wifi_mode_only   \ .text.phy_set_wifi_mode_only $4
+  $0 1 LITERALS
+    SYMBOL phy_freq_wifi_only
+$4 L:
+  A1 32 ENTRY,  A8 $0 L L32R,  A2 A8 0 S8I,  MEMW,  RETW.N,
+$12 L:  END-CODE
+
+LINK-SYMBOLS   \ the cells of other packages that wait for these names
+END-PACKAGE  PREVIOUS   \ not in the search order: ALSO name gives its words (README.md)

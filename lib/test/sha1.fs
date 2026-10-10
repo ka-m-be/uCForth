@@ -1,0 +1,29 @@
+\ sha1.fs - FIPS 180-4 vectors; load SHA1, BYTES and tester first
+ONLY FORTH DEFINITIONS ALSO SHA1 ALSO BYTES
+CREATE EEMPTY $DA C, $39 C, $A3 C, $EE C, $5E C, $6B C, $4B C, $0D C, $32 C, $55 C,
+  $BF C, $EF C, $95 C, $60 C, $18 C, $90 C, $AF C, $D8 C, $07 C, $09 C,
+CREATE ABC $A9 C, $99 C, $3E C, $36 C, $47 C, $06 C, $81 C, $6A C, $BA C, $3E C,
+  $25 C, $71 C, $78 C, $50 C, $C2 C, $6C C, $9C C, $D0 C, $D8 C, $9D C,
+CREATE TWO $84 C, $98 C, $3E C, $44 C, $1C C, $3B C, $D2 C, $6E C, $BA C, $AE C,
+  $4A C, $A1 C, $F9 C, $51 C, $29 C, $E5 C, $E5 C, $46 C, $70 C, $F1 C,
+SHA1-CONTEXT BUFFER: SNAP
+T{ S" " SHA1-DIGEST EEMPTY 20 BYTES= -> TRUE }T
+T{ S" abc" SHA1-DIGEST ABC 20 BYTES= -> TRUE }T
+T{ S" abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq" SHA1-DIGEST TWO 20 BYTES= -> TRUE }T
+: STREAM ( -- f )
+  SHA1-START S" a" SHA1-ADD SNAP SHA1-SAVE
+  S" wrong" SHA1-ADD SNAP SHA1-RESTORE
+  S" b" SHA1-ADD S" c" SHA1-ADD SHA1-END ABC 20 BYTES= ;
+T{ STREAM -> TRUE }T
+1000 BUFFER: S1000
+CREATE E1000 $AF C, $0B C, $19 C, $1C C, $2D C, $E4 C, $6F C, $E1 C, $3F C, $E0 C,
+  $90 C, $8F C, $5A C, $6A C, $4E C, $90 C, $E0 C, $CA C, $FC C, $46 C,
+: MANY ( -- f )
+  1000 0 DO I $FF AND S1000 I + C! LOOP SHA1-START
+  S1000 1 SHA1-ADD S1000 1+ 63 SHA1-ADD S1000 64 + 936 SHA1-ADD
+  SHA1-END E1000 20 BYTES= ;
+T{ MANY -> TRUE }T
+: BAD-LENGTH ( -- )  0 -1 SHA1-ADD ;
+T{ ' BAD-LENGTH CATCH 0<> -> TRUE }T
+SHA1-CLEAR
+S" sha1" .RESULTS

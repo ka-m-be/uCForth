@@ -1,0 +1,33 @@
+\ stamock.fs - only synthetic frames; no hardware or OS network access
+PACKAGE TEST-STA ALSO BYTES
+CREATE OWN 2 C, 0 C, 0 C, 0 C, 0 C, 2 C,
+CREATE AP 2 C, 0 C, 0 C, 0 C, 0 C, 1 C,
+PUBLIC
+512 BUFFER: RF
+512 BUFFER: SENT
+VARIABLE RF-N VARIABLE RF-READY VARIABLE SENT-N VARIABLE SENDS
+VARIABLE NOW VARIABLE RANDS VARIABLE BAD-RNG
+VARIABLE CHANNEL VARIABLE FILTERED
+: MILLIS ( -- n ) 1 NOW +! NOW @ ;
+: RADIO-START ( -- ) 1 CHANNEL ! ;
+: RADIO-CHANNEL! ( n -- ) CHANNEL ! ;
+: RADIO-CHANNEL@ ( -- n ) CHANNEL @ ;
+: RADIO-BEACONS ( -- ) FALSE FILTERED ! ;
+: RADIO-LEVEL ( -- n ) -40 ;
+: RADIO-MAC@ ( -- a ) OWN ;
+: RADIO-STATION ( a -- ) AP 6 BYTES= 0= ABORT" test: wrong peer" TRUE FILTERED ! ;
+: RADIO-RANDOM ( a n -- )
+  BAD-RNG @ IF 0 FILL ELSE 0 DO $40 I + OVER I + C! LOOP DROP THEN 1 RANDS +! ;
+: RADIO-RECEIVE ( -- a n | 0 )
+  RF-READY @ IF FALSE RF-READY ! RF RF-N @ ELSE 0 THEN ;
+: RADIO-SEND ( a n ack -- )
+  0= ABORT" test: ACK not requested"
+  OVER 4 + AP 6 BYTES= 0= ABORT" test: TX peer mismatch"
+  OVER 10 + OWN 6 BYTES= 0= ABORT" test: TX source mismatch"
+  DUP SENT-N ! SENT SWAP MOVE 1 SENDS +! ;
+: RF-HEADER ( fc flags -- )
+  RF 512 0 FILL RF 1+ C! RF C!
+  OWN RF 4 + 6 MOVE AP RF 10 + 6 MOVE AP RF 16 + 6 MOVE ;
+: RECEIVE ( n -- ) RF-N ! TRUE RF-READY ! ;
+END-PACKAGE
+: RADIO ( -- ) TEST-STA ;

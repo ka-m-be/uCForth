@@ -1,0 +1,70 @@
+\ macinit.fs - ESP32 MAC initialization in Forth, with the PHY kept separate
+\
+\ Register sequence from hal_init of libpp.a and its MAC helpers
+\ (Espressif, Apache 2.0; blob/esp32/libpp). No C MAC function is
+\ called here. PHY-LOW-OFF still owns the PHY rate and calibrated power
+\ tables. On the board, the registers matched the binary hal_init (69 of
+\ 69), and RX, TX and ACK passed; the binary oracle is gone (git 9b67376).
+PACKAGE ESP32-MAC  ALSO ESP32-PHY
+$3FF73000 CONSTANT MAC-BASE
+: REG ( offset -- a )   MAC-BASE + ;
+: SET ( mask offset -- )   REG BIS! ;
+: CLEAR ( mask offset -- )   REG BIC! ;
+: WRITE ( x offset -- )   REG ! ;
+: TXRX-INIT ( -- )
+  $80802000 $C6C SET  $100 $C6C SET
+  4 0 DO  $40 $D8 I CELLS + SET  $20 $D8 I CELLS + CLEAR  LOOP
+  8 $C74 SET
+  4 0 DO  $FFFF0000 $F8 I CELLS + CLEAR  LOOP
+  $1000000 $F8 SET  $1000000 $FC SET  $4000000 $F8 SET  $4000000 $FC SET
+  $F0 $10C CLEAR  $80000000 $114 SET
+  $0FF00000 $114 CLEAR  $1B00000 $114 SET
+  3 $C78 SET  $F0 $D78 CLEAR
+  $FF $C54 CLEAR  4 $C54 SET  $FF00 $C54 CLEAR  $400 $C54 SET
+  $FFF $C1C CLEAR  $F0 $C1C SET  $80000000 $C1C SET  $40000000 $C1C SET
+  $FFF $C20 CLEAR  $F0 $C20 SET  $FFF $C24 CLEAR  $F0 $C24 SET
+  $F0 $CAC CLEAR  $40 $CAC SET
+  $7FFF0000 $C5C SET  $80000000 $C5C SET
+  $0F000000 $C88 CLEAR  2 $288 SET  $80000000 $84 CLEAR ;
+: FILTER-INIT ( -- )
+  4 0 DO
+    5 $D8 I CELLS + SET  $900 $D8 I CELLS + CLEAR
+    I 3 < IF
+      $110 $D8 I CELLS + CLEAR
+      $10000 $24 I 8 * + CLEAR  $10000 $64 I 8 * + CLEAR
+    THEN
+  LOOP ;
+: RX-BUFS ( -- )
+  $3FFAE000 $11C WRITE  $3FFAE000 $124 WRITE
+  $400A0000 $118 WRITE  $400A0000 $120 WRITE
+  $FF $80 CLEAR  0 $88 WRITE  $20000000 $80 CLEAR
+  $3000 $14C WRITE  0 $158 WRITE  12 $164 WRITE
+  $800 $148 SET  $100 $148 SET  $8000000 $9C SET ;
+: ACK-RATES ( -- )
+  0 $404 WRITE  0 $400 WRITE  $03020100 $40C WRITE  $07060500 $408 WRITE
+  $0B0B0B0B $414 WRITE  $0B0B0B0B $410 WRITE
+  $090B0B0B $41C WRITE  $09090909 $418 WRITE ;
+: NORMAL-RATES ( -- )
+  PHY-LOW-OFF
+  $090B0B0B $41C WRITE  $09090909 $418 WRITE
+  $400 $6001C860 BIC!  $800 $6001C860 BIC!  $800 $6001C87C BIC! ;
+: CRYPTO-RESET ( -- )   \ neutral control state, no keys or cryptographic operations
+  2 0 DO  $30000 $800 I CELLS + WRITE  LOOP
+  3 0 DO  0 $808 I CELLS + WRITE  LOOP ;
+: ANTENNA-INIT ( -- )
+  8 0 DO  7 $125C I 60 * - CLEAR  LOOP
+  8 0 DO
+    8 $125C I 60 * - CLEAR  $20 $125C I 60 * - SET  $10 $125C I 60 * - CLEAR
+  LOOP
+  7 $284 CLEAR  $20 $284 SET ;
+: WAIT-MAC ( -- )
+  1000 0 DO  $D24 REG @ 1 AND IF  UNLOOP EXIT  THEN  LOOP
+  TRUE ABORT" ESP32-MAC: initialization did not become ready" ;
+PUBLIC
+: MAC-HAL-INIT ( -- )
+  2 $D24 SET  WAIT-MAC  0 $C40 WRITE  -1 $C4C WRITE
+  TXRX-INIT  FILTER-INIT  RX-BUFS  ACK-RATES  NORMAL-RATES
+  CRYPTO-RESET  ANTENNA-INIT
+  $1E839E0 $C40 WRITE  $40000000 $3FF5D040 BIS!
+  $FF $9C CLEAR  2 $9C SET ;
+END-PACKAGE

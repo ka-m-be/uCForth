@@ -1,0 +1,52 @@
+\ ccmp.fs - CCMP header, AAD and 48-bit packet numbers, no radio or keys
+PACKAGE CCMP ALSO BYTES
+VARIABLE FRAME
+VARIABLE HLEN
+VARIABLE TID
+VARIABLE OUT-AAD
+VARIABLE OUT-NONCE
+: NEED ( f -- ) 0= IF -439 THROW THEN ;
+PUBLIC
+: CCMP-HEAD ( a n -- header-bytes tid )
+  DUP 24 < 0= NEED OVER FRAME !
+  OVER C@ DUP 8 = SWAP $88 = OR NEED
+  OVER 1+ C@ DUP 3 AND DUP 1 = SWAP 2 = OR NEED
+  $44 AND $40 = NEED
+  OVER 22 + C@ 15 AND 0= NEED
+  24 HLEN ! 0 TID !
+  OVER C@ $80 AND IF
+    DUP 26 < 0= NEED
+    OVER 24 + C@ DUP $80 AND 0= NEED 15 AND TID !
+    26 HLEN !
+    OVER 1+ C@ $80 AND IF 30 HLEN ! THEN
+  ELSE OVER 1+ C@ $80 AND 0= NEED THEN
+  DUP HLEN @ 16 + < 0= NEED 2DROP HLEN @ TID @ ;
+: CCMP-AAD ( frame header-bytes aad -- n )
+  OUT-AAD ! HLEN ! FRAME !
+  OUT-AAD @ 24 0 FILL
+  FRAME @ C@ $8F AND OUT-AAD @ C!
+  FRAME @ 1+ C@ $C7 AND HLEN @ 24 > IF $7F AND THEN OUT-AAD @ 1+ C!
+  FRAME @ 4 + OUT-AAD @ 2 + 18 MOVE
+  FRAME @ 22 + C@ 15 AND OUT-AAD @ 20 + C!
+  HLEN @ 24 > IF FRAME @ 24 + C@ 15 AND OUT-AAD @ 22 + C! 24 ELSE 22 THEN ;
+: CCMP-NONCE ( frame pn tid out -- )
+  OUT-NONCE ! OUT-NONCE @ C! SWAP 10 + OUT-NONCE @ 1+ 6 MOVE
+  6 0 DO DUP 5 I - + C@ OUT-NONCE @ 7 + I + C! LOOP DROP ;
+: CCMP-PN@ ( header pn -- key-id )
+  OVER 2 + C@ 0= NEED OVER 3 + C@ DUP $3F AND $20 = NEED 6 RSHIFT >R
+  OVER C@ OVER C! OVER 1+ C@ OVER 1+ C!
+  4 0 DO OVER I 4 + + C@ OVER I 2 + + C! LOOP 2DROP R> ;
+: CCMP-PN! ( pn header key-id -- )
+  DUP 0 4 WITHIN NEED 6 LSHIFT $20 OR OVER 3 + C! 0 OVER 2 + C!
+  OVER C@ OVER C! OVER 1+ C@ OVER 1+ C!
+  4 0 DO OVER I 2 + + C@ OVER I 4 + + C! LOOP 2DROP ;
+: PN< ( a b -- f )
+  6 0 DO
+    OVER 5 I - + C@ OVER 5 I - + C@ 2DUP <> IF < >R 2DROP R> UNLOOP EXIT THEN 2DROP
+  LOOP 2DROP FALSE ;
+: PN-NEXT ( a -- )
+  6 0 DO
+    DUP I + DUP C@ 1+ DUP 256 < IF SWAP C! DROP UNLOOP EXIT THEN
+    DROP 0 SWAP C!
+  LOOP DROP -438 THROW ;
+END-PACKAGE

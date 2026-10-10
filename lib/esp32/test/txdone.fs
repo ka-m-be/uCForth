@@ -1,0 +1,157 @@
+\ txdone.fs - ESP32-RADIO TX start, completion and errors, on the host
+\
+\ First run the RX and TX-preparation tests. Hardware events below
+\ update the MAC model; MILLIS advances a deterministic clock and can
+\ deliver an interrupt. No real hardware or frames are used.
+\ In the folder ucf, with 32-bit cells:
+\   build/ucf-c -32 host/files.fs lib/esp32/test/txdone.fs </dev/null
+
+ONLY FORTH DEFINITIONS  ALSO FILES
+INCLUDE lib/esp32/test/txhost.fs
+
+VARIABLE AFTER
+VARIABLE COMPLETE-BITS
+VARIABLE ERROR-BITS
+VARIABLE EVENT-PMD
+: IRQ ( -- )   INT0-ON @ IF  INT0-XT @ EXECUTE  THEN ;
+: EVENT ( complete error pmd -- )
+  TX-PMD >HOST !  TX-ERROR-STATUS >HOST !  TX-COMPLETE-STATUS >HOST !
+  0 PMD-READS !  -1 TX-CLEAR-READS !
+  TX-COMPLETE-STATUS @ IF  $80 INT-STATUS BIS!  THEN
+  TX-ERROR-STATUS @ $1F AND IF  $100 INT-STATUS BIS!  THEN
+  TX-ERROR-STATUS @ $1F0000 AND IF  $80000 INT-STATUS BIS!  THEN ;
+: ADVANCE ( -- )
+  TX-CTRL @ TX-START-BITS AND TX-START-BITS = IF
+    -1 AFTER +!  AFTER @ 0= IF
+      0 MAC-HOOK !  COMPLETE-BITS @ ERROR-BITS @ EVENT-PMD @ EVENT  IRQ
+    THEN
+  THEN ;
+: PLAN ( delay complete error pmd -- )
+  EVENT-PMD !  ERROR-BITS !  COMPLETE-BITS !  AFTER !
+  ['] ADVANCE MAC-HOOK ! ;
+: SEND ( -- )   24 SAMPLE FALSE RADIO-SEND ;
+: RESULT ( -- result pmd active blocked )   TX-RESULT @ TX-LAST-PMD @ TX-ACTIVE? TX-BLOCKED? ;
+: WRAP-SEND ( -- dt )   SEND  MAC-NOW @ TX-SINCE - ;
+
+T{ TX-ERROR-CLEAR TX-ERROR-STATUS TX-COMPLETE-CLEAR TX-COMPLETE-STATUS ->
+   $3FF73CBC $3FF73CC0 $3FF73CC4 $3FF73CC8 }T
+T{ TX-MASK TX-TIMEOUT-MASK TX-ERROR-MASK RNG-DATA -> 4 $40000 $40004 $60035144 }T
+T{ ' SEND CATCH -> -2 }T
+RADIO-START
+0 MAC-NOW !  0 #TX-STARTS !  0 #TRACKS !
+T{ RESULT #TX @ -> 0 0 FALSE FALSE 0 }T
+
+\ Ignore stale slot status, then snapshot PMD before clearing the new status.
+4 $40004 $5555 EVENT
+3 4 0 $00AB PLAN
+T{ SEND RESULT -> TX-COMPLETE $00AB FALSE FALSE }T
+T{ #TX-STARTS @ #TX @ TX-CTRL @ -> 1 1 0 }T
+T{ TX-COMPLETE-STATUS @ TX-ERROR-STATUS @ INT-STATUS @ -> 0 0 0 }T
+T{ PMD-READS @ TX-CLEAR-READS @ -> 1 1 }T
+T{ TX-CONFIG @ $3FF000 AND -> $F000 }T
+T{ TX-TEST TX-BUF 24 SAME-BYTES?  RX-CTRL @ RX-ON AND -> TRUE RX-ON }T
+
+\ Ordinary channel access errors are terminal, not a software timeout.
+2 0 $40000 $1234 PLAN
+T{ ' SEND CATCH RESULT -> -2 TX-ACCESS-TIMEOUT $1234 FALSE FALSE }T
+T{ TX-CTRL @ TX-ERROR-STATUS @ TX-CLEAR-READS @ -> 0 0 1 }T
+2 0 4 $0456 PLAN
+T{ ' SEND CATCH RESULT -> -2 TX-COLLISION $0456 FALSE FALSE }T
+2 4 $40004 $0789 PLAN
+T{ ' SEND CATCH RESULT -> -2 TX-ACCESS-TIMEOUT $0789 FALSE FALSE }T
+
+\ Completion with a PMD protocol error must not be reported as success.
+2 4 0 $5001 PLAN
+T{ ' SEND CATCH RESULT -> -2 TX-COMPLETE $5001 FALSE FALSE }T
+T{ TX-LAST-PMD @ TX-CLEAR-READS @ -> $5001 1 }T
+
+\ One caller retains the buffer until the wait is over, even after an IRQ.
+VARIABLE NESTED-ERROR
+: NESTED ( -- )
+  TX-ACTIVE? IF
+    0 MAC-HOOK !  ['] SEND CATCH NESTED-ERROR !
+    4 0 0 EVENT IRQ
+  THEN ;
+' NESTED MAC-HOOK !
+T{ SEND NESTED-ERROR @ RESULT -> -2 TX-COMPLETE 0 FALSE FALSE }T
+
+\ Channel, filter and restart cannot change a transmission in flight.
+VARIABLE CHANNEL-ERROR
+VARIABLE FILTER-ERROR
+VARIABLE RESTART-ERROR
+: CHANGE-CHANNEL ( -- )   6 RADIO-CHANNEL! ;
+: CHANGES ( -- )
+  TX-ACTIVE? IF
+    0 MAC-HOOK !
+    ['] CHANGE-CHANNEL CATCH CHANNEL-ERROR !
+    ['] RADIO-BEACONS CATCH FILTER-ERROR !
+    ['] RADIO-START CATCH RESTART-ERROR !
+    4 0 0 EVENT IRQ
+  THEN ;
+' CHANGES MAC-HOOK !
+T{ SEND CHANNEL-ERROR @ FILTER-ERROR @ RESTART-ERROR @ -> -2 -2 -2 }T
+T{ RADIO-CHANNEL@ BEACONS? TX-ACTIVE? -> 1 FALSE FALSE }T
+
+\ Tracking runs only in the foreground, after every five slot completions.
+RADIO-STOP RADIO-START  0 #TRACKS !
+: FIVE ( -- )   5 0 DO  1 4 0 0 PLAN SEND  LOOP ;
+FIVE
+T{ #TX @ TX-TRACK @ #TRACKS @ -> 5 0 1 }T
+
+\ A completion at the 100-ms boundary wins over the software deadline.
+100 4 0 0 PLAN
+T{ WRAP-SEND RESULT -> 100 TX-COMPLETE 0 FALSE FALSE }T
+
+\ No event: 100 ms exactly; reuse is locked until a real MAC reset.
+0 MAC-HOOK !
+T{ ' SEND CATCH MAC-NOW @ TX-SINCE - RESULT -> -2 100 TX-NO-END 0 FALSE TRUE }T
+T{ TX-CTRL @ RX-CTRL @ RX-ON AND INT0-ON @ -> 0 RX-ON TRUE }T
+T{ 0 #WRITES ! ' SEND CATCH #WRITES @ -> -2 0 }T
+4 0 $5001 EVENT IRQ
+T{ RESULT TX-COMPLETE-STATUS @ -> TX-NO-END 0 FALSE TRUE 0 }T
+RADIO-STOP RADIO-START
+T{ RESULT #TX @ -> 0 0 FALSE FALSE 0 }T
+1 4 0 0 PLAN
+T{ SEND RESULT -> TX-COMPLETE 0 FALSE FALSE }T
+
+\ Another slot cannot finish ours, and its status is not ours to clear.
+2 8 0 $3456 PLAN
+T{ ' SEND CATCH RESULT TX-COMPLETE-STATUS @ -> -2 TX-NO-END $3456 FALSE TRUE 8 }T
+RADIO-STOP RADIO-START
+2 12 0 $00CD PLAN
+T{ SEND RESULT TX-COMPLETE-STATUS @ -> TX-COMPLETE $00CD FALSE FALSE 8 }T
+
+\ The deadline works when MILLIS wraps around the 32-bit boundary.
+RADIO-STOP RADIO-START  $FFFFFFF0 MAC-NOW !
+25 4 0 0 PLAN
+T{ WRAP-SEND MAC-NOW @ 20 U< RESULT -> 25 TRUE TX-COMPLETE 0 FALSE FALSE }T
+
+\ RADIO-STOP and Ctrl-C release the start bits without recycling the buffer.
+: STOP-DURING ( -- )
+  TX-ACTIVE? IF  0 MAC-HOOK !  RADIO-STOP  THEN ;
+' STOP-DURING MAC-HOOK !
+T{ ' SEND CATCH RESULT RADIO-CHANNEL@ -> -2 TX-CANCELLED 0 FALSE TRUE 0 }T
+RADIO-START
+: BREAK-DURING ( -- )
+  TX-ACTIVE? IF  0 MAC-HOOK !  -28 THROW  THEN ;
+' BREAK-DURING MAC-HOOK !
+T{ ' SEND CATCH RESULT TX-CTRL @ -> -28 TX-CANCELLED 0 FALSE TRUE 0 }T
+RADIO-STOP RADIO-START
+
+\ Invalid inputs and ACK without an own MAC start nothing.
+: ACK-SEND ( -- )   24 SAMPLE TRUE RADIO-SEND ;
+: SHORT-SEND ( -- )   $DEADBEEF 23 FALSE RADIO-SEND ;
+T{ 0 #WRITES ! 0 #TX-STARTS ! ' ACK-SEND CATCH #WRITES @ #TX-STARTS @ -> -2 0 0 }T
+T{ ' SHORT-SEND CATCH #WRITES @ #TX-STARTS @ -> -2 0 0 }T
+
+\ RX continues after TX; a mixed RX/TX interrupt preserves both results.
+1 4 0 0 PLAN SEND
+T{ 0 60 FRAME ARRIVE  RECEIVED NIP -> 60 }T
+0 #INTS !  0 INT-BITS !
+24 SAMPLE FALSE 7 TX-PREPARE TX-KICK
+0 60 FRAME ARRIVE  4 0 $00EF EVENT IRQ
+T{ TX-RESULT @ TX-LAST-PMD @ #INTS @ INT-BITS @ -> TX-COMPLETE $00EF 1 $10000A0 }T
+T{ RECEIVED NIP RX-CTRL @ RX-ON AND -> 60 RX-ON }T
+TX-RELEASE
+0 MAC-HOOK !  RADIO-STOP
+S" txdone" .RESULTS

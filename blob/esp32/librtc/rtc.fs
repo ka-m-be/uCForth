@@ -1,0 +1,1408 @@
+\ rtc.fs - package RTC-RTC: rtc.o of librtc.a (ESP32)
+\
+\ Made from rtc.S by s2fs.py, not by hand. Each function of C is a
+\ CODE word: its bytes are those of the compiler, at the same offsets of
+\ its section (L gives the address of an offset); its literals are at the
+\ start of the word, after a jump. The data come first, then the
+\ functions, each after those that it calls. The global symbols are
+\ PUBLIC, the static ones PRIVATE. lib/esp32/clink.fs explains the words.
+\
+\ 24 functions (24 global), 0 data objects.
+\ A function runs as C code with the windowed calls of the Xtensa: call
+\ it with CALL-C ( x1 .. xn n xt -- x ), never by its name alone.
+\
+\ Names of other packages: a literal waits until its package comes
+\ (LINK-SYMBOLS); a name outside the libraries until EXTERN gives it.
+\ Outside the libraries (../README.md):
+\   esp_dport_access_reg_read rtc_init_clk rtc_slp_prep
+\
+\ Needs XTENSA (asm/xtensa.fs), ASM (lib/esp32/asm.fs) and CLINK
+\ (lib/esp32/clink.fs) of ucf; the ESP32.
+
+PACKAGE RTC-RTC  ALSO ASM  ALSO CLINK   \ lib/package.fs
+EXPORTS   \ the PUBLIC words are symbols for the other packages
+
+\ ==== Code =============================================================
+
+CODE rtc_cmd_wakeup_conf   \ .text.rtc_cmd_wakeup_conf $20
+  $0 8 LITERALS
+    $3FF48830 T,  $FFC007FF T,  $8000 T,  $3FF4882C T,
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+$20 L:
+  A1 32 ENTRY,  A3 $0 L L32R,  A2 -2048 MOVI,  A10 A3 MOV.N,  A8 $10 L L32R,
+  A8 CALLX8,
+  A10 A10 A2 AND,  A2 $118 MOVI,  A10 A10 A2 OR,  MEMW,  A10 A3 0 S32I,
+  A10 A3 A3 OR,  A8 $14 L L32R,  A8 CALLX8,
+  A8 $4 L L32R,  A10 A10 A8 AND,  A2 $8 L L32R,  A8 A10 A2 OR,  A2 $C L L32R,
+  A10 A2 MOV.N,  MEMW,  A8 A3 0 S32I.N,  A8 $18 L L32R,  A8 CALLX8,
+  A3 -513 MOVI,  A3 A10 A3 AND,  A10 A2 MOV.N,  MEMW,  A3 A2 0 S32I.N,
+  A8 $1C L L32R,  A8 CALLX8,
+  A3 $300 MOVI,  A10 A10 A3 OR,  MEMW,  A10 A2 0 S32I.N,  RETW.N,
+$85 L:  END-CODE
+
+CODE rtc_pads_muxsel   \ .text.rtc_pads_muxsel $A0
+  $0 40 LITERALS
+    $3FF4847C T,  $F7FFFFFF T,  $FBFFFFFF T,  $FDFFFFFF T,  $FEFFFFFF T,
+    $3FF48480 T,  $DFFFFFFF T,  $EFFFFFFF T,  $3FF48484 T,  $FFFDFFFF T,
+    $3FF48488 T,  $3FF4848C T,  $FFFBFFFF T,  $3FF48494 T,  $FFF7FFFF T,
+    $3FF48498 T,  $3FF4849C T,  $3FF484A0 T,  $3FF484A4 T,  $3FF484A8 T,
+    $3FF484AC T,  $3FF484B0 T,  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read
+$A0 L:
+  A1 32 ENTRY,  A2 0 $C5 L BBCI,
+  A5 $0 L L32R,  A10 A5 MOV.N,  A8 $58 L L32R,  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 27 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$C5 L:
+  A2 1 $F0 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $0 L L32R,  A10 A5 A5 OR,  A8 $5C L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $8 L L32R,  A8 A8 26 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$F0 L:
+  A2 2 $11C L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $0 L L32R,  A10 A5 A5 OR,  A8 $60 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $C L L32R,  A8 A8 25 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$11C L:
+  A2 3 $148 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $0 L L32R,  A10 A5 A5 OR,  A8 $64 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $10 L L32R,  A8 A8 24 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$148 L:
+  A2 4 $174 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $14 L L32R,  A10 A5 A5 OR,  A8 $68 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $18 L L32R,  A8 A8 29 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$174 L:
+  A2 5 $1A0 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $14 L L32R,  A10 A5 A5 OR,  A8 $6C L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $1C L L32R,  A8 A8 28 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$1A0 L:
+  A2 6 $1CC L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $20 L L32R,  A10 A5 A5 OR,  A8 $70 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $24 L L32R,  A8 A8 17 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$1CC L:
+  A2 7 $1F8 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $28 L L32R,  A10 A5 A5 OR,  A8 $74 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $24 L L32R,  A8 A8 17 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$1F8 L:
+  A2 8 $224 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $2C L L32R,  A10 A5 A5 OR,  A8 $78 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $30 L L32R,  A8 A8 18 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$224 L:
+  A2 9 $250 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $2C L L32R,  A10 A5 A5 OR,  A8 $7C L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $24 L L32R,  A8 A8 17 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$250 L:
+  A2 10 $27C L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $34 L L32R,  A10 A5 A5 OR,  A8 $80 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $38 L L32R,  A8 A8 19 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$27C L:
+  A2 11 $2A8 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $3C L L32R,  A10 A5 A5 OR,  A8 $84 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $38 L L32R,  A8 A8 19 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$2A8 L:
+  A2 12 $2D4 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $40 L L32R,  A10 A5 A5 OR,  A8 $88 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $38 L L32R,  A8 A8 19 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$2D4 L:
+  A2 13 $300 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $44 L L32R,  A10 A5 A5 OR,  A8 $8C L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $38 L L32R,  A8 A8 19 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$300 L:
+  A2 14 $32C L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $48 L L32R,  A10 A5 A5 OR,  A8 $90 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $38 L L32R,  A8 A8 19 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$32C L:
+  A2 15 $358 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $4C L L32R,  A10 A5 A5 OR,  A8 $94 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $38 L L32R,  A8 A8 19 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$358 L:
+  A2 16 $384 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $50 L L32R,  A10 A5 A5 OR,  A8 $98 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $38 L L32R,  A8 A8 19 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$384 L:
+  A2 17 $3AA L BBCI,
+  A3 A3 0 1 EXTUI,  A3 A3 19 SLLI,  NOP.N,  NOP.N,  A4 $54 L L32R,  A10 A4 MOV.N,
+  A8 $9C L L32R,  A8 CALLX8,
+  A2 $38 L L32R,  A10 A10 A2 AND,  A3 A3 A10 OR,  MEMW,  A3 A4 0 S32I.N,
+$3AA L:
+  RETW.N,
+$3AC L:  END-CODE
+
+CODE rtc_pads_funsel   \ .text.rtc_pads_funsel $94
+  $0 37 LITERALS
+    $3FF4847C T,  $FF3FFFFF T,  $FFF9FFFF T,  $FFFFCFFF T,  $3FF48480 T,
+    $F3FFFFFF T,  $FF9FFFFF T,  $3FF48484 T,  $FFFE7FFF T,  $3FF48488 T,
+    $3FF4848C T,  $3FF48494 T,  $3FF48498 T,  $3FF4849C T,  $3FF484A0 T,
+    $3FF484A4 T,  $3FF484A8 T,  $3FF484AC T,  $3FF484B0 T,
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+$94 L:
+  A1 32 ENTRY,  A2 0 $B9 L BBCI,
+  A5 $0 L L32R,  A10 A5 MOV.N,  A8 $4C L L32R,  A8 CALLX8,
+  A8 A3 0 2 EXTUI,  A4 $4 L L32R,  A8 A8 22 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$B9 L:
+  A2 1 $E5 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $0 L L32R,  A10 A5 A5 OR,  A8 $50 L L32R,
+  A8 CALLX8,
+  A8 A3 0 2 EXTUI,  A4 $8 L L32R,  A8 A8 17 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$E5 L:
+  A2 2 $111 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $0 L L32R,  A10 A5 A5 OR,  A8 $54 L L32R,
+  A8 CALLX8,
+  A8 A3 0 2 EXTUI,  A4 $C L L32R,  A8 A8 12 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$111 L:
+  A2 3 $139 L BBCI,
+  A4 -385 MOVI,  NOP.N,  NOP.N,  NOP.N,  A5 $0 L L32R,  A10 A5 MOV.N,
+  A8 $58 L L32R,  A8 CALLX8,
+  A8 A3 0 2 EXTUI,  A8 A8 7 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,  MEMW,
+  A10 A5 0 S32I.N,
+$139 L:
+  A2 4 $165 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $10 L L32R,  A10 A5 A5 OR,  A8 $5C L L32R,
+  A8 CALLX8,
+  A8 A3 0 2 EXTUI,  A4 $14 L L32R,  A8 A8 26 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$165 L:
+  A2 5 $191 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $10 L L32R,  A10 A5 A5 OR,  A8 $60 L L32R,
+  A8 CALLX8,
+  A8 A3 0 2 EXTUI,  A4 $18 L L32R,  A8 A8 21 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$191 L:
+  A2 6 $1BD L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $1C L L32R,  A10 A5 A5 OR,  A8 $64 L L32R,
+  A8 CALLX8,
+  A8 A3 0 2 EXTUI,  A4 $20 L L32R,  A8 A8 15 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$1BD L:
+  A2 7 $1E9 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $24 L L32R,  A10 A5 A5 OR,  A8 $68 L L32R,
+  A8 CALLX8,
+  A8 A3 0 2 EXTUI,  A4 $20 L L32R,  A8 A8 15 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$1E9 L:
+  A2 8 $215 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $28 L L32R,  A10 A5 A5 OR,  A8 $6C L L32R,
+  A8 CALLX8,
+  A8 A3 0 2 EXTUI,  A4 $20 L L32R,  A8 A8 15 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$215 L:
+  A2 9 $23D L BBCI,
+  A4 -1537 MOVI,  NOP.N,  NOP.N,  NOP.N,  A5 $28 L L32R,  A10 A5 MOV.N,
+  A8 $70 L L32R,  A8 CALLX8,
+  A8 A3 0 2 EXTUI,  A8 A8 9 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,  MEMW,
+  A10 A5 0 S32I.N,
+$23D L:
+  A2 10 $268 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $2C L L32R,  A10 A5 A5 OR,  A8 $74 L L32R,
+  A8 CALLX8,
+  A8 A3 0 2 EXTUI,  A4 $8 L L32R,  A8 A8 17 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$268 L:
+  A2 11 $294 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $30 L L32R,  A10 A5 A5 OR,  A8 $78 L L32R,
+  A8 CALLX8,
+  A8 A3 0 2 EXTUI,  A4 $8 L L32R,  A8 A8 17 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$294 L:
+  A2 12 $2C0 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $34 L L32R,  A10 A5 A5 OR,  A8 $7C L L32R,
+  A8 CALLX8,
+  A8 A3 0 2 EXTUI,  A4 $8 L L32R,  A8 A8 17 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$2C0 L:
+  A2 13 $2EC L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $38 L L32R,  A10 A5 A5 OR,  A8 $80 L L32R,
+  A8 CALLX8,
+  A8 A3 0 2 EXTUI,  A4 $8 L L32R,  A8 A8 17 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$2EC L:
+  A2 14 $318 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $3C L L32R,  A10 A5 A5 OR,  A8 $84 L L32R,
+  A8 CALLX8,
+  A8 A3 0 2 EXTUI,  A4 $8 L L32R,  A8 A8 17 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$318 L:
+  A2 15 $344 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $40 L L32R,  A10 A5 A5 OR,  A8 $88 L L32R,
+  A8 CALLX8,
+  A8 A3 0 2 EXTUI,  A4 $8 L L32R,  A8 A8 17 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$344 L:
+  A2 16 $370 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $44 L L32R,  A10 A5 A5 OR,  A8 $8C L L32R,
+  A8 CALLX8,
+  A8 A3 0 2 EXTUI,  A4 $8 L L32R,  A8 A8 17 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$370 L:
+  A2 17 $396 L BBCI,
+  A3 A3 0 2 EXTUI,  A3 A3 17 SLLI,  NOP.N,  NOP.N,  A4 $48 L L32R,  A10 A4 MOV.N,
+  A8 $90 L L32R,  A8 CALLX8,
+  A2 $8 L L32R,  A10 A10 A2 AND,  A3 A3 A10 OR,  MEMW,  A3 A4 0 S32I.N,
+$396 L:
+  RETW.N,
+$398 L:  END-CODE
+
+CODE rtc_pads_slpsel   \ .text.rtc_pads_slpsel $94
+  $0 37 LITERALS
+    $3FF4847C T,  $FFDFFFFF T,  $FFFEFFFF T,  $FFFFF7FF T,  $3FF48480 T,
+    $FDFFFFFF T,  $FFEFFFFF T,  $3FF48484 T,  $FFFFBFFF T,  $3FF48488 T,
+    $3FF4848C T,  $3FF48494 T,  $3FF48498 T,  $3FF4849C T,  $3FF484A0 T,
+    $3FF484A4 T,  $3FF484A8 T,  $3FF484AC T,  $3FF484B0 T,
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+$94 L:
+  A1 32 ENTRY,  A2 0 $B9 L BBCI,
+  A5 $0 L L32R,  A10 A5 MOV.N,  A8 $4C L L32R,  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 21 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$B9 L:
+  A2 1 $E5 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $0 L L32R,  A10 A5 A5 OR,  A8 $50 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $8 L L32R,  A8 A8 16 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$E5 L:
+  A2 2 $111 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $0 L L32R,  A10 A5 A5 OR,  A8 $54 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $C L L32R,  A8 A8 11 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$111 L:
+  A2 3 $139 L BBCI,
+  A4 -65 MOVI,  NOP.N,  NOP.N,  NOP.N,  A5 $0 L L32R,  A10 A5 MOV.N,  A8 $58 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A8 A8 6 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,  MEMW,
+  A10 A5 0 S32I.N,
+$139 L:
+  A2 4 $165 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $10 L L32R,  A10 A5 A5 OR,  A8 $5C L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $14 L L32R,  A8 A8 25 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$165 L:
+  A2 5 $191 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $10 L L32R,  A10 A5 A5 OR,  A8 $60 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $18 L L32R,  A8 A8 20 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$191 L:
+  A2 6 $1BD L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $1C L L32R,  A10 A5 A5 OR,  A8 $64 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $20 L L32R,  A8 A8 14 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$1BD L:
+  A2 7 $1E9 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $24 L L32R,  A10 A5 A5 OR,  A8 $68 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $20 L L32R,  A8 A8 14 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$1E9 L:
+  A2 8 $215 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $28 L L32R,  A10 A5 A5 OR,  A8 $6C L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $20 L L32R,  A8 A8 14 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$215 L:
+  A2 9 $23D L BBCI,
+  A4 -257 MOVI,  NOP.N,  NOP.N,  NOP.N,  A5 $28 L L32R,  A10 A5 MOV.N,
+  A8 $70 L L32R,  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A8 A8 8 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,  MEMW,
+  A10 A5 0 S32I.N,
+$23D L:
+  A2 10 $268 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $2C L L32R,  A10 A5 A5 OR,  A8 $74 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $8 L L32R,  A8 A8 16 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$268 L:
+  A2 11 $294 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $30 L L32R,  A10 A5 A5 OR,  A8 $78 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $8 L L32R,  A8 A8 16 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$294 L:
+  A2 12 $2C0 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $34 L L32R,  A10 A5 A5 OR,  A8 $7C L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $8 L L32R,  A8 A8 16 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$2C0 L:
+  A2 13 $2EC L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $38 L L32R,  A10 A5 A5 OR,  A8 $80 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $8 L L32R,  A8 A8 16 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$2EC L:
+  A2 14 $318 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $3C L L32R,  A10 A5 A5 OR,  A8 $84 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $8 L L32R,  A8 A8 16 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$318 L:
+  A2 15 $344 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $40 L L32R,  A10 A5 A5 OR,  A8 $88 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $8 L L32R,  A8 A8 16 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$344 L:
+  A2 16 $370 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $44 L L32R,  A10 A5 A5 OR,  A8 $8C L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $8 L L32R,  A8 A8 16 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$370 L:
+  A2 17 $396 L BBCI,
+  A3 A3 0 1 EXTUI,  A3 A3 16 SLLI,  NOP.N,  NOP.N,  A4 $48 L L32R,  A10 A4 MOV.N,
+  A8 $90 L L32R,  A8 CALLX8,
+  A2 $8 L L32R,  A10 A10 A2 AND,  A3 A3 A10 OR,  MEMW,  A3 A4 0 S32I.N,
+$396 L:
+  RETW.N,
+$398 L:  END-CODE
+
+CODE rtc_pads_slpoe   \ .text.rtc_pads_slpoe $64
+  $0 25 LITERALS
+    $3FF48484 T,  $FFFFEFFF T,  $3FF48488 T,  $3FF4848C T,  $3FF48494 T,
+    $FFFFBFFF T,  $3FF48498 T,  $3FF4849C T,  $3FF484A0 T,  $3FF484A4 T,
+    $3FF484A8 T,  $3FF484AC T,  $3FF484B0 T,  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read
+$64 L:
+  A1 32 ENTRY,  A2 6 $89 L BBCI,
+  A5 $0 L L32R,  A10 A5 MOV.N,  A8 $34 L L32R,  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 12 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$89 L:
+  A2 7 $B5 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $8 L L32R,  A10 A5 A5 OR,  A8 $38 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 12 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$B5 L:
+  A2 8 $E1 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $C L L32R,  A10 A5 A5 OR,  A8 $3C L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 12 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$E1 L:
+  A2 9 $109 L BBCI,
+  A4 -65 MOVI,  NOP.N,  NOP.N,  NOP.N,  A5 $C L L32R,  A10 A5 MOV.N,  A8 $40 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A8 A8 6 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,  MEMW,
+  A10 A5 0 S32I.N,
+$109 L:
+  A2 10 $134 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $10 L L32R,  A10 A5 A5 OR,  A8 $44 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $14 L L32R,  A8 A8 14 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$134 L:
+  A2 11 $160 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $18 L L32R,  A10 A5 A5 OR,  A8 $48 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $14 L L32R,  A8 A8 14 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$160 L:
+  A2 12 $18C L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $1C L L32R,  A10 A5 A5 OR,  A8 $4C L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $14 L L32R,  A8 A8 14 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$18C L:
+  A2 13 $1B8 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $20 L L32R,  A10 A5 A5 OR,  A8 $50 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $14 L L32R,  A8 A8 14 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$1B8 L:
+  A2 14 $1E4 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $24 L L32R,  A10 A5 A5 OR,  A8 $54 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $14 L L32R,  A8 A8 14 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$1E4 L:
+  A2 15 $210 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $28 L L32R,  A10 A5 A5 OR,  A8 $58 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $14 L L32R,  A8 A8 14 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$210 L:
+  A2 16 $23C L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $2C L L32R,  A10 A5 A5 OR,  A8 $5C L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $14 L L32R,  A8 A8 14 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$23C L:
+  A2 17 $262 L BBCI,
+  A3 A3 0 1 EXTUI,  A3 A3 14 SLLI,  NOP.N,  NOP.N,  A4 $30 L L32R,  A10 A4 MOV.N,
+  A8 $60 L L32R,  A8 CALLX8,
+  A2 $14 L L32R,  A10 A10 A2 AND,  A3 A3 A10 OR,  MEMW,  A3 A4 0 S32I.N,
+$262 L:
+  RETW.N,
+$264 L:  END-CODE
+
+CODE rtc_pads_slpie   \ .text.rtc_pads_slpie $90
+  $0 36 LITERALS
+    $3FF4847C T,  $FFEFFFFF T,  $FFFF7FFF T,  $3FF48480 T,  $FEFFFFFF T,
+    $FFF7FFFF T,  $3FF48484 T,  $FFFFDFFF T,  $3FF48488 T,  $3FF4848C T,
+    $3FF48494 T,  $3FF48498 T,  $3FF4849C T,  $3FF484A0 T,  $3FF484A4 T,
+    $3FF484A8 T,  $3FF484AC T,  $3FF484B0 T,  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read
+$90 L:
+  A1 32 ENTRY,  A2 0 $B5 L BBCI,
+  A5 $0 L L32R,  A10 A5 MOV.N,  A8 $48 L L32R,  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 20 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$B5 L:
+  A2 1 $E1 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $0 L L32R,  A10 A5 A5 OR,  A8 $4C L L32R,
+  A8 CALLX8,
+  A8 A3 15 SLLI,  A4 $8 L L32R,  A8 A8 0 16 EXTUI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$E1 L:
+  A2 2 $109 L BBCI,
+  A4 -1025 MOVI,  NOP.N,  NOP.N,  NOP.N,  A5 $0 L L32R,  A10 A5 MOV.N,
+  A8 $50 L L32R,  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A8 A8 10 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,  MEMW,
+  A10 A5 0 S32I.N,
+$109 L:
+  A2 3 $131 L BBCI,
+  A4 -33 MOVI,  NOP.N,  NOP.N,  NOP.N,  A5 $0 L L32R,  A10 A5 MOV.N,  A8 $54 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A8 A8 5 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,  MEMW,
+  A10 A5 0 S32I.N,
+$131 L:
+  A2 4 $15D L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $C L L32R,  A10 A5 A5 OR,  A8 $58 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $10 L L32R,  A8 A8 24 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$15D L:
+  A2 5 $189 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $C L L32R,  A10 A5 A5 OR,  A8 $5C L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $14 L L32R,  A8 A8 19 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$189 L:
+  A2 6 $1B5 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $18 L L32R,  A10 A5 A5 OR,  A8 $60 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $1C L L32R,  A8 A8 13 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$1B5 L:
+  A2 7 $1E1 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $20 L L32R,  A10 A5 A5 OR,  A8 $64 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $1C L L32R,  A8 A8 13 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$1E1 L:
+  A2 8 $20D L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $24 L L32R,  A10 A5 A5 OR,  A8 $68 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $1C L L32R,  A8 A8 13 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$20D L:
+  A2 9 $235 L BBCI,
+  A4 -129 MOVI,  NOP.N,  NOP.N,  NOP.N,  A5 $24 L L32R,  A10 A5 MOV.N,
+  A8 $6C L L32R,  A8 CALLX8,
+  A8 A3 7 SLLI,  A8 A8 0 8 EXTUI,  A10 A10 A4 AND,  A10 A8 A10 OR,  MEMW,
+  A10 A5 0 S32I.N,
+$235 L:
+  A2 10 $260 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $28 L L32R,  A10 A5 A5 OR,  A8 $70 L L32R,
+  A8 CALLX8,
+  A8 A3 15 SLLI,  A4 $8 L L32R,  A8 A8 0 16 EXTUI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$260 L:
+  A2 11 $28C L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $2C L L32R,  A10 A5 A5 OR,  A8 $74 L L32R,
+  A8 CALLX8,
+  A8 A3 15 SLLI,  A4 $8 L L32R,  A8 A8 0 16 EXTUI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$28C L:
+  A2 12 $2B8 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $30 L L32R,  A10 A5 A5 OR,  A8 $78 L L32R,
+  A8 CALLX8,
+  A8 A3 15 SLLI,  A4 $8 L L32R,  A8 A8 0 16 EXTUI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$2B8 L:
+  A2 13 $2E4 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $34 L L32R,  A10 A5 A5 OR,  A8 $7C L L32R,
+  A8 CALLX8,
+  A8 A3 15 SLLI,  A4 $8 L L32R,  A8 A8 0 16 EXTUI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$2E4 L:
+  A2 14 $310 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $38 L L32R,  A10 A5 A5 OR,  A8 $80 L L32R,
+  A8 CALLX8,
+  A8 A3 15 SLLI,  A4 $8 L L32R,  A8 A8 0 16 EXTUI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$310 L:
+  A2 15 $33C L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $3C L L32R,  A10 A5 A5 OR,  A8 $84 L L32R,
+  A8 CALLX8,
+  A8 A3 15 SLLI,  A4 $8 L L32R,  A8 A8 0 16 EXTUI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$33C L:
+  A2 16 $368 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $40 L L32R,  A10 A5 A5 OR,  A8 $88 L L32R,
+  A8 CALLX8,
+  A8 A3 15 SLLI,  A4 $8 L L32R,  A8 A8 0 16 EXTUI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$368 L:
+  A2 17 $38E L BBCI,
+  A3 A3 15 SLLI,  A3 A3 0 16 EXTUI,  NOP.N,  NOP.N,  A4 $44 L L32R,  A10 A4 MOV.N,
+  A8 $8C L L32R,  A8 CALLX8,
+  A2 $8 L L32R,  A10 A10 A2 AND,  A3 A3 A10 OR,  MEMW,  A3 A4 0 S32I.N,
+$38E L:
+  RETW.N,
+$390 L:  END-CODE
+
+CODE rtc_pads_funie   \ .text.rtc_pads_funie $94
+  $0 37 LITERALS
+    $3FF4847C T,  $FFF7FFFF T,  $FFFFBFFF T,  $3FF48480 T,  $FF7FFFFF T,
+    $FFFBFFFF T,  $3FF48484 T,  $FFFFF7FF T,  $3FF48488 T,  $3FF4848C T,
+    $3FF48494 T,  $FFFFDFFF T,  $3FF48498 T,  $3FF4849C T,  $3FF484A0 T,
+    $3FF484A4 T,  $3FF484A8 T,  $3FF484AC T,  $3FF484B0 T,
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+$94 L:
+  A1 32 ENTRY,  A2 0 $B9 L BBCI,
+  A5 $0 L L32R,  A10 A5 MOV.N,  A8 $4C L L32R,  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 19 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$B9 L:
+  A2 1 $E5 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $0 L L32R,  A10 A5 A5 OR,  A8 $50 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $8 L L32R,  A8 A8 14 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$E5 L:
+  A2 2 $10D L BBCI,
+  A4 -513 MOVI,  NOP.N,  NOP.N,  NOP.N,  A5 $0 L L32R,  A10 A5 MOV.N,
+  A8 $54 L L32R,  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A8 A8 9 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,  MEMW,
+  A10 A5 0 S32I.N,
+$10D L:
+  A2 3 $135 L BBCI,
+  A4 -17 MOVI.N,  NOP.N,  NOP.N,  NOP.N,  A5 $0 L L32R,  A10 A5 A5 OR,
+  A8 $58 L L32R,  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A8 A8 4 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,  MEMW,
+  A10 A5 0 S32I.N,
+$135 L:
+  A2 4 $161 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $C L L32R,  A10 A5 A5 OR,  A8 $5C L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $10 L L32R,  A8 A8 23 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$161 L:
+  A2 5 $18D L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $C L L32R,  A10 A5 A5 OR,  A8 $60 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $14 L L32R,  A8 A8 18 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$18D L:
+  A2 6 $1B9 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $18 L L32R,  A10 A5 A5 OR,  A8 $64 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $1C L L32R,  A8 A8 11 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$1B9 L:
+  A2 7 $1E5 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $20 L L32R,  A10 A5 A5 OR,  A8 $68 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $1C L L32R,  A8 A8 11 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$1E5 L:
+  A2 8 $211 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $24 L L32R,  A10 A5 A5 OR,  A8 $6C L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $1C L L32R,  A8 A8 11 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I,
+$211 L:
+  A2 9 $239 L BBCI,
+  A4 -33 MOVI,  NOP.N,  NOP.N,  NOP.N,  A5 $24 L L32R,  A10 A5 MOV.N,
+  A8 $70 L L32R,  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A8 A8 5 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,  MEMW,
+  A10 A5 0 S32I.N,
+$239 L:
+  A2 10 $264 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $28 L L32R,  A10 A5 A5 OR,  A8 $74 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $2C L L32R,  A8 A8 13 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$264 L:
+  A2 11 $290 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $30 L L32R,  A10 A5 A5 OR,  A8 $78 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $2C L L32R,  A8 A8 13 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$290 L:
+  A2 12 $2BC L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $34 L L32R,  A10 A5 A5 OR,  A8 $7C L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $2C L L32R,  A8 A8 13 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$2BC L:
+  A2 13 $2E8 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $38 L L32R,  A10 A5 A5 OR,  A8 $80 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $2C L L32R,  A8 A8 13 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$2E8 L:
+  A2 14 $314 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $3C L L32R,  A10 A5 A5 OR,  A8 $84 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $2C L L32R,  A8 A8 13 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$314 L:
+  A2 15 $340 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $40 L L32R,  A10 A5 A5 OR,  A8 $88 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $2C L L32R,  A8 A8 13 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$340 L:
+  A2 16 $36C L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $44 L L32R,  A10 A5 A5 OR,  A8 $8C L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $2C L L32R,  A8 A8 13 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$36C L:
+  A2 17 $392 L BBCI,
+  A3 A3 0 1 EXTUI,  A3 A3 13 SLLI,  NOP.N,  NOP.N,  A4 $48 L L32R,  A10 A4 MOV.N,
+  A8 $90 L L32R,  A8 CALLX8,
+  A2 $2C L L32R,  A10 A10 A2 AND,  A3 A3 A10 OR,  MEMW,  A3 A4 0 S32I.N,
+$392 L:
+  RETW.N,
+$394 L:  END-CODE
+
+CODE rtc_pads_pu   \ .text.rtc_pads_pu $64
+  $0 25 LITERALS
+    $3FF48484 T,  $F7FFFFFF T,  $3FF48488 T,  $3FF4848C T,  $FFBFFFFF T,
+    $3FF48494 T,  $3FF48498 T,  $3FF4849C T,  $3FF484A0 T,  $3FF484A4 T,
+    $3FF484A8 T,  $3FF484AC T,  $3FF484B0 T,  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read
+$64 L:
+  A1 32 ENTRY,  A2 6 $89 L BBCI,
+  A5 $0 L L32R,  A10 A5 MOV.N,  A8 $34 L L32R,  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 27 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$89 L:
+  A2 7 $B4 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $8 L L32R,  A10 A5 A5 OR,  A8 $38 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 27 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$B4 L:
+  A2 8 $E0 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $C L L32R,  A10 A5 A5 OR,  A8 $3C L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 27 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$E0 L:
+  A2 9 $10C L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $C L L32R,  A10 A5 A5 OR,  A8 $40 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $10 L L32R,  A8 A8 22 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$10C L:
+  A2 10 $138 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $14 L L32R,  A10 A5 A5 OR,  A8 $44 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 27 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$138 L:
+  A2 11 $164 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $18 L L32R,  A10 A5 A5 OR,  A8 $48 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 27 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$164 L:
+  A2 12 $190 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $1C L L32R,  A10 A5 A5 OR,  A8 $4C L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 27 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$190 L:
+  A2 13 $1BC L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $20 L L32R,  A10 A5 A5 OR,  A8 $50 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 27 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$1BC L:
+  A2 14 $1E8 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $24 L L32R,  A10 A5 A5 OR,  A8 $54 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 27 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$1E8 L:
+  A2 15 $214 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $28 L L32R,  A10 A5 A5 OR,  A8 $58 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 27 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$214 L:
+  A2 16 $240 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $2C L L32R,  A10 A5 A5 OR,  A8 $5C L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 27 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$240 L:
+  A2 17 $266 L BBCI,
+  A3 A3 0 1 EXTUI,  A3 A3 27 SLLI,  NOP.N,  NOP.N,  A4 $30 L L32R,  A10 A4 MOV.N,
+  A8 $60 L L32R,  A8 CALLX8,
+  A2 $4 L L32R,  A10 A10 A2 AND,  A3 A3 A10 OR,  MEMW,  A3 A4 0 S32I.N,
+$266 L:
+  RETW.N,
+$268 L:  END-CODE
+
+CODE rtc_pads_pd   \ .text.rtc_pads_pd $64
+  $0 25 LITERALS
+    $3FF48484 T,  $EFFFFFFF T,  $3FF48488 T,  $3FF4848C T,  $FF7FFFFF T,
+    $3FF48494 T,  $3FF48498 T,  $3FF4849C T,  $3FF484A0 T,  $3FF484A4 T,
+    $3FF484A8 T,  $3FF484AC T,  $3FF484B0 T,  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read
+$64 L:
+  A1 32 ENTRY,  A2 6 $89 L BBCI,
+  A5 $0 L L32R,  A10 A5 MOV.N,  A8 $34 L L32R,  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 28 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$89 L:
+  A2 7 $B4 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A5 $8 L L32R,  A10 A5 A5 OR,  A8 $38 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 28 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$B4 L:
+  A2 8 $E0 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $C L L32R,  A10 A5 A5 OR,  A8 $3C L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 28 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$E0 L:
+  A2 9 $10C L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $C L L32R,  A10 A5 A5 OR,  A8 $40 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $10 L L32R,  A8 A8 23 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$10C L:
+  A2 10 $138 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $14 L L32R,  A10 A5 A5 OR,  A8 $44 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 28 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$138 L:
+  A2 11 $164 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $18 L L32R,  A10 A5 A5 OR,  A8 $48 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 28 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$164 L:
+  A2 12 $190 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $1C L L32R,  A10 A5 A5 OR,  A8 $4C L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 28 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$190 L:
+  A2 13 $1BC L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $20 L L32R,  A10 A5 A5 OR,  A8 $50 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 28 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$1BC L:
+  A2 14 $1E8 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $24 L L32R,  A10 A5 A5 OR,  A8 $54 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 28 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$1E8 L:
+  A2 15 $214 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $28 L L32R,  A10 A5 A5 OR,  A8 $58 L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 28 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$214 L:
+  A2 16 $240 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP,  A5 $2C L L32R,  A10 A5 A5 OR,  A8 $5C L L32R,
+  A8 CALLX8,
+  A8 A3 0 1 EXTUI,  A4 $4 L L32R,  A8 A8 28 SLLI,  A10 A10 A4 AND,  A10 A8 A10 OR,
+  MEMW,  A10 A5 0 S32I.N,
+$240 L:
+  A2 17 $266 L BBCI,
+  A3 A3 0 1 EXTUI,  A3 A3 28 SLLI,  NOP.N,  NOP.N,  A4 $30 L L32R,  A10 A4 MOV.N,
+  A8 $60 L L32R,  A8 CALLX8,
+  A2 $4 L L32R,  A10 A10 A2 AND,  A3 A3 A10 OR,  MEMW,  A3 A4 0 S32I.N,
+$266 L:
+  RETW.N,
+$268 L:  END-CODE
+
+CODE rtc_pads_hold   \ .text.rtc_pads_hold $90
+  $0 36 LITERALS
+    $3FF4847C T,  $7FFFFFFF T,  $BFFFFFFF T,  $DFFFFFFF T,  $EFFFFFFF T,
+    $3FF48480 T,  $3FF48484 T,  $3FF48488 T,  $3FF4848C T,  $FEFFFFFF T,
+    $3FF48494 T,  $3FF48498 T,  $3FF4849C T,  $3FF484A0 T,  $3FF484A4 T,
+    $3FF484A8 T,  $3FF484AC T,  $3FF484B0 T,  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read
+$90 L:
+  A1 32 ENTRY,  A2 0 $B2 L BBCI,
+  A4 $0 L L32R,  A10 A4 MOV.N,  A8 $48 L L32R,  A8 CALLX8,
+  A8 A3 31 SLLI,  A9 $4 L L32R,  A10 A10 A9 AND,  A8 A10 A8 OR,  MEMW,
+  A8 A4 0 S32I.N,
+$B2 L:
+  A2 1 $DC L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A4 $0 L L32R,  A10 A4 MOV.N,  A8 $4C L L32R,
+  A8 CALLX8,
+  A9 A3 0 1 EXTUI,  A8 $8 L L32R,  A9 A9 30 SLLI,  A10 A10 A8 AND,  A10 A9 A10 OR,
+  MEMW,  A10 A4 0 S32I.N,
+$DC L:
+  A2 2 $108 L BBCI,
+  NOP.N,  NOP.N,  NOP,  NOP.N,  A4 $0 L L32R,  A10 A4 A4 OR,  A8 $50 L L32R,
+  A8 CALLX8,
+  A9 A3 0 1 EXTUI,  A8 $C L L32R,  A9 A9 29 SLLI,  A10 A10 A8 AND,  A10 A9 A10 OR,
+  MEMW,  A10 A4 0 S32I.N,
+$108 L:
+  A2 3 $134 L BBCI,
+  NOP.N,  NOP.N,  NOP,  NOP.N,  A4 $0 L L32R,  A10 A4 A4 OR,  A8 $54 L L32R,
+  A8 CALLX8,
+  A9 A3 0 1 EXTUI,  A8 $10 L L32R,  A9 A9 28 SLLI,  A10 A10 A8 AND,  A10 A9 A10 OR,
+  MEMW,  A10 A4 0 S32I.N,
+$134 L:
+  A2 4 $15D L BBCI,
+  NOP.N,  NOP.N,  NOP,  NOP.N,  A4 $14 L L32R,  A10 A4 A4 OR,  A8 $58 L L32R,
+  A8 CALLX8,
+  A8 A3 31 SLLI,  A9 $4 L L32R,  A10 A10 A9 AND,  A8 A10 A8 OR,  MEMW,
+  A8 A4 0 S32I.N,
+$15D L:
+  A2 5 $188 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A4 $14 L L32R,  A10 A4 A4 OR,  A8 $5C L L32R,
+  A8 CALLX8,
+  A9 A3 0 1 EXTUI,  A8 $8 L L32R,  A9 A9 30 SLLI,  A10 A10 A8 AND,  A10 A9 A10 OR,
+  MEMW,  A10 A4 0 S32I.N,
+$188 L:
+  A2 6 $1B4 L BBCI,
+  NOP.N,  NOP.N,  NOP,  NOP.N,  A4 $18 L L32R,  A10 A4 A4 OR,  A8 $60 L L32R,
+  A8 CALLX8,
+  A9 A3 0 1 EXTUI,  A8 $C L L32R,  A9 A9 29 SLLI,  A10 A10 A8 AND,  A10 A9 A10 OR,
+  MEMW,  A10 A4 0 S32I.N,
+$1B4 L:
+  A2 7 $1E0 L BBCI,
+  NOP.N,  NOP.N,  NOP,  NOP.N,  A4 $1C L L32R,  A10 A4 A4 OR,  A8 $64 L L32R,
+  A8 CALLX8,
+  A9 A3 0 1 EXTUI,  A8 $C L L32R,  A9 A9 29 SLLI,  A10 A10 A8 AND,  A10 A9 A10 OR,
+  MEMW,  A10 A4 0 S32I.N,
+$1E0 L:
+  A2 8 $20C L BBCI,
+  NOP.N,  NOP.N,  NOP,  NOP.N,  A4 $20 L L32R,  A10 A4 A4 OR,  A8 $68 L L32R,
+  A8 CALLX8,
+  A9 A3 0 1 EXTUI,  A8 $C L L32R,  A9 A9 29 SLLI,  A10 A10 A8 AND,  A10 A9 A10 OR,
+  MEMW,  A10 A4 0 S32I.N,
+$20C L:
+  A2 9 $238 L BBCI,
+  NOP.N,  NOP.N,  NOP,  NOP.N,  A4 $20 L L32R,  A10 A4 A4 OR,  A8 $6C L L32R,
+  A8 CALLX8,
+  A9 A3 0 1 EXTUI,  A8 $24 L L32R,  A9 A9 24 SLLI,  A10 A10 A8 AND,  A10 A9 A10 OR,
+  MEMW,  A10 A4 0 S32I.N,
+$238 L:
+  A2 10 $261 L BBCI,
+  NOP.N,  NOP.N,  NOP,  NOP.N,  A4 $28 L L32R,  A10 A4 A4 OR,  A8 $70 L L32R,
+  A8 CALLX8,
+  A8 A3 31 SLLI,  A9 $4 L L32R,  A10 A10 A9 AND,  A8 A10 A8 OR,  MEMW,
+  A8 A4 0 S32I.N,
+$261 L:
+  A2 11 $289 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A4 $2C L L32R,  A10 A4 A4 OR,  A8 $74 L L32R,
+  A8 CALLX8,
+  A8 A3 31 SLLI,  A9 $4 L L32R,  A10 A10 A9 AND,  A8 A10 A8 OR,  MEMW,
+  A8 A4 0 S32I.N,
+$289 L:
+  A2 12 $2B1 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A4 $30 L L32R,  A10 A4 A4 OR,  A8 $78 L L32R,
+  A8 CALLX8,
+  A8 A3 31 SLLI,  A9 $4 L L32R,  A10 A10 A9 AND,  A8 A10 A8 OR,  MEMW,
+  A8 A4 0 S32I.N,
+$2B1 L:
+  A2 13 $2D9 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A4 $34 L L32R,  A10 A4 A4 OR,  A8 $7C L L32R,
+  A8 CALLX8,
+  A8 A3 31 SLLI,  A9 $4 L L32R,  A10 A10 A9 AND,  A8 A10 A8 OR,  MEMW,
+  A8 A4 0 S32I.N,
+$2D9 L:
+  A2 14 $301 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A4 $38 L L32R,  A10 A4 A4 OR,  A8 $80 L L32R,
+  A8 CALLX8,
+  A8 A3 31 SLLI,  A9 $4 L L32R,  A10 A10 A9 AND,  A8 A10 A8 OR,  MEMW,
+  A8 A4 0 S32I.N,
+$301 L:
+  A2 15 $329 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A4 $3C L L32R,  A10 A4 A4 OR,  A8 $84 L L32R,
+  A8 CALLX8,
+  A8 A3 31 SLLI,  A9 $4 L L32R,  A10 A10 A9 AND,  A8 A10 A8 OR,  MEMW,
+  A8 A4 0 S32I.N,
+$329 L:
+  A2 16 $351 L BBCI,
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A4 $40 L L32R,  A10 A4 A4 OR,  A8 $88 L L32R,
+  A8 CALLX8,
+  A8 A3 31 SLLI,  A9 $4 L L32R,  A10 A10 A9 AND,  A8 A10 A8 OR,  MEMW,
+  A8 A4 0 S32I.N,
+$351 L:
+  A2 17 $376 L BBCI,
+  A3 A3 31 SLLI,  NOP.N,  NOP.N,  NOP.N,  A4 $44 L L32R,  A10 A4 MOV.N,
+  A8 $8C L L32R,  A8 CALLX8,
+  A2 $4 L L32R,  A10 A10 A2 AND,  A3 A10 A3 OR,  MEMW,  A3 A4 0 S32I.N,
+$376 L:
+  RETW.N,
+$378 L:  END-CODE
+
+CODE rtc_apbbridge_sel   \ .text.rtc_apbbridge_sel $C
+  $0 3 LITERALS
+    $3FF48018 T,  $FFBFFFFF T,  SYMBOL esp_dport_access_reg_read
+$C L:
+  A1 32 ENTRY,  A3 $0 L L32R,  A2 A2 0 1 EXTUI,  A10 A3 MOV.N,  A8 $8 L L32R,
+  A8 CALLX8,
+  A2 A2 22 SLLI,  A8 $4 L L32R,  A10 A10 A8 AND,  A10 A2 A10 OR,  MEMW,
+  A10 A3 0 S32I.N,  RETW.N,
+$30 L:  END-CODE
+
+CODE rtc_powerup_rf   \ .text.rtc_powerup_rf $C
+  $0 3 LITERALS
+    $3FF48030 T,  $D8000000 T,  SYMBOL esp_dport_access_reg_read
+$C L:
+  A1 32 ENTRY,  A2 $0 L L32R,  A10 A2 MOV.N,  A8 $8 L L32R,  A8 CALLX8,
+  A8 $4 L L32R,  A10 A10 A8 OR,  MEMW,  A10 A2 0 S32I.N,  RETW.N,
+$27 L:  END-CODE
+
+CODE rtc_powerdown_rf   \ .text.rtc_powerdown_rf $C
+  $0 3 LITERALS
+    $3FF48030 T,  $27FFFFFF T,  SYMBOL esp_dport_access_reg_read
+$C L:
+  A1 32 ENTRY,  A2 $0 L L32R,  A10 A2 MOV.N,  A8 $8 L L32R,  A8 CALLX8,
+  A8 $4 L L32R,  A10 A10 A8 AND,  MEMW,  A10 A2 0 S32I.N,  RETW.N,
+$27 L:  END-CODE
+
+CODE rtc_get_st   \ .text.rtc_get_st $8
+  $0 2 LITERALS
+    $3FF480C0 T,  SYMBOL esp_dport_access_reg_read
+$8 L:
+  A1 32 ENTRY,  A10 $0 L L32R,  A8 $4 L L32R,  A8 CALLX8,
+  A2 A10 28 4 EXTUI,  RETW.N,
+$19 L:  END-CODE
+
+CODE rtc_is_st_idle   \ .text.rtc_is_st_idle $C
+  $0 3 LITERALS
+    $3FF480C0 T,  $8000000 T,  SYMBOL esp_dport_access_reg_read
+$C L:
+  A1 32 ENTRY,  A10 $0 L L32R,  A8 $8 L L32R,  A8 CALLX8,
+  A2 $4 L L32R,  A2 A10 A2 AND,  A2 A2 27 5 EXTUI,  RETW.N,
+$23 L:  END-CODE
+
+CODE rtc_soc_clk_ck12m   \ .text.rtc_soc_clk_ck12m $20
+  $0 8 LITERALS
+    $3FF48070 T,  $E7FFFFFF T,  $10000000 T,  $3FF48000 T,  $FFFFC0FF T,  $1500 T,
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+$20 L:
+  A1 32 ENTRY,  A3 $0 L L32R,  A10 A3 MOV.N,  A8 $18 L L32R,  A8 CALLX8,
+  A8 $4 L L32R,  A10 A10 A8 AND,  A8 $8 L L32R,  A8 A10 A8 OR,  A2 $C L L32R,
+  A10 A2 A2 OR,  MEMW,  A8 A3 0 S32I,  A8 $1C L L32R,  A8 CALLX8,
+  A8 $10 L L32R,  A10 A10 A8 AND,  A8 $14 L L32R,  A10 A10 A8 OR,  MEMW,
+  A10 A2 0 S32I.N,  RETW.N,
+$5F L:  END-CODE
+
+CODE rtc_init_full   \ .text.rtc_init_full $144
+  $0 81 LITERALS
+    $3FF4808C T,  $3FF4801C T,  $FFFFFF T,  $FF003FFF T,  $FFFFC03F T,
+    $3FF48070 T,  $4000000 T,  $FBFFFFFF T,  $3FF48000 T,  $2000 T,  $FFFFDFFF T,
+    $400000 T,  $FFBFFFFF T,  $80000 T,  $FFF7FFFF T,  $10000 T,  $FFFEFFFF T,
+    $FFEFFFFF T,  $FFFDFFFF T,  $FFFFBFFF T,  $800 T,  $FFFFF7FF T,  $3FF48084 T,
+    $FFFBFFFF T,  $FFFEAABF T,  $3FF48080 T,  $FFFEDFFF T,  $3FF48088 T,
+    $7FFFFFFF T,  $DFFFFFFF T,  $F555FFFF T,  $FFFFEFFF T,  $3FF48078 T,
+    $40000000 T,  $BFFFFFFF T,  $20000000 T,  $3FF4807C T,  $FE3FFFFF T,
+    $F1FFFFFF T,  $FFFFC7FF T,  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL rtc_init_clk
+$144 L:
+  A1 48 ENTRY,  A10 $0 L L32R,  A6 A6 24 SLLI,  A5 A5 0 10 EXTUI,  A5 A5 14 SLLI,
+  A4 A1 0 S32I,  A8 $A0 L L32R,  A8 CALLX8,
+  A9 -1025 MOVI,  A9 A10 A9 AND,  A4 $4 L L32R,  A10 A4 MOV.N,  A11 $0 L L32R,
+  MEMW,  A9 A11 0 S32I.N,  A8 $A4 L L32R,  A8 CALLX8,
+  A9 $8 L L32R,  A10 A10 A9 AND,  A6 A10 A6 OR,  A10 A4 A4 OR,  MEMW,
+  A6 A4 0 S32I.N,  A8 $A8 L L32R,  A8 CALLX8,
+  A6 $C L L32R,  A10 A10 A6 AND,  A5 A5 A10 OR,  A10 A4 MOV.N,  MEMW,
+  A5 A4 0 S32I.N,  A8 $AC L L32R,  A8 CALLX8,
+  A8 A1 0 L32I.N,  A8 A8 0 8 EXTUI,  A8 A8 6 SLLI,  A5 $10 L L32R,  A10 A10 A5 AND,
+  A10 A8 A10 OR,  MEMW,  A10 A4 0 S32I.N,  NOP.N,  NOP.N,  NOP.N,  NOP.N,
+  A4 A1 56 L32I.N,  A4 $542 L BEQZ,
+  A5 $14 L L32R,  A10 A5 MOV.N,  A4 A1 60 L32I.N,  A4 $1E4 L BEQZ.N,
+  A8 $B0 L L32R,  A8 CALLX8,
+  A4 $18 L L32R,  A10 A10 A4 OR,  MEMW,  A10 A5 0 S32I.N,  $1F5 L J,
+  2 ZEROS,
+$1E4 L:
+  A8 $B4 L L32R,  A8 CALLX8,
+  A4 $1C L L32R,  A10 A10 A4 AND,  MEMW,  A10 A5 0 S32I.N,
+$1F5 L:
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A4 A1 64 L32I,  A4 $21D L BEQZ.N,
+  A4 $20 L L32R,  A10 A4 MOV.N,  A8 $B8 L L32R,  A8 CALLX8,
+  A5 $24 L L32R,  A10 A10 A5 OR,  MEMW,  A10 A4 0 S32I.N,  $233 L J,
+  2 ZEROS,
+$21D L:
+  A4 $20 L L32R,  A10 A4 MOV.N,  A8 $BC L L32R,  A8 CALLX8,
+  A5 $28 L L32R,  A10 A10 A5 AND,  MEMW,  A10 A4 0 S32I.N,
+$233 L:
+  A10 A4 MOV.N,  NOP.N,  NOP.N,  NOP,  A5 A1 68 L32I,  A5 $258 L BEQZ,
+  A8 $C0 L L32R,  A8 CALLX8,
+  A5 $2C L L32R,  A10 A10 A5 OR,  MEMW,  A10 A4 0 S32I.N,  $269 L J,
+  2 ZEROS,
+$258 L:
+  A8 $C4 L L32R,  A8 CALLX8,
+  A5 $30 L L32R,  A10 A10 A5 AND,  MEMW,  A10 A4 0 S32I.N,
+$269 L:
+  A10 A4 MOV.N,  NOP.N,  NOP.N,  NOP.N,  A5 A1 72 L32I,  A5 $28C L BEQZ.N,
+  A8 $C8 L L32R,  A8 CALLX8,
+  A5 $34 L L32R,  A10 A10 A5 OR,  MEMW,  A10 A4 0 S32I.N,  $29D L J,
+  2 ZEROS,
+$28C L:
+  A8 $CC L L32R,  A8 CALLX8,
+  A5 $38 L L32R,  A10 A10 A5 AND,  MEMW,  A10 A4 0 S32I.N,
+$29D L:
+  A10 A4 MOV.N,  NOP.N,  NOP.N,  NOP.N,  A5 A1 76 L32I,  A5 $2C0 L BEQZ.N,
+  A8 $D0 L L32R,  A8 CALLX8,
+  A5 $3C L L32R,  A10 A10 A5 OR,  MEMW,  A10 A4 0 S32I.N,  $2D1 L J,
+  2 ZEROS,
+$2C0 L:
+  A8 $D4 L L32R,  A8 CALLX8,
+  A5 $40 L L32R,  A10 A10 A5 AND,  MEMW,  A10 A4 0 S32I.N,
+$2D1 L:
+  A10 A4 MOV.N,  A8 $D8 L L32R,  A8 CALLX8,
+  A6 $44 L L32R,  A5 A10 A6 AND,  A10 A4 MOV.N,  MEMW,  A5 A4 0 S32I,
+  A8 $DC L L32R,  A8 CALLX8,
+  A5 $48 L L32R,  A5 A10 A5 AND,  A10 A4 MOV.N,  MEMW,  A5 A4 0 S32I.N,
+  A8 $E0 L L32R,  A8 CALLX8,
+  A5 $4C L L32R,  A10 A10 A5 AND,  A8 A1 80 L32I,  MEMW,  A10 A4 0 S32I.N,
+  A10 A4 MOV.N,  A8 $326 L BEQZ.N,
+  A8 $E4 L L32R,  A8 CALLX8,
+  A8 $50 L L32R,  A10 A10 A8 OR,  MEMW,  A10 A4 0 S32I.N,  $337 L J,
+$326 L:
+  A8 $E8 L L32R,  A8 CALLX8,
+  A8 $54 L L32R,  A10 A10 A8 AND,  MEMW,  A10 A4 0 S32I.N,
+$337 L:
+  A10 A4 MOV.N,  NOP.N,  NOP.N,  NOP,  A8 A1 84 L32I,  A8 $35C L BEQZ,
+  A8 $EC L L32R,  A8 CALLX8,
+  A8 $200 MOVI,  A10 A10 A8 OR,  MEMW,  A10 A4 0 S32I.N,  $36D L J,
+  2 ZEROS,
+$35C L:
+  A8 $F0 L L32R,  A8 CALLX8,
+  A8 -513 MOVI,  A10 A10 A8 AND,  MEMW,  A10 A4 0 S32I.N,
+$36D L:
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A4 $58 L L32R,  A10 A4 A4 OR,  A8 $F4 L L32R,
+  A8 CALLX8,
+  A10 A10 A6 AND,  MEMW,  A10 A4 0 S32I.N,  A10 A4 MOV.N,  A8 $F8 L L32R,
+  A8 CALLX8,
+  A6 $5C L L32R,  A6 A10 A6 AND,  A10 A4 MOV.N,  MEMW,  A6 A4 0 S32I,
+  A8 $FC L L32R,  A8 CALLX8,
+  A6 $60 L L32R,  A6 A10 A6 AND,  A10 A4 MOV.N,  MEMW,  A6 A4 0 S32I.N,
+  A8 $100 L L32R,  A8 CALLX8,
+  A8 -17 MOVI.N,  A8 A10 A8 AND,  A6 $64 L L32R,  A10 A6 MOV.N,  MEMW,
+  A8 A4 0 S32I.N,  A8 $104 L L32R,  A8 CALLX8,
+  A8 $68 L L32R,  A8 A10 A8 AND,  A4 $6C L L32R,  A10 A4 A4 OR,  MEMW,
+  A8 A6 0 S32I,  A8 $108 L L32R,  A8 CALLX8,
+  A8 $70 L L32R,  A8 A10 A8 AND,  A10 A4 MOV.N,  MEMW,  A8 A4 0 S32I,
+  A8 $10C L L32R,  A8 CALLX8,
+  A9 $74 L L32R,  A8 A10 A9 AND,  A10 A4 MOV.N,  MEMW,  A8 A4 0 S32I,
+  A8 $110 L L32R,  A8 CALLX8,
+  A8 $78 L L32R,  A8 A10 A8 AND,  A10 A6 A6 OR,  MEMW,  A8 A4 0 S32I,
+  A8 $114 L L32R,  A8 CALLX8,
+  A8 -6 MOVI.N,  A8 A10 A8 AND,  A10 A4 MOV.N,  MEMW,  A8 A6 0 S32I,
+  A8 $118 L L32R,  A8 CALLX8,
+  A5 A10 A5 AND,  A10 A4 MOV.N,  MEMW,  A5 A4 0 S32I.N,  A8 $11C L L32R,  A8 CALLX8,
+  A5 $7C L L32R,  A10 A10 A5 AND,  MEMW,  A10 A4 0 S32I.N,  NOP.N,  NOP.N,  NOP.N,
+  NOP.N,  A4 A1 96 L32I,  A4 $479 L BEQZ.N,
+  A4 $80 L L32R,  A10 A4 MOV.N,  A8 $120 L L32R,  A8 CALLX8,
+  A5 $84 L L32R,  A10 A10 A5 OR,  MEMW,  A10 A4 0 S32I.N,  $48F L J,
+  3 ZEROS,
+$479 L:
+  A4 $80 L L32R,  A10 A4 MOV.N,  A8 $124 L L32R,  A8 CALLX8,
+  A5 $88 L L32R,  A10 A10 A5 AND,  MEMW,  A10 A4 0 S32I.N,
+$48F L:
+  A10 A4 MOV.N,  NOP.N,  NOP.N,  NOP,  A5 A1 100 L32I,  A5 $4B4 L BEQZ,
+  A8 $128 L L32R,  A8 CALLX8,
+  A5 $8C L L32R,  A10 A10 A5 OR,  MEMW,  A10 A4 0 S32I.N,  $4C5 L J,
+  2 ZEROS,
+$4B4 L:
+  A8 $12C L L32R,  A8 CALLX8,
+  A11 $74 L L32R,  A10 A10 A11 AND,  MEMW,  A10 A4 0 S32I.N,
+$4C5 L:
+  NOP.N,  NOP.N,  NOP.N,  NOP.N,  A4 $90 L L32R,  A10 A4 MOV.N,  A6 A1 104 L32I,
+  A6 A6 0 3 EXTUI,  A5 A1 108 L32I,  A8 $130 L L32R,  A8 CALLX8,
+  A9 A6 22 SLLI,  A6 A6 25 SLLI,  A5 A5 0 3 EXTUI,  A8 $94 L L32R,  A10 A10 A8 AND,
+  A8 A10 A9 OR,  A10 A4 MOV.N,  MEMW,  A8 A4 0 S32I.N,  A8 $134 L L32R,  A8 CALLX8,
+  A8 $98 L L32R,  A10 A10 A8 AND,  A6 A10 A6 OR,  A10 A4 A4 OR,  MEMW,
+  A6 A4 0 S32I,  A8 $138 L L32R,  A8 CALLX8,
+  A8 A5 11 SLLI,  A5 A5 8 SLLI,  A6 $9C L L32R,  A10 A10 A6 AND,  A6 A10 A8 OR,
+  A10 A4 MOV.N,  MEMW,  A6 A4 0 S32I.N,  A8 $13C L L32R,  A8 CALLX8,
+  A6 -1793 MOVI,  A10 A10 A6 AND,  A5 A10 A5 OR,  MEMW,  A5 A4 0 S32I.N,
+$542 L:
+  A13 A7 MOV.N,  A12 A3 MOV.N,  A11 A2 MOV.N,  A10 0 MOVI.N,  A15 A1 52 L32I.N,
+  A14 A1 48 L32I.N,  A8 $140 L L32R,  A8 CALLX8,
+  RETW.N,
+$556 L:  END-CODE
+
+CODE rtc_pad_gpio_wakeup   \ .text.rtc_pad_gpio_wakeup $38
+  $0 14 LITERALS
+    $3FF48428 T,  $3FF4840C T,  $3FF48470 T,  SYMBOL rtc_pads_muxsel
+    SYMBOL rtc_pads_funsel  SYMBOL esp_dport_access_reg_read
+    SYMBOL rtc_pads_slpsel  SYMBOL rtc_pads_slpoe  SYMBOL rtc_pads_slpie
+    SYMBOL rtc_pads_funie  SYMBOL rtc_pads_pu  SYMBOL rtc_pads_pd
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+$38 L:
+  A1 48 ENTRY,  A10 A2 MOV.N,  A11 1 MOVI,  A8 $C L L32R,  A8 CALLX8,
+  A11 0 MOVI.N,  A10 A2 MOV.N,  A8 $10 L L32R,  A8 CALLX8,
+  A5 $4 L L32R,  A4 -1 MOVI.N,  A10 A5 MOV.N,  A8 $14 L L32R,  A8 CALLX8,
+  A4 A4 A2 XOR,  A10 A4 A10 AND,  MEMW,  A10 A5 0 S32I.N,  A11 1 MOVI,
+  A10 A2 A2 OR,  A8 $18 L L32R,  A8 CALLX8,
+  A10 A2 MOV.N,  A11 0 MOVI.N,  A8 $1C L L32R,  A8 CALLX8,
+  A10 A2 MOV.N,  A11 1 MOVI.N,  A8 $20 L L32R,  A8 CALLX8,
+  A10 A2 MOV.N,  A11 1 MOVI.N,  A8 $24 L L32R,  A8 CALLX8,
+  A10 A2 MOV.N,  A11 0 MOVI.N,  A8 $28 L L32R,  A8 CALLX8,
+  A11 0 MOVI.N,  A10 A2 MOV.N,  A3 A3 0 3 EXTUI,  A8 $2C L L32R,  A8 CALLX8,
+  A3 A3 7 SLLI,  A4 $0 L L32R,  A7 $400 MOVI,  A6 -897 MOVI,  A5 $8 L L32R,
+  A3 A1 0 S32I.N,  A3 1 MOVI,
+$BD L:
+  A2 A3 $E5 L BNONE,
+  A10 A4 MOV.N,  A8 $30 L L32R,  A8 CALLX8,
+  A10 A10 A7 OR,  MEMW,  A10 A4 0 S32I.N,  A10 A4 MOV.N,  A8 $34 L L32R,  A8 CALLX8,
+  A10 A10 A6 AND,  A8 A1 0 L32I.N,  A10 A10 A8 OR,  MEMW,  A10 A4 0 S32I.N,
+$E5 L:
+  A4 A4 4 ADDI.N,  A3 A3 1 SLLI,  A4 A5 $BD L BNE,
+  RETW.N,
+$EF L:  END-CODE
+
+CODE rtc_pad_ext_wakeup   \ .text.rtc_pad_ext_wakeup $40
+  $0 16 LITERALS
+    $3FF4840C T,  $3FF484BC T,  $7FFFFFF T,  $3FF48060 T,  $BFFFFFFF T,
+    SYMBOL rtc_pads_muxsel  SYMBOL rtc_pads_funsel
+    SYMBOL esp_dport_access_reg_read  SYMBOL rtc_pads_slpsel
+    SYMBOL rtc_pads_slpoe  SYMBOL rtc_pads_slpie  SYMBOL rtc_pads_funie
+    SYMBOL rtc_pads_pu  SYMBOL rtc_pads_pd  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read
+$40 L:
+  A1 32 ENTRY,  A10 A2 MOV.N,  A11 1 MOVI,  A8 $14 L L32R,  A8 CALLX8,
+  A10 A2 MOV.N,  A11 0 MOVI.N,  A8 $18 L L32R,  A8 CALLX8,
+  A6 $0 L L32R,  A5 A2 14 SLLI,  A10 A6 MOV.N,  A8 $1C L L32R,  A8 CALLX8,
+  A8 -1 MOVI.N,  A5 A8 A5 XOR,  A10 A5 A10 AND,  MEMW,  A10 A6 0 S32I.N,
+  A11 1 MOVI.N,  A10 A2 A2 OR,  A8 $20 L L32R,  A8 CALLX8,
+  A10 A2 MOV.N,  A11 0 MOVI.N,  A8 $24 L L32R,  A8 CALLX8,
+  A10 A2 MOV.N,  A11 1 MOVI.N,  A8 $28 L L32R,  A8 CALLX8,
+  A10 A2 MOV.N,  A11 1 MOVI.N,  A8 $2C L L32R,  A8 CALLX8,
+  A10 A2 MOV.N,  A11 0 MOVI.N,  A8 $30 L L32R,  A8 CALLX8,
+  A10 A2 MOV.N,  A11 0 MOVI.N,  A8 $34 L L32R,  A8 CALLX8,
+  A2 $4 L L32R,  A3 A3 27 SLLI,  A10 A2 MOV.N,  A8 $38 L L32R,  A8 CALLX8,
+  A4 A4 0 1 EXTUI,  A5 $8 L L32R,  A4 A4 30 SLLI,  A10 A10 A5 AND,  A3 A10 A3 OR,
+  A5 $C L L32R,  A10 A5 MOV.N,  MEMW,  A3 A2 0 S32I.N,  A8 $3C L L32R,  A8 CALLX8,
+  A2 $10 L L32R,  A10 A10 A2 AND,  A10 A4 A10 OR,  MEMW,  A10 A5 0 S32I.N,  RETW.N,
+$ED L:  END-CODE
+
+CODE rtc_cmd_ext_wakeup   \ .text.rtc_cmd_ext_wakeup $40
+  $0 16 LITERALS
+    $3FF4840C T,  $3FF484BC T,  $7FFFFFF T,  $3FF48060 T,  $40000000 T,
+    SYMBOL rtc_pads_muxsel  SYMBOL rtc_pads_funsel
+    SYMBOL esp_dport_access_reg_read  SYMBOL rtc_pads_slpsel
+    SYMBOL rtc_pads_slpoe  SYMBOL rtc_pads_slpie  SYMBOL rtc_pads_funie
+    SYMBOL rtc_pads_pu  SYMBOL rtc_pads_pd  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read
+$40 L:
+  A1 32 ENTRY,  A10 A2 MOV.N,  A11 1 MOVI,  A8 $14 L L32R,  A8 CALLX8,
+  A10 A2 MOV.N,  A11 0 MOVI.N,  A8 $18 L L32R,  A8 CALLX8,
+  A4 $0 L L32R,  A5 -1 MOVI.N,  A10 A4 MOV.N,  A8 $1C L L32R,  A8 CALLX8,
+  A8 A2 14 SLLI,  A8 A5 A8 XOR,  A10 A8 A10 AND,  MEMW,  A10 A4 0 S32I.N,
+  A11 1 MOVI.N,  A10 A2 A2 OR,  A8 $20 L L32R,  A8 CALLX8,
+  A10 A2 MOV.N,  A11 0 MOVI.N,  A8 $24 L L32R,  A8 CALLX8,
+  A10 A2 MOV.N,  A11 1 MOVI.N,  A8 $28 L L32R,  A8 CALLX8,
+  A10 A2 MOV.N,  A11 1 MOVI.N,  A8 $2C L L32R,  A8 CALLX8,
+  A10 A2 MOV.N,  A11 0 MOVI.N,  A8 $30 L L32R,  A8 CALLX8,
+  A10 A2 MOV.N,  A11 0 MOVI,  A8 $34 L L32R,  A8 CALLX8,
+  A4 $4 L L32R,  A3 A3 27 SLLI,  A10 A4 A4 OR,  A8 $38 L L32R,  A8 CALLX8,
+  A2 $8 L L32R,  A10 A10 A2 AND,  A3 A10 A3 OR,  A5 $C L L32R,  A10 A5 MOV.N,  MEMW,
+  A3 A4 0 S32I.N,  A8 $3C L L32R,  A8 CALLX8,
+  A2 $10 L L32R,  A10 A10 A2 OR,  MEMW,  A10 A5 0 S32I.N,  RETW.N,
+$E6 L:  END-CODE
+
+CODE rtc_wifi_force_pd   \ .text.rtc_wifi_force_pd $28
+  $0 10 LITERALS
+    $3FF000CC T,  $3FF000D0 T,  $3FF48088 T,  $10000000 T,  $3FF48084 T,
+    $20000 T,  SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+$28 L:
+  A1 32 ENTRY,  A3 $0 L L32R,  A10 A3 MOV.N,  A8 $18 L L32R,  A8 CALLX8,
+  A8 -65 MOVI,  A2 $4 L L32R,  A8 A10 A8 AND,  A10 A2 MOV.N,  MEMW,  A8 A3 0 S32I.N,
+  A8 $1C L L32R,  A8 CALLX8,
+  A8 4 MOVI.N,  A8 A10 A8 OR,  A3 $8 L L32R,  A10 A3 MOV.N,  MEMW,  A8 A2 0 S32I.N,
+  A8 $20 L L32R,  A8 CALLX8,
+  A8 $C L L32R,  A8 A10 A8 OR,  A2 $10 L L32R,  A10 A2 MOV.N,  MEMW,  A8 A3 0 S32I,
+  A8 $24 L L32R,  A8 CALLX8,
+  A8 $14 L L32R,  A10 A10 A8 OR,  MEMW,  A10 A2 0 S32I.N,  RETW.N,
+$85 L:  END-CODE
+
+CODE rtc_sdreg_off   \ .text.rtc_sdreg_off $1C
+  $0 7 LITERALS
+    $3FF48074 T,  $400000 T,  $800000 T,  $7FFFFFFF T,
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read
+$1C L:
+  A1 32 ENTRY,  A2 $0 L L32R,  A10 A2 MOV.N,  A8 $10 L L32R,  A8 CALLX8,
+  A8 $4 L L32R,  A8 A10 A8 OR,  A10 A2 MOV.N,  MEMW,  A8 A2 0 S32I.N,
+  A8 $14 L L32R,  A8 CALLX8,
+  A8 $8 L L32R,  A8 A10 A8 OR,  A10 A2 MOV.N,  MEMW,  A8 A2 0 S32I.N,
+  A8 $18 L L32R,  A8 CALLX8,
+  A8 $C L L32R,  A10 A10 A8 AND,  MEMW,  A10 A2 0 S32I.N,  RETW.N,
+$5D L:  END-CODE
+
+CODE rtc_slp_prep_lite_12M   \ .text.rtc_slp_prep_lite_12M $4
+  $0 1 LITERALS
+    SYMBOL rtc_slp_prep
+$4 L:
+  A1 80 ENTRY,  A8 0 MOVI.N,  A9 4 MOVI.N,  A8 A1 36 S32I.N,  A15 A8 MOV.N,
+  A14 A8 MOV.N,  A13 A8 MOV.N,  A12 A8 MOV.N,  A8 A1 32 S32I.N,  A11 A8 MOV.N,
+  A10 2 MOVI.N,  A8 A1 28 S32I.N,  A9 A1 24 S32I.N,  A3 A1 20 S32I.N,
+  A8 A1 16 S32I.N,  A2 A1 12 S32I.N,  A8 A1 8 S32I.N,  A8 A1 4 S32I.N,
+  A8 A1 0 S32I.N,  A8 $0 L L32R,  A8 CALLX8,
+  RETW.N,
+$33 L:  END-CODE
+
+CODE cfg_sdio_volt   \ .text.cfg_sdio_volt $3C
+  $0 15 LITERALS
+    $3FF48074 T,  $80000000 T,  $9FFFFFFF T,  $E7FFFFFF T,  $F9FFFFFF T,
+    $1000000 T,  $FF7FFFFF T,  $400000 T,  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+    SYMBOL esp_dport_access_reg_read  SYMBOL esp_dport_access_reg_read
+$3C L:
+  A1 32 ENTRY,  A5 $0 L L32R,  A2 A2 0 8 EXTUI,  A10 A5 MOV.N,  A8 $20 L L32R,
+  A8 CALLX8,
+  A3 A3 0 8 EXTUI,  A8 $4 L L32R,  A4 A4 0 8 EXTUI,  A8 A10 A8 OR,  A10 A5 A5 OR,
+  MEMW,  A8 A5 0 S32I,  A8 $24 L L32R,  A8 CALLX8,
+  A8 A2 0 2 EXTUI,  A8 A8 29 SLLI,  A9 $8 L L32R,  A10 A10 A9 AND,  A8 A8 A10 OR,
+  A10 A5 MOV.N,  MEMW,  A8 A5 0 S32I,  A8 $28 L L32R,  A8 CALLX8,
+  A8 A3 0 2 EXTUI,  A8 A8 27 SLLI,  A9 $C L L32R,  A10 A10 A9 AND,  A8 A8 A10 OR,
+  A10 A5 MOV.N,  MEMW,  A8 A5 0 S32I.N,  A8 $2C L L32R,  A8 CALLX8,
+  A8 A4 0 2 EXTUI,  A8 A8 25 SLLI,  A9 $10 L L32R,  A10 A10 A9 AND,  A8 A8 A10 OR,
+  A10 A5 MOV.N,  MEMW,  A8 A5 0 S32I.N,  A8 $30 L L32R,  A8 CALLX8,
+  A2 $14 L L32R,  A2 A10 A2 OR,  A10 A5 MOV.N,  MEMW,  A2 A5 0 S32I,  A8 $34 L L32R,
+  A8 CALLX8,
+  A2 $18 L L32R,  A2 A10 A2 AND,  A10 A5 MOV.N,  MEMW,  A2 A5 0 S32I.N,
+  A8 $38 L L32R,  A8 CALLX8,
+  A2 $1C L L32R,  A10 A10 A2 OR,  MEMW,  A10 A5 0 S32I.N,  RETW.N,
+$F1 L:  END-CODE
+
+LINK-SYMBOLS   \ the cells of other packages that wait for these names
+END-PACKAGE  PREVIOUS   \ not in the search order: ALSO name gives its words (README.md)

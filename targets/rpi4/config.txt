@@ -1,0 +1,8 @@
+# config.txt - the firmware of the Raspberry Pi 4 and 400 reads this file
+# 64 bit; load kernel8.img at address 0 and start all cores there
+arm_64bit=1
+kernel_old=1
+# no command line and no device tree in memory: they would lie at $100
+disable_commandline_tags=1
+device_tree=
+enable_uart=1

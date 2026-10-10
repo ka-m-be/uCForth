@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>uCForth</title>
+<!--
+  ucf.html - uCForth in a web browser: the page around ucf.js
+
+  The page gives the JavaScript bootstrap VM its files, a terminal and
+  Ctrl-C. The files come from the folder ucf that you choose, or from the
+  web server when the page comes over http. The files that uCForth writes
+  (FREEZE: ucf.hex, a build: build/...) show below the terminal as links
+  to save them. See README.md in this folder.
+
+  targets/browser/build.fs makes build/ucf-web.html of this page: with
+  an image in the element "image" and ucf.js in the page. Such a page
+  starts from its image at once (targets/browser/README.md).
+-->
+<style>
+  :root { --bg: #fff; --fg: #111; --dim: #666; --line: #ccc; --err: #b00; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111; --fg: #ddd; --dim: #999; --line: #444; --err: #f66; }
+  }
+  body { background: var(--bg); color: var(--fg); font: 15px/1.4 system-ui, sans-serif;
+         margin: 0 auto; padding: 16px; max-width: 70rem; }
+  h1 { font-size: 1.2rem; margin: 0 0 8px; }
+  p, label { color: var(--dim); }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 6px 0; }
+  #cmd { flex: 1; min-width: 12rem; font: 14px monospace; padding: 4px; }
+  #term { font: 14px/1.35 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap;
+          overflow-wrap: anywhere; border: 1px solid var(--line); padding: 8px; min-height: 20rem;
+          max-height: 70vh; overflow-y: auto; margin-top: 8px; }
+  #line { font: 14px ui-monospace, Menlo, Consolas, monospace; width: 100%; box-sizing: border-box;
+          padding: 4px 8px; border: 1px solid var(--line); border-top: 0; background: var(--bg); color: var(--fg); }
+  .err { color: var(--err); }
+  #written a { margin-right: 12px; }
+</style>
+</head>
+<body>
+<h1>uCForth &mdash; the JavaScript bootstrap VM</h1>
+<div class="row">
+  <label for="folder">1. The folder <code>ucf</code>:</label>
+  <input type="file" id="folder" webkitdirectory>
+  <span id="count"></span>
+</div>
+<div class="row">
+  <label for="cmd">2. Options and files:</label>
+  <input id="cmd" placeholder="for example: -32 host/files.fs" spellcheck="false">
+  <button id="start">Start</button>
+  <button id="stop" title="Ctrl-C: stop the word that runs">Ctrl-C</button>
+</div>
+<div id="term" aria-live="polite"></div>
+<input id="line" placeholder="a line for uCForth, then the return key" autocomplete="off" spellcheck="false" disabled>
+<div class="row" id="written"></div>
+<!-- targets/browser/build.fs puts the image (ucf.hex) into the next element, and ucf.js into the page -->
+<script type="text/plain" id="image">
+</script>
+<script src="ucf.js"></script>
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const files = new Map();                // the files of the folder ucf, and the files that uCForth writes
+const served = location.protocol === 'http:' || location.protocol === 'https:';
+const bytesOf = (s) => Uint8Array.from(s, (ch) => ch.charCodeAt(0) & 255);
+const image = $('image').text.trim() ? bytesOf($('image').text) : null;   // the image in the page, or null
+const page = image && decodeURIComponent(location.pathname.split('/').pop()) || 'ucf-web.html';   // its name
+const base = served && new URL(image ? '../' : '../../', location.href);   // the folder ucf on the web server
+const original = document.documentElement.cloneNode(true);   // the page as it came: FREEZE makes a new one
+let vm = null;
+
+// ---- the files --------------------------------------------------------------
+
+function clean(name) {                  // a path without "." and "..": forth/core.fs
+  const parts = [];
+  for (const p of name.split('/')) {
+    if (p === '..') parts.pop();
+    else if (p && p !== '.') parts.push(p);
+  }
+  return parts.join('/');
+}
+
+$('folder').addEventListener('change', async () => {
+  files.clear();
+  for (const f of $('folder').files) {  // the path starts with the name of the folder: ucf/...
+    const path = f.webkitRelativePath.split('/').slice(1).join('/');
+    files.set(path, new Uint8Array(await f.arrayBuffer()));
+  }
+  $('count').textContent = files.size + ' files';
+});
+
+function fromServer(name) {             // a file from the web server, or null
+  const req = new XMLHttpRequest();
+  req.open('GET', new URL(name, base), false);   // wait for it: OPEN-FILE cannot wait later
+  req.overrideMimeType('text/plain; charset=x-user-defined');
+  try { req.send(); } catch (e) { return null; }
+  if (req.status !== 200) return null;
+  const s = req.responseText, b = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) b[i] = s.charCodeAt(i) & 255;
+  files.set(clean(name), b);
+  return b;
+}
+
+function offer(name, bytes) {           // a link to save a file that uCForth wrote
+  let a = [...$('written').querySelectorAll('a')].find((x) => x.download === name.split('/').pop() && x.title === name);
+  if (!a) { a = document.createElement('a'); a.title = name; $('written').appendChild(a); }
+  if (a.href) URL.revokeObjectURL(a.href);
+  a.href = URL.createObjectURL(new Blob([bytes]));
+  a.download = name.split('/').pop();
+  a.textContent = name + ' (' + bytes.length + ' bytes)';
+}
+
+function pageWith(hex) {                // this page with the image hex (FREEZE), or null
+  const copy = original.cloneNode(true);
+  copy.querySelector('#image').text = '\n' + new TextDecoder().decode(hex);
+  const load = copy.querySelector('script[src]');
+  if (load) {                           // the page of the bootstrap VM: ucf.js goes into the page
+    const js = host.readFile('bootstrap/js/ucf.js');
+    if (!js) return null;
+    load.removeAttribute('src');
+    load.text = '\n' + new TextDecoder().decode(js);
+  }
+  return new TextEncoder().encode('<!doctype html>\n' + copy.outerHTML + '\n');
+}
+
+// ---- the terminal -------------------------------------------------------------
+
+const decoder = new TextDecoder('utf-8');
+function show(text, cls) {
+  const term = $('term');
+  const atEnd = term.scrollTop + term.clientHeight >= term.scrollHeight - 4;
+  if (cls) { const s = document.createElement('span'); s.className = cls; s.textContent = text; term.appendChild(s); }
+  else term.appendChild(document.createTextNode(text));
+  if (atEnd) term.scrollTop = term.scrollHeight;
+}
+
+const host = {
+  tty: true,                            // the page shows each typed line itself
+  poll: true,                           // KEY? does not wait for a line
+  write: (b) => show(decoder.decode(b, { stream: true }).replace(/\r/g, '')),
+  error: (s) => show(s, 'err'),
+  readFile: (name) => (image && name === page ? image
+    : files.get(clean(name)) || (served ? fromServer(name) : null)),
+  openWrite: (name, fresh) => {
+    const old = files.get(clean(name));
+    return { name: clean(name), parts: fresh || !old ? [] : [old] };
+  },
+  writeTo: (h, b) => { h.parts.push(b.slice()); return true; },
+  closeFile: (h) => {
+    const n = h.parts.reduce((s, p) => s + p.length, 0), all = new Uint8Array(n);
+    let o = 0;
+    for (const p of h.parts) { all.set(p, o); o += p.length; }
+    files.set(h.name, all);
+    offer(h.name, all);
+    if (h.name === 'ucf.hex') {         // FREEZE: also this page with the new image
+      const html = pageWith(all);
+      if (html) offer(page, html);
+    }
+  },
+  env: () => '',
+  now: () => Math.floor(performance.now()),
+  later: (fn, ms) => setTimeout(fn, ms),
+  exit: (code) => { show('\n[the end, exit status ' + code + ']\n', code ? 'err' : ''); $('line').disabled = true; vm = null; }
+};
+
+function start() {
+  if (!image && !served && !files.size) { show('Choose the folder ucf first.\n', 'err'); return; }
+  $('term').textContent = '';
+  $('line').disabled = false;
+  $('line').focus();
+  const own = Object.create(host);      // the host of this VM: an older VM stops when a new one starts
+  own.later = (fn, ms) => setTimeout(() => { if (vm === mine) fn(); }, ms);
+  const mine = vm = makeVM(own);
+  const args = $('cmd').value.split(/\s+/).filter((s) => s);
+  vm.start(image ? ['-image', page].concat(args) : args);
+}
+
+$('start').addEventListener('click', start);
+$('stop').addEventListener('click', () => vm && vm.interrupt());
+$('line').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && vm) {
+    const text = $('line').value;
+    $('line').value = '';
+    show(text + '\n');                  // the typed line shows, as at a terminal
+    vm.input(new TextEncoder().encode(text));
+  } else if (e.key === 'c' && e.ctrlKey && !$('line').value && vm) {
+    e.preventDefault();                 // Ctrl-C in the empty line: stop the word that runs
+    vm.interrupt();
+  }
+});
+
+if (image) {                            // uCForth starts from the image in the page; the folder is a choice
+  document.querySelector('h1').textContent = 'uCForth';
+  $('folder').labels[0].innerHTML = 'The folder <code>ucf</code> for <code>INCLUDE</code> (not necessary):';
+  $('cmd').labels[0].textContent = 'Files to load after the image:';
+  $('cmd').placeholder = 'for example: examples/hello.fs';
+  $('start').textContent = 'Start again';
+}
+
+// ?args=...: start at once with these options and files (for tests over http)
+const auto = new URLSearchParams(location.search).get('args');
+if (served) $('count').textContent = 'files from the web server';
+if (auto !== null) { $('cmd').value = auto; start(); }
+else if (image) start();
+</script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+# The files that git does not keep.
+
+# macOS
+.DS_Store
+
+# build/: the results of the tools. Git keeps only its README
+# (build/README.md).
+/build/*
+!/build/README.md
+
+# The image that FREEZE and SAVE-IMAGE write (or the file in
+# $UCF_IMAGE). Each build of a target writes it and reads it again
+# (host/image.fs); it is not a source.
+ucf.hex
+
+# The files that the tests write (host/test/files.fs).
+*.tmp
+
+# Python (bootstrap/python/ucf.py)
+__pycache__/
+*.pyc
+
+# blob/esp32: git keeps only the archives (.a), the assembler sources
+# (.S), the packages (.fs), the READMEs and LICENSE. The tools, the
+# objects and the listings stay local (blob/esp32/README.md, section 8).
+/blob/esp32/**
+!/blob/esp32/**/
+!/blob/esp32/**/*.a
+!/blob/esp32/**/*.S
+!/blob/esp32/**/*.fs
+!/blob/esp32/**/README.md
+!/blob/esp32/LICENSE
