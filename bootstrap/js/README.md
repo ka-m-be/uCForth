@@ -36,8 +36,8 @@ There, `targets/browser/build.fs` makes the same page from a command
 line.
 
 **From a web server.** When the page comes over http, it takes the files
-from the server, and step 2 is not necessary. In the folder `ucf`, for
-example with Python:
+from the server, and step 2 is not necessary; the field "1." says so.
+In the folder `ucf`, for example with Python:
 
     python3 -m http.server 8000
 

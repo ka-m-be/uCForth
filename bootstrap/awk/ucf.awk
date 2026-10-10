@@ -54,7 +54,7 @@ function usage() {
 
 # ==== Options ===========================================================
 # The default files lie in the project. The script looks for them in the
-# current folder (ucf), then two folders above (ucf/bootstrap/awk).
+# current folder (ucf), then two folders above (a start in bootstrap/awk).
 
 function options(   i, a, n) {
   if (readable("forth/core.fs")) PFX = ""

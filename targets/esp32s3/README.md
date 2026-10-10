@@ -637,10 +637,10 @@ gives the prompt). `examples/tick.fs` has `TURNKEY` at its end:
 Or build it on the Mac: put the application files before
 `targets/freeze.fs`:
 
-    LC_ALL=C awk -f bootstrap/awk/ucf.awk -- -32 lib/package.fs lib/esp32/rom.fs lib/esp32/esp32s3/chip.fs lib/esp32/intr.fs \
-       lib/esp32/gpio.fs lib/esp32/timers.fs lib/esp32/flash.fs lib/esp32/esp32s3/clock.fs lib/esp32/esp32s3/psram.fs \
-       lib/esp32/esp32s3/bootimg.fs targets/esp32s3/boot.fs examples/tick.fs targets/freeze.fs host/files.fs \
-       targets/esp32s3/build.fs </dev/null
+    LC_ALL=C awk -f bootstrap/awk/ucf.awk -- -32 lib/package.fs lib/idle.fs lib/esp32/rom.fs lib/esp32/esp32s3/chip.fs \
+       lib/esp32/intr.fs lib/esp32/gpio.fs lib/esp32/timers.fs lib/esp32/flash.fs lib/esp32/esp32s3/clock.fs \
+       lib/esp32/esp32s3/psram.fs lib/esp32/esp32s3/bootimg.fs targets/esp32s3/boot.fs examples/tick.fs targets/freeze.fs \
+       host/files.fs targets/esp32s3/build.fs </dev/null
 
 ## Test
 

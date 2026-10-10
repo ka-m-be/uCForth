@@ -273,7 +273,8 @@ flash.
   linker scripts of ESP-IDF (`__divsf3` from the older script of the
   Arduino core 1.0.4).
 
-`ucf/LICENSE` names the files under the Apache License 2.0.
+The file `LICENSE` in the folder `ucf` names the files under the Apache
+License 2.0.
 
 ### Pick again: `tools/pick.fs`
 

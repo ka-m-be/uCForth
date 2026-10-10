@@ -189,17 +189,19 @@ or `targets/linux-i386/build.fs`, `build/ucf-a64`, `build/ucf-x64` or
 
 ## 6 uCForth on an ESP32-S3 board
 
-**Build the image** `build/esp32s3.bin` (about 40 s):
+**Build the image** `build/esp32s3.bin` (about 75 s):
 
-    LC_ALL=C awk -f bootstrap/awk/ucf.awk -- -32 lib/package.fs lib/esp32/rom.fs lib/esp32/esp32s3/chip.fs lib/esp32/intr.fs \
-       lib/esp32/gpio.fs lib/esp32/timers.fs lib/esp32/flash.fs lib/esp32/esp32s3/clock.fs lib/esp32/esp32s3/psram.fs \
-       lib/esp32/esp32s3/bootimg.fs targets/esp32s3/boot.fs targets/freeze.fs host/files.fs targets/esp32s3/build.fs </dev/null
+    LC_ALL=C awk -f bootstrap/awk/ucf.awk -- -32 lib/package.fs lib/idle.fs lib/esp32/rom.fs lib/esp32/esp32s3/chip.fs \
+       lib/esp32/intr.fs lib/esp32/gpio.fs lib/esp32/timers.fs lib/esp32/flash.fs lib/esp32/esp32s3/clock.fs \
+       lib/esp32/esp32s3/psram.fs lib/esp32/esp32s3/bootimg.fs targets/esp32s3/boot.fs targets/freeze.fs host/files.fs \
+       targets/esp32s3/build.fs </dev/null
 
-The command line has the packages for the board (`lib/esp32/`, and the
-ones that only the ESP32-S3 has in `lib/esp32/esp32s3/`), the
-start of the board (`boot.fs`), `FREEZE` (`targets/freeze.fs`), and
-the tool that writes the file (`build.fs`). Each part is in
-targets/esp32s3/README.md, section "Build".
+The command line has the package IDLE (`lib/idle.fs`: the words that
+run while the console waits), the packages for the board
+(`lib/esp32/`, and the ones that only the ESP32-S3 has in
+`lib/esp32/esp32s3/`), the start of the board (`boot.fs`), `FREEZE`
+(`targets/freeze.fs`), and the tool that writes the file (`build.fs`).
+Each part is in targets/esp32s3/README.md, section "Build".
 
 **Connect the board.** A USB cable goes from the Mac to the socket "USB
 to serial port" of the board. `ls /dev/cu.*` shows its port:
@@ -268,13 +270,13 @@ the file first, then you use its words (apps/README.md):
 
 **An ESP32 board** (for example with the module ESP32-WROOM-32) goes
 the same way, with its own image. The ROM of the ESP32 reads the image
-at `$1000` in the flash (targets/esp32/README.md). Build it (about 30
+at `$1000` in the flash (targets/esp32/README.md). Build it (about 75
 s), then ask the chip, write the image, restart, and start the console;
 here the port is `/dev/cu.usbserial-110`:
 
-    LC_ALL=C awk -f bootstrap/awk/ucf.awk -- -32 lib/package.fs lib/esp32/rom.fs lib/esp32/esp32/chip.fs lib/esp32/intr.fs \
-       lib/esp32/gpio.fs lib/esp32/timers.fs lib/esp32/flash.fs lib/esp32/esp32/clock.fs lib/esp32/esp32/bootimg.fs \
-       targets/esp32/boot.fs targets/freeze.fs host/files.fs targets/esp32/build.fs </dev/null
+    LC_ALL=C awk -f bootstrap/awk/ucf.awk -- -32 lib/package.fs lib/idle.fs lib/esp32/rom.fs lib/esp32/esp32/chip.fs \
+       lib/esp32/intr.fs lib/esp32/gpio.fs lib/esp32/timers.fs lib/esp32/flash.fs lib/esp32/esp32/clock.fs \
+       lib/esp32/esp32/bootimg.fs targets/esp32/boot.fs targets/freeze.fs host/files.fs targets/esp32/build.fs </dev/null
 
     $ build/ucf info /dev/cu.usbserial-110
     connecting .. ok
@@ -329,8 +331,8 @@ checks run on the bootstrap VM or on a program.
 | `build/ucf-macos-x64` (a Mac with Intel) | `LC_ALL=C awk -f bootstrap/awk/ucf.awk -- -32 host/files.fs targets/macos-x64/build.fs </dev/null` | 1 min |
 | `build/ucf-x64.efi` (a PC with UEFI: a USB stick) | `LC_ALL=C awk -f bootstrap/awk/ucf.awk -- -32 host/files.fs targets/uefi-x64/build.fs </dev/null` | 14 s |
 | `build/ucf` | `LC_ALL=C awk -f bootstrap/awk/ucf.awk -- -32 host/files.fs tools/ucf.fs targets/macos-a64/build.fs </dev/null` | 80 s |
-| `build/esp32s3.bin` | the command in step 6 | 40 s |
-| `build/esp32.bin` (an ESP32 board) | the command in step 6, "An ESP32 board" | 30 s |
+| `build/esp32s3.bin` | the command in step 6 | 75 s |
+| `build/esp32.bin` (an ESP32 board) | the command in step 6, "An ESP32 board" | 75 s |
 | `build/kernel8.img` (Raspberry Pi 4) | `LC_ALL=C awk -f bootstrap/awk/ucf.awk -- -32 targets/freeze.fs host/files.fs targets/rpi4/build.fs </dev/null` | 7 s |
 | `build/ucf.com` (MS-DOS), `kernel.com`, `ucf.scr`, `ucf.lst` | `LC_ALL=C awk -f bootstrap/awk/ucf.awk -- host/files.fs targets/dos/build.fs </dev/null` (16-bit cells) | 12 s |
 | `build/ucf-pc.img` (a PC with a BIOS: a floppy disk, a USB stick) | `LC_ALL=C awk -f bootstrap/awk/ucf.awk -- lib/package.fs lib/pc/bios.fs targets/freeze.fs host/files.fs targets/pc-bios/build.fs </dev/null` (16-bit cells) | 10 s |

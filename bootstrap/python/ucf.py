@@ -78,7 +78,7 @@ def catch_int():
 
 # ==== Options ============================================================
 # The default files lie in the project. The program looks for them in the
-# current folder (ucf), then two folders above (ucf/bootstrap/python).
+# current folder (ucf), then two folders above (a start in bootstrap/python).
 
 BITS = 16                               # the cell size
 pure = check = False                    # -pure, -check

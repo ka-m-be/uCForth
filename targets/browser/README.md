@@ -61,6 +61,10 @@ files stay on your computer):
     ok> ALSO FILES  INCLUDE examples/hello.fs
     Hello from uCForth
 
+When the page comes from a web server (for example from GitHub Pages),
+`INCLUDE` reads the files from the server, in the folder above the
+page. Then the field of the folder says so; a folder is not necessary.
+
 The field "Files to load after the image" takes files as a command line
 does; "Start again" loads them after the start.
 
@@ -109,7 +113,7 @@ Then open `http://localhost:8000/build/ucf-web.html?args=tools/test.fs`.
 The page takes the files from the server and loads `tools/test.fs`
 after the image. The output ends with:
 
-    all: 10979 tests, 0 errors
+    all: 11125 tests, 0 errors
 
     [the end, exit status 0]
 

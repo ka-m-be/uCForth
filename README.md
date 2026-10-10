@@ -30,9 +30,11 @@ binary file: only text files.
 
 ## Start
 
+All commands run in the folder `ucf`: the top folder of this
+repository.
+
 **On Linux or macOS with bash:**
 
-    cd ucf
     bash bootstrap/bash/ucf.sh
 
 The bootstrap VM compiles `forth/core.fs` and `forth/base.fs` (about 20
@@ -63,7 +65,7 @@ the fastest, and the reference for all bootstrap VMs:
 **In a web browser**, without any installation: open `bootstrap/js/ucf.html`,
 choose the folder `ucf`, then "Start".
 
-(There is a prebuild github page: https://ka-m-be.github.io/uCForth/build/ucf-web.html)
+(There is a prebuilt GitHub page: https://ka-m-be.github.io/uCForth/build/ucf-web.html)
 
 **On Windows** (7 to 11), without any installation, in a command
 window in the folder `ucf`:

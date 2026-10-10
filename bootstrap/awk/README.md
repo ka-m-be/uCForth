@@ -13,7 +13,8 @@ works, part by part, in the order of the script.
 
 ## Start
 
-    cd ucf
+In the folder `ucf` (the top folder of uCForth):
+
     LC_ALL=C awk -f bootstrap/awk/ucf.awk
 
 The bootstrap VM compiles `forth/core.fs` (Genesis) and `forth/base.fs`

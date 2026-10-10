@@ -10,7 +10,8 @@ order of the script.
 
 ## Start
 
-    cd ucf
+In the folder `ucf` (the top folder of uCForth):
+
     bash bootstrap/bash/ucf.sh
 
 The bootstrap VM compiles `forth/core.fs` (Genesis) and `forth/base.fs`

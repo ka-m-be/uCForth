@@ -124,7 +124,7 @@ static int slurp(const char *name, char **text, unsigned long *len);
 
 /* ==== Options ===========================================================
  * The default files lie in the project. The program looks for them in
- * the current folder (ucf), then two folders above (ucf/bootstrap/c).
+ * the current folder (ucf), then two folders above (a start in bootstrap/c).
  */
 
 static int BITS = 16;                   /* the cell size */

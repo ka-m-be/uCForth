@@ -197,6 +197,13 @@ if (image) {                            // uCForth starts from the image in the 
   $('start').textContent = 'Start again';
 }
 
+if (served) {                           // over http the files come from the web server; a folder is a choice
+  $('folder').labels[0].innerHTML = (image
+    ? 'The files come from this web server: <code>ALSO FILES  INCLUDE examples/hello.fs</code>.'
+    : '1. The files come from this web server: name them in 2.')
+    + ' A folder of your own (not necessary):';
+}
+
 // ?args=...: start at once with these options and files (for tests over http)
 const auto = new URLSearchParams(location.search).get('args');
 if (served) $('count').textContent = 'files from the web server';
