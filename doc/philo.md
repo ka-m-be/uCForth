@@ -12,7 +12,7 @@ The main purpose of this project is not a fancy or productive application, altho
 
 **Will this project be maintained?**
 
-Yes and no. It is not a real product. More a bookshelf. There is no roadmap, milestones or relaases. I may occasionally add code that comes from currents interests, like the IR remote for the air condition.
+Yes and no. It is not a real product. More like a bookshelf. There is no roadmap, milestones or relaases. I may occasionally add code that comes from currents interests, like the IR remote for the air condition.
 
 **Why does this look so LLM generated?**
 

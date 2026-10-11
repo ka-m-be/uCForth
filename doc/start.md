@@ -8,14 +8,13 @@ For the basics of Forth, read `forth.md` first.
 
 What you need:
 
-- Steps 1 to 3: a computer with awk: Linux, macOS, BSD, or a small
-  system with BusyBox.
-- Step 4: macOS on Apple silicon, Linux on 64-bit ARM or on a PC, or
-  Windows.
-- Steps 5 and 6: macOS (Windows and Linux have the tool `ucf` too), and
+- For steps 1 to 3: a computer with awk or bash or Javascript or...:
+  Linux, MacOS, BSD, or a small system with BusyBox.
+- For step 4: MacOS, Linux or Windows.
+- For steps 5 and 6: MacOS (Windows and Linux have the tool `ucf` too), and
   an ESP32-S3 board or an ESP32 board with a USB cable.
 
-Give all commands in the folder `ucf`. The times are from a Mac with
+Give all commands in the top folder. The times are from a Mac with
 Apple M4.
 
 ## 1 The first prompt
