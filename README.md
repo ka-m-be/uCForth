@@ -16,7 +16,7 @@ Next, build a real executable on your programming machine. Finally use your
 machine to program some bare metal microcontroller in uCForth. This might be a
 modern 32bit SoC (system on chip, e.g. ESP32) or older 8 bit or 16 bit chips.
 
-uCForth runs on a small virtual machine. Only 32 primitives and a small
+uCForth runs on a small virtual machine (or virtual CPU). Only 32 primitives and a small
 HAL (hardware abstraction layer) depend on the computer. Everything else
 is Forth: the interpreter, the compiler, the drivers and the tools.
 
@@ -28,10 +28,14 @@ bootstrap VM supplies the primitives and reads `forth/core.fs` once.
 From then on, uCForth compiles itself. No compiler, no download, no
 binary file: only text files.
 
-## Start
+## More information
 
-All commands run in the folder `ucf`: the top folder of this
-repository.
+Background about the design, Forth basics, the VM concept, etc. is given in `doc/`.
+See the `README.md` there.
+
+## Start, try out and using
+
+All commands run in the top folder of this repository.
 
 **On Linux or macOS with bash:**
 
