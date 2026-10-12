@@ -27,7 +27,7 @@
 \ At the end: "radiohost: 34 tests, 0 errors".
 
 ONLY FORTH DEFINITIONS  ALSO FILES
-INCLUDE forth/test/tester.fs
+[DEFINED] T{ S" forth/test/tester.fs" ?INCLUDED
 ONLY FORTH DEFINITIONS  ALSO FILES
 
 PACKAGE MOCK-MAC
@@ -105,6 +105,7 @@ PUBLIC
   CTRL-REG @ OWNER AND 0=  OVER ROOM? 0=  OR IF  2DROP  1 LOST +!  EXIT THEN
   LEFT !  FROM !
   BEGIN  NEXT-REG @ >HOST PART  LEFT @ 0=  UNTIL
+  MAC $2CC + >HOST DUP @ 1+ SWAP !
   STATUS-REG @ $1000020 OR  STATUS-REG ! ;           \ the interrupt of the reception
 : BIS! ( mask a -- )
   DUP NOTE-WRITE  2DUP NOTE-TX  2DUP NOTE-ACK

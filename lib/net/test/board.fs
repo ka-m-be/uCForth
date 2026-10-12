@@ -18,7 +18,7 @@ ONLY FORTH
 ONLY FORTH
 #require IDLE ../../idle.fs
 ONLY FORTH
-#require NO-LINK ../nolink.fs
+#require LINK ../nolink.fs
 ONLY FORTH
 #require ARP ../arp.fs
 ONLY FORTH
@@ -36,7 +36,7 @@ ONLY FORTH
 ONLY FORTH
 #require DNS ../dns.fs
 ONLY FORTH
-#require NET-START ../../esp32/nettimer.fs
+#require NET-TIMER ../../esp32/nettimer.fs
 ONLY FORTH DEFINITIONS  ALSO INTERNALS  ALSO TEXT  ALSO INET  ALSO NET  ALSO NET-TIMER
 NET-START
 #include sockets.fs

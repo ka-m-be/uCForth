@@ -48,9 +48,11 @@ itself differs, each chip has its own file in its folder.
 | `intr.fs` | board | package INTR: handlers of interrupts (`INT!`, `INT@`, `INT-ON`, `INT-OFF`, `+INT`, `-INT`): Forth words at the next NEXT, `CODE` words at once (level 2); an error stops only its handler, and its message comes when the console waits (`INT-STOPPED`); the message of an error of the CPU (-9 with the address and the PC); needs CHIP and IDLE; `FAULT-REGS`: the HAL writes all registers of the last error of the CPU there (the monitor shows them, `asm/monitor/README.md`); `DEBUG-HOOK`: the code of the monitor for a debug exception |
 | `gpio.fs` | board | package GPIO: the base of the drivers: `BITS!` (bits in a register), `SRAM-ALLOT` and `SRAM-BUFFER:` (RAM inside the chip, also when the RAM data are in the PSRAM), GPIO (`OUTPUT INPUT PULLUP PULLDOWN OPEN-DRAIN HIGH LOW PIN@ PIN! TOGGLE DRIVE`), the GPIO matrix (`SIGNAL>PIN`, `PIN>SIGNAL`), interrupts of the pins (`PIN-INT!`); needs CHIP and INTR |
 | `timers.fs` | board | package TIMERS: `EVERY`, `AFTER`, `.TIMERS`: Forth words that run later, or every n ms; an error stops only its word; needs CHIP and INTR |
-| `nettimer.fs` | board | package NET-TIMER: our TCP/IP in the background, a step every 1 ms in a timer (`NET-START`, `NET-STOP`); needs TIMERS and our TCP/IP (`lib/net/`) |
+| `nettimer.fs` | board | package NET-TIMER: our TCP/IP in the background, a step every 1 ms in a timer, and its foreground work in IDLE (`NET-START`, `NET-STOP`); needs TIMERS, IDLE and our TCP/IP (`lib/net/`) |
+| `tcpip.fs` | `ucf term` | loads our TCP/IP and NET-TIMER with one `#require` (the board version of `lib/net/tcpip.fs`) |
 | `flash.fs` | board | package FLASH: the SPI flash over the ROM (`FLASH-READ`, `FLASH-WRITE`, `FLASH-ERASE`), with `FLASH-SYSCALL` of the layer of the chip (on the ESP32 the cache is off meanwhile); buffers only inside the chip; needs CHIP and ROM |
 | `ir.fs` | board | package IR: frames of IR remote controls as times in us over the RMT: `IR-PINS`, `IR-SEND`, `IR-FRAME?`, `IR-LISTEN`; made for the IR transceiver of Adafruit (product 5990); needs RMT and GPIO |
+| `irqueue.fs` | WROOM, with IR-CAPTURE | package IR-QUEUE: IR in the background for the bridge: a ring of 16 received frames, sending after 15 ms without light with a check of the echo (`IR-Q-START`, `IR-Q-SEND`, `IR-Q-FRAME?`; section "IR for the bridge on the WROOM") |
 | `ws2812.fs` | board | package WS2812: an RGB LED over channel 0 of the RMT (`RGB-PIN`, `RGB!`); needs RMT |
 | `clink.fs` | board | package CLINK: links code of C that is written as `CODE` words (the quarry `blob/esp32`): cells that get the address of a name (`SYMBOL`, `SYMBOL!`), names outside (`EXTERN`), `LINK-SYMBOLS`, `.UNRESOLVED`, `UNRESOLVED?`, the data of C (`DATA:`, `INIT`), `CALL-C`, `FPU-ON`; needs TEXT, XTENSA, ROM and ASM; not in the image: ESP32-PHY loads it only for the link |
 | `rmt.fs` | `ucf term` | chooses the package RMT of the chip (`#when`) |
@@ -61,7 +63,7 @@ itself differs, each chip has its own file in its folder.
 | `test/timers.fs` | board | the test of TIMERS: the same on each chip |
 | `test/mock.fs` | host | ROM and ASM on the host, for tests of `CODE` words of the ESP32: `CODE` assembles as on the chip and shows the code; `QUIET` hides it |
 | `test/phyhost.fs` | host | the test of ESP32-PHY on the host (section "The radio of the ESP32: ESP32-PHY") |
-| `test/radiohost.fs` | host | the test of ESP32-RADIO on the host (section "The radio of the ESP32: ESP32-RADIO") |
+| `test/radiohost.fs` | host | the test of ESP32-RADIO on the host (section "The radio of the ESP32: ESP32-RADIO"); the tests of WLAN-BACK, SETUP-AP and IR-QUEUE: section "The WLAN of the WROOM", "Tests" |
 
 `lib/idle.fs` (package IDLE: the chain of words that run while the
 console waits, and `NO-BREAK`, for which Ctrl-C waits) comes before
@@ -88,9 +90,9 @@ README: "Build").
 
 | File | Contents |
 | --- | --- |
-| `chip.fs` | package ESP32: the layer of the chip (the addresses of GPIO, the IO MUX with a table for its registers, the pull resistors in the RTC IO (`>PULL`), the interrupt matrix, timer group 1, the functions of the ROM for the flash and `FLASH-SYSCALL`, HAL 105: `SYSCALL` with the cache of the flash off), `APB-MHZ`, `CHIP-NAME`; then `CHIP` |
+| `chip.fs` | package ESP32: the layer of the chip (the addresses of GPIO, the IO MUX with a table for its registers, the pull resistors in the RTC IO (`>PULL`), the interrupt matrix, timer group 0 with `MICROS` (the time in us), timer group 1, the functions of the ROM for the flash and `FLASH-SYSCALL`, HAL 105: `SYSCALL` with the cache of the flash off), `APB-MHZ`, `CHIP-NAME`; then `CHIP` |
 | `clock.fs` | package CLOCK: the clock of the CPU, 40 to 240 MHz (`MHZ`, `CPU-MHZ`), with new dividers for UART0 and the timers (they count the APB clock); needs ROM, CHIP and GPIO |
-| `bootimg.fs` | package BOOTIMG: `FREEZE` on the board appends the dictionary to its frozen part in the flash (at `$6_0000` + VM address; `FLASH-END`, `DICT-FLASH`), then writes the boot image at `$1000` (`(SAVE-IMAGE)`), with the code of the `CODE` words (`CODE-START`, `CODE-HERE`) and the RAM data; `XDATA-ON` gives the RAM behind the frozen part to the RAM data; needs ROM and FLASH |
+| `bootimg.fs` | package BOOTIMG: `FREEZE` on the board appends the dictionary to its frozen part in the flash (at `$6_0000` + VM address; `FLASH-END`, `DICT-FLASH`), then writes the boot image at `$1000` (`(SAVE-IMAGE)`), with the code of the `CODE` words (`CODE-START`, `CODE-HERE`) and the RAM data; `XDATA-ON` gives the RAM behind the frozen part to the RAM data; `XDATA-FREEZE` and `?FREEZE` for the loader of an application; needs ROM and FLASH |
 | `asm.fs` | package ASM: `CODE` ... `END-CODE` with the assembler `asm/xtensa.fs`, the words of the ESP32-S3; the code goes to SRAM0 after the code of the kernel, a cell at a time (at most 2 KB for one word); needs TEXT, XTENSA, ROM and BOOTIMG; not in the image |
 | `rmt.fs` | package RMT: the words of the package RMT of the ESP32-S3 for the RMT of the ESP32 (8 channels, each sends or receives; 64 pulse words per block; the APB clock; no demodulator); needs CHIP and GPIO |
 | `phy.fs` | package ESP32-PHY: calibration, channel, power and PHY rate tables, with selected code of C from libphy/librtc; no libpp MAC code |
@@ -98,9 +100,14 @@ README: "Build").
 | `phychip.fs`, `phyana.fs`, `phycal.fs`, `phyrtc.fs`, `phydata.fs` | the code and the data of C for ESP32-PHY: copies from the quarry `blob/esp32`, made by `tools/pick.fs`; Apache License 2.0 |
 | `phypick.fs` | the pick list of ESP32-PHY: which functions `tools/pick.fs` copies |
 | `phyidf.fs` | for ESP32-PHY: the 5 functions of ESP-IDF that the code of C calls (here as `CODE` words), `fpu_on`, and the addresses of the 7 functions of the ROM that it calls |
-| `radio.fs` | package ESP32-RADIO: the radio of the ESP32 with the words of the contract RADIO: on and off, the channel, the reception of frames, the filter of a scan (`RADIO-START`, `RADIO-CHANNEL!`, `RADIO-CHANNEL@`, `RADIO-BEACONS`, `RADIO-RECEIVE`, `RADIO-LEVEL`, `RADIO-STOP`); then `RADIO`; a file for `ucf term`, after `phy.fs`, not in the image (section "The radio of the ESP32: ESP32-RADIO") |
+| `radio.fs` | package ESP32-RADIO: the radio of the ESP32 with the words of the contract RADIO: on and off, the channel, reception and sending, the filters of a scan, a station and an AP, the keys of the CCMP in the MAC, the packet RAM (`RADIO-POOL`); then `RADIO`; a file for `ucf term`, after `phy.fs`, not in the image (section "The radio of the ESP32: ESP32-RADIO") |
+| `wlsave.fs` | package WLSAVE: the WLAN profile (name and key) in two sectors of the flash; `WLAN-SAVE`, `WLAN-SAVED?`, `WLAN-SAVED-NET`, `WLAN-JOIN`, `WLAN-FORGET` |
+| `wlstack.fs` | `ucf term`: loads the WLAN of the WROOM with one `#require` (radio, WPA2 station, WLSAVE, both LINKs) |
+| `wlback.fs` | package WLAN-BACK: the station joins its saved network and stays joined (`WBACK-START`, `WBACK-STOP`, `WLAN-BOOT-ON`) |
+| `wlap.fs` | package SETUP-AP: a temporary open network for one device (`SETUP-START`, `SETUP-STOP`) |
+| `ircap.fs` | package IR-CAPTURE: the IR receiver into 4 raw slots by a CODE handler; for IR-QUEUE |
 | `diymore/wroom-n4.fs` | package DIYMORE-WROOM-N4: the board ESP-WROOM-32 N4 of diymore: `LED` (2), `BUTTON` (0), `LED-ON`, `LED-OFF`; then `BOARD` |
-| `test/` | the tests of INTR, GPIO, RMT, IR and ASM on this chip (GPIO 25, without wires); `phy.fs`, the test of ESP32-PHY; `radio.fs`, the test of ESP32-RADIO (it needs an access point near the board) |
+| `test/` | the tests of INTR, GPIO, RMT, IR and ASM on this chip (GPIO 25, without wires); `phy.fs`, the test of ESP32-PHY; `radio.fs`, the test of ESP32-RADIO (it needs an access point near the board); `irqueue.fs`, `irqbusy.fs`: IR-QUEUE; `airping.fs`, `airsock.fs`, `airtime.fs`, `aphttp.fs`: the WLAN (section "The WLAN of the WROOM") |
 
 IDLE, ROM, ESP32, INTR, GPIO, TIMERS, FLASH, CLOCK and BOOTIMG are in the
 image that `targets/esp32/build.fs` makes, in this order (its README:
@@ -326,10 +333,10 @@ filter of a scan. It is Forth over the registers of the MAC (the part
 of the chip that sends and receives the frames), over ESP32-PHY. The
 package WIFI (`lib/net/wifi.fs`) lists the networks around with it.
 
-**Status:** tested on the board ESP-WROOM-32: the beacons of the access
-points come, with their level, and WIFI lists the networks, as a phone
-does. The radio does not send yet. The addresses and the bits of the
-MAC come from the reference (the register map of the crate esp32
+**Status:** tested on the board ESP-WROOM-32: it receives and sends, as a
+station of a WPA2 network with the CCMP in the MAC, and as an open access
+point for one device (section "The WLAN of the WROOM"). The addresses and
+the bits of the MAC come from the reference (the register map of the crate esp32
 0.40.2, the start in esp-wifi-hal 0.3.3) and from measurements on the
 board.
 
@@ -363,6 +370,16 @@ beacon of 410 bytes), or 0. `RADIO-LEVEL` gives the level of that frame.
 | `RADIO-MAC! ( a -- )` | own 6-byte unicast address for interface 0, after `RADIO-START`; copied, not borrowed | |
 | `RADIO-MAC@ ( -- a )` | the configured address; do not change its bytes | |
 | `RADIO-SEND ( a n ack? -- )` | send one frame without FCS; TRUE requests an ACK; then the header source must equal the configured own MAC | at most 100 ms for the completion; broadcast tested on the board, ACK on the host |
+| `RADIO-POOL ( -- a n )` | the RAM of the chip for the packet buffers of the LINKs: SRAM1 from `$3FFE_0500`, 14 880 bytes | |
+| `RADIO-FACTORY ( -- )`, `RADIO-RANDOM ( a n -- )` | the own address from the eFuses; random bytes of the hardware (section "The WPA2 station") | |
+| `bssid RADIO-STATION ( -- )` | the filters of a station of the access point bssid | |
+| `RADIO-AP ( -- )`, `peer RADIO-AP-PEER! ( -- )` | the filters of an AP: first only authentications and probes, then only the frames of the device peer | |
+| `key peer id group? RADIO-CCMP-KEY! ( -- )`, `RADIO-KEYS-CLEAR ( -- )` | a key into the MAC (slot 0 the pair, 1 to 4 the group keys 0 to 3); all keys out | |
+| `RADIO-CCMP? ( -- f )`, `RADIO-DECRYPTED? ( -- f )` | the MAC has keys; the MAC has decrypted the frame of the last `RADIO-RECEIVE` | |
+| `RADIO-SOFT-CCMP ( -- )` | protected frames in software (a radio without keys in the MAC) | |
+| `a n ack? RADIO-TX-START ( -- )`, `RADIO-TX-POLL ( -- n )` | send without waiting; the result later: 1 at work, 0 done, else the code | |
+| `RADIO-TX-BUSY? RADIO-TX-BLOCKED? ( -- f )`, `RADIO-TX-CANCEL ( -- )`, `RADIO-TX-END ( -- )` | the state of a send; cancel it; let it end (at most 200 ms) | |
+| `RADIO-TRACK ( -- )` | `PHY-TRACK` after 5 sends, while none runs (the foreground) | |
 | `RADIO-STOP ( -- )` | the radio off: no reception, the handler off, `PHY-OFF` | |
 | `RADIO ( -- )` | `ALSO RADIO` gives ESP32-RADIO, as `ALSO CHIP` gives the layer of the chip | |
 
@@ -401,10 +418,15 @@ While the radio is off, `RADIO-CHANNEL!`, `RADIO-BEACONS` and
   gives a beacon (`$80`) and gives each other frame back unread
   (`#OTHER` counts them). The filters by address stay off.
 - A Forth handler (package INTR, level 1; source 0 goes to CPU
-  interrupt 1) counts the interrupts of the MAC (`#INTS`, `INT-BITS`:
-  one for each frame, bits `$0100_0020`) and clears them. Call
+  interrupt 1) counts calls of the MAC handler (`#INTS`, `INT-BITS`,
+  RX bits `$0100_0020`) and clears them. This is not a frame counter:
+  several frames can wait when it runs, and TX also uses it. The
+  measured DMA frame counter is at MAC + `$2CC`. Call
   `RADIO-RECEIVE` from one place only: from the program, or from one
   handler.
+- In station mode and AP mode, the software checks the addresses too
+  (`WANTED?`): see sections "The WPA2 station" and "The WLAN of the
+  WROOM". The host test is `test/starx.fs`.
 
 ### Transmission (N3c-2)
 
@@ -414,8 +436,9 @@ It prepares one DMA descriptor and the registers of hardware slot 2
 (best effort), but does not set the bits that start a transmission.
 The radio must be on and the slot free. The length without FCS must
 be 24 to 1 572 bytes; the buffer reserves four more bytes for the FCS
-that the hardware adds. A protected frame or a group address with
-ACK requested is an error, before any write.
+that the hardware adds. Protected frames need software or hardware
+CCMP enabled; a group receiver with ACK requested is an error before
+any write.
 
 `RADIO-SEND` starts the slot after preparation. The MAC handler saves
 the result and PMD (the MAC protocol status) before clearing the slot
@@ -425,7 +448,12 @@ does not wait or run PHY calibration; the foreground calls
 `PHY-TRACK` after every five slot completions.
 
 Use `RADIO-SEND` only in the foreground, not in a Forth handler. It
-waits with the handlers on for at most 100 ms. It does not enable
+waits with the handlers on for at most 100 ms per attempt. A known
+ACK timeout retries at most three times (four attempts total), with
+the same sequence, packet number and prepared bytes, plus the Retry
+bit. Other errors and unknown ends do not retry. `RADIO-TX-POLL`
+performs the same policy without waiting. The caller's bytes are
+unchanged. It does not enable
 handlers that the caller switched off. If the end is unknown, or
 Ctrl-C interrupts the wait, it disables the slot and locks the TX
 buffer until `RADIO-STOP` and `RADIO-START` reset the MAC. It saves
@@ -671,6 +699,212 @@ free, including small RNG-test buffers. The original clean boot image
 was not replaced. Only the owner's explicitly approved two profile
 sectors changed. End of the real test: station left, radio off, reset,
 RAM keys gone, serial port closed; both profile copies remain.
+
+## The WLAN of the WROOM: station, setup network, sockets
+
+The WROOM joins a WPA2 network as a station, keeps the connection, and
+our TCP/IP gives sockets over it (`lib/net/README.md`, "The words of an
+application"). For the setup, it can also open a temporary network of
+its own for one device. Only one of the two runs at a time; the board
+never routes between them.
+
+### Load
+
+`apps/irbridge/app.fs` loads all of it onto the base image and freezes
+it (`apps/irbridge/README.md`). Its parts, for ucf term, right after a
+reset:
+
+| File | Loads |
+| --- | --- |
+| `esp32/wlstack.fs` | ESP32-PHY, BYTES, ESP32-MAC, ESP32-RADIO, WIFI, SHA1, KDF1, AES128, WPAKEY, WLAN, WLSAVE, TEXT, INET, CCMP, WIFI-LINK, AP-LINK, RADIO-LINK; then `RADIO-POOL LINK-POOL!` |
+| `tcpip.fs` | our TCP/IP: ARP, IPV4, UDP, TCP, DHCP, LINK-NET, NET, DNS, NET-TIMER |
+| `esp32/wlback.fs` | WLAN-BACK: the station with the saved profile |
+| `../net/dhcps.fs`, `esp32/wlap.fs` | DHCP-SERVER and SETUP-AP: the setup network |
+
+The radio does the CCMP of the data frames itself, so the CCMP in
+software (`lib/net/wlsoft.fs`, package CCM) is not loaded. The base has
+not enough RAM data for all buffers: after `wlstack.fs`,
+`ALSO BOOTIMG XDATA-FREEZE` puts the first part into the flash and
+gives the RAM behind it to the next buffers (package BOOTIMG).
+
+### The station: WLAN-BACK
+
+The profile (the name of the network and its key, never the password)
+lies in the flash (package WLSAVE, section "The WPA2 station on the
+WROOM"). WLAN-BACK uses it without a terminal. A step of it runs in
+the chain of IDLE, while the console waits:
+
+| Word | Effect |
+| --- | --- |
+| `WBACK-START ( -- )` | the radio on, a scan in steps over the channels 1 to 13, the strongest access point with the saved name, the join, WIFI-LINK, `NET-START`, DHCP |
+| `WBACK-READY? ( -- f )` | joined, the link up, the address from DHCP |
+| `.WBACK ( -- )` | the state (0 wait, 1 scan, 2 join, 3 DHCP, 4 ready), the attempts, the joins, the code of the last failure |
+| `WBACK-STOP ( -- )` | the station tells the access point that it goes (a deauthentication), then the network and the radio go off; the keys in the RAM go, the profile stays |
+| `WBACK-RUNNING? ( -- f )` | between `WBACK-START` and `WBACK-STOP` |
+| `WLAN-BOOT-ON ( -- )` | after each start of the board: `WBACK-START`, then the console (TURNKEY); `FREEZE` keeps it |
+| `WLAN-BOOT-OFF ( -- )` | the normal start again, the radio off; `FREEZE` keeps it |
+
+When the beacons of the access point stay away for 5 s, or the link
+fails, WLAN-BACK stops all and tries again after a pause: 1 s, then 2,
+4, 8 ... at most 32 s, until `WBACK-STOP`. An error in one of its steps
+does the same; only Ctrl-C goes through. It shows numbers only.
+
+    board ok> ALSO WLAN-BACK  WBACK-START
+    WLAN back: link and DHCP ready
+    board ok> WBACK-READY? .  .WBACK
+    -1 WLAN back state/attempts/joins/code: 4 1 1 0
+
+Then the words of NET work as on a host. `FREEZE` only after
+`WBACK-STOP`: no key may go into the flash.
+
+**The CCMP in the radio.** The MAC of the ESP32 encrypts and decrypts
+the data frames when it has the keys. WLAN gives them to it with
+`RADIO-CCMP-KEY!` after the 4-way handshake and after a new group key:
+slot 0 holds the key of the pair, the slots 1 to 4 the group keys 0 to
+3. A slot is off while it changes, and a key goes in only when it is
+new. `WIFI-LEAVE`, a failure and `RADIO-STOP` clear all slots. The MAC
+writes the plain text of a received frame after its CCMP header and
+leaves out MIC and FCS; `RADIO-RECEIVE` gives the shorter length, and
+`RADIO-DECRYPTED?` says that this frame was decrypted. WIFI-LINK still
+checks the addresses, the packet number (no frame twice) and the key
+generation. The register facts come from esp-wifi-hal 0.3.3
+(`src/ll.rs`) and the register map esp32 0.40.2 (`crypto_control`,
+`crypto_key_slot`).
+
+### The setup network: SETUP-AP
+
+`SETUP-START` makes the board an open access point. The first device
+that logs on is the only one until `SETUP-STOP`: the radio then gives
+only its frames to the program (`RADIO-AP-PEER!`). It gets its address
+by DHCP. Stop the station first:
+
+    board ok> ALSO WLAN-BACK WBACK-STOP  ALSO SETUP-AP
+    board ok> S" ucf-setup" 6 SETUP-START
+
+| Word | Effect |
+| --- | --- |
+| `a n ch SETUP-START ( -- )` | the network with the name a n on channel ch, open; the board is 192.168.77.1/24 |
+| `SETUP-STOP ( -- )` | a deauthentication to the device (a device in power save can miss it and sees the end some seconds later); AP, DHCP and the network go off |
+| `.SETUP ( -- )` | the state of the device (0 none, 1 authenticated, 2 associated), frames in, out, dropped, the last code; the replies of DHCP |
+
+The device gets 192.168.77.2, a lease of 600 s, no router and no DNS
+server: it reaches only the board, and a phone may ask whether it
+shall stay in a network without Internet. The words of NET work as with
+the station. The network is open and its data readable, and another
+device could log on first: use it only for a short time, and send no
+secret over it. The AP knows the legacy OFDM rates (6 to 54 Mbit/s),
+frames without fragments and without A-MSDU, and no power save of the
+device: a frame to all goes to the device as a frame to it. After
+`SETUP-STOP`, `WBACK-START` joins the saved network again.
+
+A test reply for a browser: `#include lib/esp32/esp32/test/aphttp.fs`,
+`AP-HTTP-START`; then `http://192.168.77.1:8080/` on the device gives
+`ucf setup AP: ok`. `AP-HTTP-STOP` ends it.
+
+### Memory and speed
+
+Measured on the WROOM at 240 MHz with all of `apps/irbridge/app.fs`
+in the flash:
+
+| | |
+| --- | --- |
+| free: dictionary, RAM data, RAM behind the frozen part (XDATA) | 27 436, 41 248, 99 016 bytes |
+| the packet RAM of the LINKs (`RADIO-POOL`) | 14 880 bytes in SRAM1 from `$3FFE_0500` (up to the data of the ROM); WIFI-LINK takes 11 392, AP-LINK 8 168 |
+| `WBACK-START` to `WBACK-READY?`, the access point near | 2.1 s |
+| ping to the router | 5 to 15 ms |
+| TCP echo with a host, 10 times 1000 bytes each way | 183 to 396 ms |
+
+### Tests
+
+On the host, in `tools/test.fs` (each also alone, with
+`build/ucf-c -32 host/files.fs FILE </dev/null`): `test/ackhost.fs`
+(with `retry.fs`: the ACK and the repeats), `test/ccmpreg.fs` (the key
+slots), `test/setup.fs` (with `aphost.fs`: the AP and SETUP-AP),
+`test/wlback.fs`, and in `lib/net/test/`: `hwrekey.fs` (WIFI-LINK over
+hardware and software CCMP, a new group key), `linksel.fs`,
+`aphttp.fs` (with `dhcps.fs`), `netdown.fs`.
+
+On the board, with the image of `apps/irbridge/app.fs` and
+`WBACK-READY?` true: `#include lib/net/test/board.fs` (85 tests of NET
+over the WLAN); `esp32/test/airping.fs` (`AIR-PING`, an echo of the router);
+`esp32/test/airsock.fs` (UDP and TCP with a host that runs
+`lib/net/test/echopeer.fs`); `esp32/test/airtime.fs` (the time of each
+`NET-STEP`).
+
+## IR for the bridge on the WROOM: IR-CAPTURE and IR-QUEUE
+
+The bridge sends and receives IR frames while the console and the
+network work, and loses no frame. The RMT of the ESP32 cannot take a
+frame in parts (it has no RX wrap: ESP-IDF 5.5.2, `rmt_ll.h`), so a
+frame has a fixed limit: channel 4 takes 4 blocks, 256 pulse words.
+
+- IR-CAPTURE (`esp32/ircap.fs`): a CODE handler at interrupt level 2
+  copies each frame into one of 4 raw slots in the internal RAM and
+  starts the reception again, in about 21 us. It uses no Forth word, no
+  flash and no ROM function.
+- IR-QUEUE (`irqueue.fs`): a timer word decodes at most 16 pulse words
+  per step and puts each frame into a ring of 16 frames of at most 400
+  times. A word in IDLE sends: after at least 15 ms without light, with
+  the receiver on; the timer compares the echo, at most 32 times per
+  step.
+
+A frame longer than 256 pulse words or 400 times is counted and
+dropped, never cut; so is the rest of it up to its end. A frame that
+comes while the queue waits for its echo, and is not the echo, goes
+into the ring like any other.
+
+| Word of IR-QUEUE | Effect |
+| --- | --- |
+| `out in IR-Q-START ( -- )` | the pins (38 kHz, 33 %), the capture, the timer word and the word in IDLE |
+| `IR-Q-STOP ( -- )` | all off; the buffers are cleared |
+| `IR-Q-FRAME? ( -- a n end-us true \| false )` | the next frame: n times at a; valid until the next call or `IR-Q-STOP` |
+| `a n IR-Q-SEND ( -- ior )` | copy a frame of n times (n odd: it ends with light); 0: accepted |
+| `IR-Q-RESULT ( -- ior \| 1 )` | 1 at work; 0 sent, the echo matched; else the code |
+| `IR-Q-IDLE-HIGH ( -- a )` | TRUE: the receiver gives a high level without light |
+| `.IR-Q ( -- )` | the counters, the longest step of the timer word, those of IR-CAPTURE |
+
+| Code | Meaning |
+| --- | --- |
+| -450 | a time or a count out of range, or a frame longer than 400 times |
+| -451 | a send waits already, or the ring was full |
+| -452 | no 15 ms without light within 2 s |
+| -453 | no matching echo after 3 attempts |
+| -454 | the queue does not run |
+
+While the queue runs, it alone uses the RMT channels 1 (TX) and 4 (RX):
+do not use `IR-LISTEN`, `IR-FRAME?` or `IR-SEND` then. An error in its
+timer word or its word in IDLE counts in `.IR-Q`; the service goes on.
+Stop the queue before `FREEZE`.
+
+With the transceiver of Adafruit (product 5990) at 3V3, GND, IRout
+GPIO 4 and IRin GPIO 14:
+
+    board ok> ALSO IR-QUEUE  4 14 IR-Q-START
+    board ok> CREATE F 2000 , 1000 , 600 , 600 , 600 ,
+    board ok> F 5 IR-Q-SEND .
+    0
+    board ok> IR-Q-RESULT .
+    0
+
+IR-Q-SEND only takes the frame; the word in IDLE sends it while the
+console waits for the next line, so IR-Q-RESULT gives 1 until then.
+**The echo of long frames.** The receiver gives each time of light
+shorter and each time of darkness longer than sent, by the same amount;
+on long frames the shift grows. Measured on the WROOM: frames of 51
+times match, frames of 201 times differ by up to 45 us, frames of 399
+times by up to 128 us; a pair of light and darkness differs by at most
+27 us. With the rule "each time within 40 us", long frames end with
+-453 although they went out well.
+
+**Troubleshooting.** Each send ends with -452 and `.IR-Q` shows many
+short frames: the input pin floats (50 Hz from the mains). Check the
+wire IRin to GPIO 14 and the supply of the receiver.
+
+Tests: on the host `test/irqueue.fs` (in `tools/test.fs`); on the board,
+with the image of `apps/irbridge/app.fs`, `esp32/test/irqueue.fs` and then
+`esp32/test/irqbusy.fs` (GPIO 25, a loop inside the chip, no light).
+Measured: the CODE handler at most 5 038 CPU cycles (21 us), a step of
+the timer word at most 326 us.
 
 ## A new driver
 

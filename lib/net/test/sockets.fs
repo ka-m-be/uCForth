@@ -107,12 +107,15 @@ T{ 10 MS  CLIENT @ SOCK-OPEN? -> FALSE }T
 T{ WRITE-TWICE -> NET-CLOSED }T                \ an error, not the end of the program (SIGPIPE)
 T{ CLIENT @ SOCK-CLOSE -> 0 }T
 
-\ a peer that sends nothing: SOCK-READ waits NET-TIMEOUT
-200 NET-TIMEOUT !
+\ a peer that sends nothing: SOCK-READ waits NET-TIMEOUT. A clock that
+\ counts only seconds (awk) steps by 1000 and can end a wait early
+\ (forth/test/t0.fs): so the upper limit is 2000, and only the waits
+\ from here on have 200 ms.
 T{ S" 127.0.0.1" PORT TCP-OPEN SWAP CLIENT ! -> 0 }T
 T{ SERVER @ TCP-ACCEPT SWAP PEER ! -> TRUE }T
+200 NET-TIMEOUT !
 : TIMED-READ ( -- u ior ms )   MILLIS >R  BUF 100 CLIENT @ SOCK-READ  MILLIS R> - ;
-T{ TIMED-READ 190 300 WITHIN -> 0 0 TRUE }T
+T{ TIMED-READ 190 2000 WITHIN -> 0 0 TRUE }T
 T{ CLIENT @ SOCK-OPEN? -> TRUE }T
 T{ CLIENT @ SOCK-CLOSE  PEER @ SOCK-CLOSE -> 0 0 }T
 
@@ -199,7 +202,7 @@ T{ GET -> 0 NET-TIMED-OUT }T
 
 \ DNS-QUERY and RESOLVE: the server is silent; two questions in NET-TIMEOUT
 : TIMED-QUERY ( -- ip ior ms )   MILLIS >R  S" a.test" RESOLVE  MILLIS R> - ;
-T{ TIMED-QUERY 190 300 WITHIN -> 0 NET-TIMED-OUT TRUE }T
+T{ TIMED-QUERY 190 2000 WITHIN -> 0 NET-TIMED-OUT TRUE }T
 T{ HEAR HEAR HEAR -> TRUE TRUE FALSE }T
 T{ FAKE @ SOCK-CLOSE -> 0 }T
 0 DNS-IP !  53 DNS-PORT !  5000 NET-TIMEOUT !

@@ -7,8 +7,9 @@
 \   build/ucf-c -32 host/files.fs lib/esp32/test/txhost.fs </dev/null
 \ At the end: "radiohost: 34 tests, 0 errors", then "txhost: 36 tests, 0 errors".
 
-ONLY FORTH DEFINITIONS  ALSO FILES
-INCLUDE lib/esp32/test/radiohost.fs
+ONLY FORTH DEFINITIONS ALSO FILES
+[DEFINED] MOCK-MAC S" lib/esp32/test/radiohost.fs" ?INCLUDED
+ONLY FORTH DEFINITIONS ALSO FILES ALSO MOCK-MAC ALSO ESP32-PHY ALSO INTR ALSO BYTES ALSO ESP32-MAC ALSO ESP32-RADIO ALSO ESP32-RADIO.I   \ as radiohost.fs leaves it
 
 1600 BUFFER: TX-TEST
 VARIABLE TX-N   24 TX-N !

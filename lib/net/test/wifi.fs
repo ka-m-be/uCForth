@@ -7,10 +7,10 @@
 \ RADIO-RECEIVE gives each frame of the channel once, then 0.
 \ Each system with files and 32-bit cells runs it; in the folder ucf:
 \   build/ucf-c -32 host/files.fs lib/net/test/wifi.fs </dev/null
-\ At the end: "wifi: 16 tests, 0 errors".
+\ At the end: "wifi: 22 tests, 0 errors".
 
 ONLY FORTH DEFINITIONS  ALSO FILES
-INCLUDE forth/test/tester.fs
+[DEFINED] T{ S" forth/test/tester.fs" ?INCLUDED
 ONLY FORTH DEFINITIONS  ALSO FILES
 
 PACKAGE MOCK-RADIO
@@ -57,7 +57,7 @@ INCLUDE lib/net/wifi.fs
 ALSO WIFI.I  ALSO MOCK-RADIO
 2 TO DWELL
 
-: NAME? ( a u ca cu -- f )   ROT OVER <> IF  2DROP DROP FALSE EXIT  THEN  SAME? ;
+: NAME? ( a u ca cu -- f )   ROT OVER <> IF  2DROP DROP FALSE EXIT  THEN  BYTES= ;
 : NET? ( i ca cu -- ch dbm f )   \ network i: its channel, its level; TRUE if its name is ca cu
   ROT WIFI-NET >R >R  NAME?  R> R> ROT ;
 
@@ -105,6 +105,14 @@ T{ RADIO-CHANNEL@  BEACONS-ON @ -> 6 TRUE }T   \ the channel as before; the filt
 : MANY ( -- )   30 0 DO  $80 0 I 100 + HEADER  S" n" 0 IE,  12 DS,  12 -70 HEARD  LOOP ;
 T{ MANY  WIFI-SCAN -> 32 }T
 T{ 0 S" alpha" NET? -> 6 -40 TRUE }T
+2 TO DWELL
+: STEPPED ( -- ) BEGIN WIFI-SCAN-STEP UNTIL ;
+T{ WIFI-SCAN-START SCANNING @ -> TRUE }T
+T{ ' WIFI-SCAN-START CATCH -> -2 }T
+T{ STEPPED #NETS @ RADIO-CHANNEL@ SCANNING @ -> 32 6 FALSE }T
+T{ ' WIFI-SCAN-STEP CATCH -> -2 }T
+T{ WIFI-SCAN-START WIFI-SCAN-CANCEL SCANNING @ -> FALSE }T
+T{ WIFI-SCAN-START WIFI-SCAN-STEP DROP WIFI-SCAN-CANCEL RADIO-CHANNEL@ -> 6 }T   \ back on its channel
 RADIO-STOP
 
 S" wifi" .RESULTS

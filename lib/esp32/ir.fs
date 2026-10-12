@@ -28,7 +28,8 @@
 \                         the own LEDs (a test)
 \
 \ A frame ends after 12 ms without light. Times up to 32767 us go out in
-\ one piece, longer ones in several pieces. Ctrl-C twice switches
+\ one piece, longer ones in several pieces. A decoded frame above 400
+\ times throws -450, rather than returning a truncated frame. Ctrl-C twice switches
 \ IR-LISTEN off (it switches all Forth handlers off): +INT switches it
 \ on again. An error in the word of IR-LISTEN switches it off: IR-LISTEN
 \ again.
@@ -74,7 +75,8 @@ VARIABLE LISTENER                   \ the word of IR-LISTEN, or 0
 : TIME+ ( t level -- )   \ the next time; with the level of the last one it adds to it
   #FRAME @ 0= OVER 0= AND IF 2DROP EXIT THEN        \ a frame starts with a mark
   #FRAME @ IF  DUP LEVEL @ = IF  DROP  #FRAME @ 1- CELLS TIMES + +!  EXIT  THEN  THEN
-  LEVEL !  #FRAME @ #TIMES < IF  #FRAME @ CELLS TIMES + !  1 #FRAME +!  ELSE DROP THEN ;
+  LEVEL !  #FRAME @ #TIMES < IF  #FRAME @ CELLS TIMES + !  1 #FRAME +!
+  ELSE DROP -450 THROW THEN ;
 : HALF+ ( t level -- f )   \ a half of a pulse word; false: the end of the frame
   OVER 0= IF  2DROP #FRAME @ 0= EXIT  THEN          \ an end before the first time is old
   TIME+ TRUE ;

@@ -1,6 +1,6 @@
 \ bytes.fs - exact comparison of packet bytes; 16- and 32-bit cells
 ONLY FORTH DEFINITIONS  ALSO FILES
-INCLUDE forth/test/tester.fs
+[DEFINED] T{ S" forth/test/tester.fs" ?INCLUDED
 ONLY FORTH DEFINITIONS  ALSO FILES
 INCLUDE lib/net/bytes.fs
 CREATE FIRST   $02 C, $AA C, $BB C, $CC C, $DD C, $EE C,
@@ -15,4 +15,7 @@ T{ 0 SECOND C! FIRST SECOND 6 BYTES= -> FALSE }T
 $02 SECOND C!
 T{ 0 SECOND 5 + C! FIRST SECOND 6 BYTES= -> FALSE }T
 T{ FIRST SECOND 5 BYTES= -> TRUE }T
+T{ FIRST 1+ LE16@ -> $BBAA }T
+$1234 SECOND LE16!
+T{ SECOND C@ SECOND 1+ C@ SECOND 2 + C@ -> $34 $12 $BB }T
 S" bytes" .RESULTS

@@ -155,6 +155,11 @@ PUBLIC
     PROTO-TCP OF IP>TCP ENDOF
     >R 2DROP R>
   ENDCASE ;
+: IP-STEP ( -- )   \ one queued loop packet; synchronous words use IP-FLUSH
+  TRUE FROM-LOOP !
+  DEQUEUE ?DUP IF LOOP-IN SWAP IP-INPUT THEN
+  FALSE FROM-LOOP ! ;
+: IP-FORGET ( -- ) 0 LOOP-N ! ;
 : IP-FLUSH ( -- )   \ at most 64 packets, so a loop that answers itself ends
   TRUE FROM-LOOP !
   64 0 DO  DEQUEUE ?DUP 0= IF LEAVE THEN  LOOP-IN SWAP IP-INPUT  LOOP

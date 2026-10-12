@@ -35,7 +35,7 @@ ONLY FORTH
 ONLY FORTH
 #require INET ../../../net/inet.fs
 ONLY FORTH
-#require NO-LINK ../../../net/nolink.fs
+#require LINK ../../../net/nolink.fs
 ONLY FORTH
 #require ARP ../../../net/arp.fs
 ONLY FORTH
@@ -51,7 +51,7 @@ ONLY FORTH
 ONLY FORTH
 #require NET ../../../net/net.fs
 ONLY FORTH
-#require NET-START ../../nettimer.fs
+#require NET-TIMER ../../nettimer.fs
 ONLY FORTH
 #require RMT ../../rmt.fs
 ONLY FORTH
@@ -60,6 +60,8 @@ ONLY FORTH
 #require IRCODE ../../../irremote/ircode.fs
 ONLY FORTH
 #require KELON168 ../../../irremote/kelon168.fs
+ONLY FORTH DEFINITIONS ALSO CHIP ALSO TEXT
+CHIP-NAME S" ESP32" S= CONSTANT H1-WROOM?
 ONLY FORTH DEFINITIONS  ALSO INTERNALS  ALSO INET  ALSO NET  ALSO NET-TIMER  ALSO TIMERS  ALSO TIMERS.I
 ALSO IDLE  ALSO GPIO  ALSO RMT  ALSO IR  ALSO IR.I  ALSO KELON168  DECIMAL
 
@@ -91,7 +93,9 @@ VARIABLE H-FRAME   VARIABLE H-N                          \ the times of the fram
 VARIABLE IR-OUT   VARIABLE IR-GOOD   VARIABLE IR-BAD   VARIABLE IR-LOST
 VARIABLE IR-WAITING   VARIABLE IR-AT                     \ a frame is on its way; MILLIS when it went
 : LOOPBACK ( -- )   \ as lib/esp32/esp32s3/test/ir.fs
-  2 2 IR-PINS  TX 2 RMT-OUT  2 RX RMT-IN  RX 38000 RMT-DEMOD  TRUE IR-ECHO !  RX RMT-RX-ON ;
+  2 2 IR-PINS TX 2 RMT-OUT 2 RX RMT-IN
+  H1-WROOM? IF 0 33 IR-CARRIER RX 0 RMT-DEMOD ELSE RX 38000 RMT-DEMOD THEN
+  TRUE IR-ECHO ! RX RMT-RX-ON ;
 : SAME-TIMES? ( a n -- f )   \ n times as sent, each within 40 us
   DUP H-N @ <> IF 2DROP FALSE EXIT THEN
   TRUE SWAP 0 ?DO  OVER I CELLS + @  H-FRAME @ I CELLS + @  - ABS 40 < AND  LOOP  NIP ;

@@ -15,6 +15,7 @@ are there.
 | Folder | Application | Hardware |
 | --- | --- | --- |
 | `aircon/` | a Hisense air conditioner over infrared: on, off, mode, temperature, fan, timers; hears the remote control | an ESP32-S3 board or an ESP32 board, the IR transceiver of Adafruit (product 5990) |
+| `irbridge/` | the IR bridge, in work: its base so far: the WLAN (a saved network, a setup network), sockets, IR in the background | an ESP32 board with the module ESP32-WROOM-32, the IR transceiver of Adafruit (product 5990) |
 
 Each app should name the main file `app.fs`. The main file should:
 

@@ -15,7 +15,19 @@
 \   RADIO-FACTORY ( -- )       configure the ESP32 factory MAC, while on
 \   RADIO-STATION ( bssid -- ) normal address filters, then strict software delivery
 \   RADIO-RANDOM ( a n -- )    hardware random bytes while RF is on, spaced reads
+\   RADIO-AP ( -- )            the filters of an AP: authentications and probes to it
+\   RADIO-AP-PEER! ( peer -- ) from now on only the frames of this device (an AP)
 \   RADIO-SEND ( a n ack? -- )  send one frame, optionally wait for its ACK
+\   RADIO-TX-START ( a n ack? -- )  the same without waiting; RADIO-TX-POLL ( -- n ):
+\                              1 at work, 0 done, else the code; RADIO-TX-BUSY?,
+\                              RADIO-TX-BLOCKED?, RADIO-TX-CANCEL, RADIO-TX-END
+\   RADIO-TRACK ( -- )         PHY-TRACK after 5 sends, while none runs
+\   RADIO-CCMP-KEY! ( key peer id group? -- )  a key into the MAC: slot 0 the pair,
+\                              slots 1 to 4 the group keys 0 to 3; RADIO-KEYS-CLEAR
+\   RADIO-CCMP? ( -- f )       the MAC has keys: it does the CCMP
+\   RADIO-DECRYPTED? ( -- f )  the MAC decrypted the frame of the last RADIO-RECEIVE
+\   RADIO-SOFT-CCMP ( -- )     protected frames in software (no keys in the MAC)
+\   RADIO-POOL ( -- a n )      the RAM for the packets of the LINKs (SRAM1)
 \   RADIO-STOP ( -- )           the radio off
 \
 \ RADIO-START does what the reference does at the start (esp-wifi-hal
@@ -140,8 +152,19 @@ MAC $64 + CONSTANT RA-MASK-HIGH
 $10000 CONSTANT RA-ENABLE
 6 BUFFER: MAC-BYTES
 6 BUFFER: BSS-BYTES
+6 BUFFER: AP-CLIENT
+0 VALUE ACCESS?
+0 VALUE AP-BOUND?
 0 VALUE STATION?
 0 VALUE SOFT-CCMP?
+0 VALUE HW-CCMP?
+0 VALUE DECRYPTED?
+MAC $800 + CONSTANT CRYPTO-CTRL   \ the CCMP of interface 0 (register map esp32 0.40.2: crypto_control)
+MAC $814 + CONSTANT KEY-ENABLE    \ bit i: key slot i is used
+$10030103 CONSTANT CRYPTO-ON       \ the values of the reference (esp-wifi-hal 0.3.3, src/ll.rs):
+$30000 CONSTANT CRYPTO-OFF         \ CCMP on, and the value of its start (not "all off")
+$CC0000 CONSTANT KEY-GROUP         \ word 1 of a key slot: the kind of a group key, of a key of
+$6C0000 CONSTANT KEY-PAIR          \ the pair; bits 30-31 the key ID, bits 0-15 the end of the MAC
 VARIABLE RANDOM-WORD
 0 VALUE MAC-SET?
 
@@ -163,6 +186,9 @@ VARIABLE TX-RESULT              \ 0: no result yet; otherwise TX-COMPLETE or an 
 VARIABLE TX-LAST-PMD
 VARIABLE #TX                   \ slot completions, also when PMD reports a protocol error
 VARIABLE TX-TRACK              \ completions since the last PHY-TRACK
+VARIABLE TX-N
+VARIABLE TX-ACK
+VARIABLE TX-RETRIES
 DEFER MAC-SETUP
 ' MAC-HAL-INIT IS MAC-SETUP
 : MAC-SELECT ( xt -- )
@@ -183,6 +209,14 @@ DEFER MAC-SETUP
 : MAC-LOW ( a -- x )
   DUP C@  OVER 1+ C@ 8 LSHIFT OR  OVER 2 + C@ 16 LSHIFT OR
   SWAP 3 + C@ 24 LSHIFT OR ;
+: KEY-SLOT ( i -- a ) 40 * MAC $1400 + + ;   \ 5 slots of 10 cells: MAC, kind, 4 cells key, 4 unused (crypto_key_slot)
+: KEY-CLEAR ( i -- )
+  KEY-SLOT 10 0 DO 0 OVER I CELLS + ! LOOP DROP ;
+: KEYS-CLEAR ( -- )
+  ON? IF
+    $1F KEY-ENABLE BIC!
+    5 0 DO I KEY-CLEAR LOOP CRYPTO-OFF CRYPTO-CTRL !
+  THEN FALSE TO HW-CCMP? FALSE TO DECRYPTED? ;
 : SET-MAC ( a -- )
   ?MAC  MAC-BYTES 6 MOVE
   RA-ENABLE RA-MASK-HIGH BIC!
@@ -209,7 +243,7 @@ DEFER MAC-SETUP
   TX-ACTIVE? TX-CTRL @ TX-START-BITS AND OR ABORT" ESP32-RADIO: the TX slot is busy"
   >R  TX-LENGTH DROP
   DUP 1+ C@ $40 AND IF
-    SOFT-CCMP? 0= ABORT" ESP32-RADIO: enable software CCMP before protected TX"
+    SOFT-CCMP? HW-CCMP? OR 0= ABORT" ESP32-RADIO: enable CCMP before protected TX"
     STATION? 0= ABORT" ESP32-RADIO: protected TX needs station filters"
   THEN
   R> IF
@@ -220,6 +254,7 @@ DEFER MAC-SETUP
   ELSE DROP THEN ;
 : TX-PREPARE ( a n ack? backoff -- )
   DUP 0 SWAP TX-ACCESS DROP  >R >R  2DUP R@ ?TX
+  DUP TX-N ! R@ TX-ACK ! 0 TX-RETRIES !
   2DUP TX-BUF SWAP MOVE  TX-BUF OVER + 4 0 FILL
   DUP TX-FLAGS TX-DESC !  TX-BUF TX-DESC CELL+ !  0 TX-DESC 2 CELLS + !
   DUP TX-RATE TX-PLCP1 !  $20 TX-PLCP2 !
@@ -276,12 +311,25 @@ DEFER MAC-SETUP
   TX-RESULT @ TX-COMPLETE <> ABORT" ESP32-RADIO: TX has no completion"
   TX-LAST-PMD @ ACK-TIMEOUT? ABORT" ESP32-RADIO: ACK timeout"
   TX-LAST-PMD @ $F000 AND ABORT" ESP32-RADIO: TX protocol error (TX-LAST-PMD)" ;
+: TX-RETRY? ( -- f )
+  TX-ACK @ TX-RESULT @ TX-COMPLETE = AND
+  TX-LAST-PMD @ ACK-TIMEOUT? AND TX-RETRIES @ 3 < AND
+  RX-NEXT @ RX-END <> AND ;
+: TX-AGAIN ( -- )
+  TX-RETRIES @ 1+ >R
+  TX-BUF 1+ DUP C@ 8 OR SWAP C!
+  TX-BUF TX-N @ TX-ACK @ RNG-DATA @ 15 AND TX-PREPARE
+  R> TX-RETRIES ! TX-KICK ;
+: TX-FINISHED ( -- )
+  TX-RESULT @ TX-COMPLETE = IF 1 #TX +! 1 TX-TRACK +! THEN ;
+: ?TRACK ( -- )   \ after 5 completions the PHY follows the PLL; only while no TX runs
+  TX-TRACK @ 5 < IF EXIT THEN  PHY-TRACK  0 TX-TRACK ! ;
 : (TX-SEND) ( -- )
-  TX-KICK  TX-WAIT  TX-RELEASE
-  TX-RESULT @ TX-COMPLETE = IF
-    1 #TX +!  1 TX-TRACK +!
-    TX-TRACK @ 5 = IF  PHY-TRACK  0 TX-TRACK !  THEN
-  THEN
+  TX-KICK
+  BEGIN
+    TX-WAIT TX-RELEASE TX-FINISHED ?TRACK
+    TX-RETRY?
+  WHILE TX-AGAIN REPEAT
   TX-CHECK ;
 : TX-EXECUTE ( -- )
   ['] (TX-SEND) CATCH ?DUP IF  TX-ACTIVE? IF TX-CANCEL THEN  THROW  THEN ;
@@ -296,15 +344,15 @@ DEFER MAC-SETUP
   RX-RELOAD RX-CTRL BIS!
   1000 0 DO  RX-CTRL @ RX-RELOAD AND 0= IF UNLOOP EXIT THEN  LOOP
   TRUE ABORT" ESP32-RADIO: the DMA does not reload" ;
-: EMPTY ( i -- )   \ descriptor i: its buffer, the end of a list, for the DMA
+: EMPTY-DESC ( i -- )   \ descriptor i: its buffer, the end of a list, for the DMA
   DUP BUF OVER DESC CELL+ !  0 OVER DESC >NEXT !  BUF-SIZE DMA-OWNS OR  SWAP DESC ! ;
 : RX-SETUP ( -- )   \ all descriptors in one list; the DMA begins with the first
-  #RX 0 DO  I EMPTY  LOOP
+  #RX 0 DO  I EMPTY-DESC  LOOP
   #RX 1 DO  I DESC  I 1- DESC >NEXT !  LOOP
   0 TO HEAD  #RX 1- TO TAIL  -1 TO HELD
   0 DESC RX-BASE !  RELOAD ;
 : GIVE ( i -- )   \ descriptor i back to the DMA, at the end of the list
-  DUP EMPTY  DUP DESC  TAIL DESC >NEXT !  DUP TO TAIL
+  DUP EMPTY-DESC  DUP DESC  TAIL DESC >NEXT !  DUP TO TAIL
   DESC RX-BASE !  RELOAD ;   \ a DMA at the end of the list begins with it
 : TAKE ( -- i )   \ the first descriptor out of the list
   HEAD  DUP DESC >NEXT @ >INDEX  TO HEAD ;
@@ -318,9 +366,34 @@ DEFER MAC-SETUP
   BEGIN  TAKE DUP GIVE  OVER =  UNTIL DROP  1 #LONG +! ;
 : RX-FRAME ( i -- a n )   \ the frame in descriptor i: after the header, without the FCS
   DUP BUF  DUP 24 + @ $FFF AND 4 -               ( i b n )
+  DECRYPTED? IF 8 - THEN                        \ the MAC also removes the CCMP MIC
   ROT DESC @ >LENGTH RX-HEAD - MIN 0 MAX  SWAP RX-HEAD + SWAP ;
+: HW-RX? ( i -- f )   \ the MAC decrypted the frame of descriptor i: CCMP on, header byte 3 bit 4
+  \ (interface 0), header byte 27 = 0 (the RX status), and the frame is protected
+  HW-CCMP? 0= IF DROP FALSE EXIT THEN
+  DUP DESC @ >LENGTH RX-HEAD 2 + < IF DROP FALSE EXIT THEN
+  BUF DUP 3 + C@ $10 AND 0<>
+  OVER 27 + C@ 0= AND SWAP RX-HEAD 1+ + C@ $40 AND 0<> AND ;
 : >LEVEL ( b -- dbm )   C@  DUP $80 AND IF 256 - THEN  96 - ;   \ byte 0 of the header
-: WANTED? ( a n -- f )   \ the frame goes to the program: any frame; after RADIO-BEACONS a beacon
+: BROADCAST? ( a -- f )
+  TRUE 6 0 DO OVER I + C@ $FF = AND LOOP NIP ;
+: WANTED? ( a n -- f )   \ the frame goes to the program: as AP, as station, in a scan (beacons)
+  ACCESS? IF
+    24 < IF DROP FALSE EXIT THEN
+    AP-BOUND? IF
+      DUP 10 + AP-CLIENT 6 BYTES= 0= IF DROP FALSE EXIT THEN
+    ELSE
+      DUP C@ DUP $B0 = SWAP $40 = OR 0= IF DROP FALSE EXIT THEN
+      DUP 10 + C@ 1 AND IF DROP FALSE EXIT THEN
+    THEN
+    DUP C@ 12 AND 0= IF
+      DUP 4 + MAC-BYTES 6 BYTES= OVER 4 + BROADCAST? OR
+      SWAP DUP 16 + MAC-BYTES 6 BYTES=
+      OVER C@ $40 = IF SWAP 16 + BROADCAST? OR ELSE NIP THEN AND
+    ELSE
+      DUP 1+ C@ 3 AND 1 = SWAP 4 + MAC-BYTES 6 BYTES= AND
+    THEN EXIT
+  THEN
   STATION? IF
     24 < IF DROP FALSE EXIT THEN
     DUP C@ 12 AND DUP 0= IF
@@ -345,19 +418,21 @@ PUBLIC
   ?CONFIG
   DUP PHY-CHANNEL!  TO CHANNEL ;
 : RADIO-CHANNEL@ ( -- ch )   CHANNEL ;   \ 0 while the radio is off
+: RADIO-POOL ( -- a n )   \ SRAM1: the stack of the ROM at the start, free after it, up to the data of the ROM
+  $3FFE0500 $3FFE3F20 OVER - ;          \ for the packet RAM of the LINKs (targets/esp32/README.md, "Memory")
 : RADIO-START ( -- )   \ the radio on: calibration, MAC, reception, channel 1
   TX-ACTIVE? ABORT" ESP32-RADIO: cannot restart during TX"
   ON? TX-BLOCKED? AND ABORT" ESP32-RADIO: stop the radio before resetting TX"
   PHY-INIT 1 U> ABORT" ESP32-RADIO: the calibration failed"
   MAC-RESET  MAC-READY  MAC-SETUP  TX-RESET
-  TRUE TO ON?  1 RADIO-CHANNEL!  FALSE TO BEACONS? FALSE TO STATION?  0 TO LEVEL
-  RX-SETUP  0 #INTS !  0 INT-BITS !  0 #LONG !  0 #OTHER !
+  TRUE TO ON?  1 RADIO-CHANNEL!  FALSE TO BEACONS? FALSE TO STATION? FALSE TO ACCESS? 0 TO LEVEL
+  KEYS-CLEAR RX-SETUP  0 #INTS !  0 INT-BITS !  0 #LONG !  0 #OTHER !
   ['] MAC-INT MAC-SOURCE INT!  MAC-SOURCE INT-ON  +INT
   RX-ON RX-CTRL BIS! ;
 : RADIO-BEACONS ( -- )   \ let the beacons in, for a scan; RADIO-RECEIVE gives only them
   ?ON  ?CONFIG
   FILTER @  FILTER-BITS INVERT AND  SCAN-FILTER OR  FILTER !
-  CTRL-TYPES CTRL-FILTER BIC!  TRUE TO BEACONS? FALSE TO STATION? FALSE TO SOFT-CCMP? ;
+  CTRL-TYPES CTRL-FILTER BIC!  TRUE TO BEACONS? FALSE TO STATION? FALSE TO ACCESS? FALSE TO SOFT-CCMP? ;
 : RADIO-STATION ( bssid -- )
   ?ON ?CONFIG
   MAC-SET? 0= ABORT" ESP32-RADIO: configure own MAC first"
@@ -367,7 +442,15 @@ PUBLIC
   MAC 4 + @ $FFFF0000 AND BSS-BYTES 4 + DUP C@ SWAP 1+ C@ 8 LSHIFT OR OR MAC 4 + !
   -1 MAC $20 + ! MAC $24 + @ $FFFF0000 AND $FFFF OR RA-ENABLE OR MAC $24 + !
   FILTER @ FILTER-BITS INVERT AND 7 OR FILTER !
-  CTRL-TYPES CTRL-FILTER BIC! FALSE TO BEACONS? TRUE TO STATION? ;
+  CTRL-TYPES CTRL-FILTER BIC! FALSE TO BEACONS? TRUE TO STATION? FALSE TO ACCESS? ;
+: RADIO-AP ( -- )
+  ?ON ?CONFIG
+  MAC-BYTES RADIO-STATION AP-CLIENT 6 0 FILL FALSE TO AP-BOUND?
+  FALSE TO STATION? TRUE TO ACCESS? ;
+: RADIO-AP-PEER! ( peer -- )
+  ?ON ACCESS? 0= ABORT" ESP32-RADIO: start AP before selecting its client"
+  AP-BOUND? ABORT" ESP32-RADIO: AP client already selected"
+  ?MAC AP-CLIENT 6 MOVE TRUE TO AP-BOUND? ;
 : RADIO-FACTORY ( -- )
   ?ON ?CONFIG
   $3FF5A008 @ DUP 8 RSHIFT MAC-BYTES C! MAC-BYTES 1+ C!
@@ -383,7 +466,8 @@ PUBLIC
   ?ON  HELD -1 <> IF  HELD GIVE  -1 TO HELD  THEN
   END-DESC  DUP 0< IF  DROP 0 EXIT  THEN
   DUP HEAD <> IF  DROP-LONG 0 EXIT  THEN
-  DROP TAKE  DUP TO HELD  RX-FRAME  2DUP WANTED? IF  HELD BUF >LEVEL TO LEVEL  EXIT  THEN
+  DROP TAKE  DUP TO HELD  DUP HW-RX? TO DECRYPTED?  RX-FRAME
+  2DUP WANTED? IF  HELD BUF >LEVEL TO LEVEL  EXIT  THEN
   2DROP  HELD GIVE  -1 TO HELD  1 #OTHER +!  0 ;
 : RADIO-LEVEL ( -- dbm )   LEVEL ;   \ the level of the frame of the last RADIO-RECEIVE
 : RADIO-MAC! ( a -- )   ?ON  ?CONFIG  SET-MAC ;
@@ -395,7 +479,25 @@ PUBLIC
   TX-EXECUTE ;
 : RADIO-SOFT-CCMP ( -- )
   ?ON ?CONFIG STATION? MAC-SET? AND 0= ABORT" ESP32-RADIO: software CCMP needs station mode"
+  HW-CCMP? ABORT" ESP32-RADIO: hardware CCMP already enabled"
   TRUE TO SOFT-CCMP? ;
+: RADIO-CCMP? ( -- f ) HW-CCMP? ;
+: RADIO-DECRYPTED? ( -- f ) DECRYPTED? ;
+: RADIO-KEYS-CLEAR ( -- ) KEYS-CLEAR ;
+: RADIO-CCMP-KEY! ( key peer id group? -- )
+  ?ON ?CONFIG STATION? 0= ABORT" ESP32-RADIO: keys need station mode"
+  SOFT-CCMP? ABORT" ESP32-RADIO: stop software CCMP before installing keys"
+  OVER 0 4 WITHIN 0= ABORT" ESP32-RADIO: key ID must be 0 to 3"
+  DUP 0= IF  OVER 0<> ABORT" ESP32-RADIO: pairwise key ID must be 0"  THEN
+  DUP IF OVER 1+ ELSE 0 THEN >R                     ( key peer id group? )  ( R: slot )
+  1 R@ LSHIFT KEY-ENABLE BIC!                       \ the slot off while it changes
+  IF KEY-GROUP ELSE KEY-PAIR THEN  SWAP 30 LSHIFT OR    ( key peer word1 )
+  OVER 4 + DUP C@ SWAP 1+ C@ 8 LSHIFT OR OR  R@ KEY-SLOT CELL+ !
+  MAC-LOW R@ KEY-SLOT !                             ( key )
+  R@ KEY-SLOT 2 CELLS +                             ( key dest )   \ no R@ inside the loops
+  4 0 DO  OVER I CELLS + MAC-LOW  OVER I CELLS + !  LOOP          \ the 4 words of the key
+  8 4 DO  0 OVER I CELLS + !  LOOP  2DROP                         \ the rest of the slot: 0
+  CRYPTO-ON CRYPTO-CTRL !  1 R> LSHIFT KEY-ENABLE BIS!  TRUE TO HW-CCMP? ;
 : RADIO-TX-START ( a n ack? -- )
   ?ON RNG-DATA @ 15 AND TX-PREPARE TX-KICK ;
 : RADIO-TX-BUSY? ( -- f ) TX-ACTIVE? ;
@@ -407,28 +509,34 @@ PUBLIC
     MILLIS TX-SINCE - TX-WAIT-MS U< IF 1 EXIT THEN
     TX-NO-END TX-RESULT ! TRUE TO TX-BLOCKED?
   THEN
-  TX-RELEASE
+  TX-RELEASE TX-FINISHED
+  TX-RETRY? IF TX-AGAIN 1 EXIT THEN
   TX-RESULT @ CASE
     TX-NO-END OF -433 ENDOF
     TX-ACCESS-TIMEOUT OF -435 ENDOF
     TX-COLLISION OF -436 ENDOF
     TX-COMPLETE OF
-      1 #TX +! 1 TX-TRACK +!
       TX-LAST-PMD @ ACK-TIMEOUT? IF -434 ELSE
         TX-LAST-PMD @ $F000 AND IF -437 ELSE 0 THEN
       THEN
     ENDOF
     >R -437 R>
   ENDCASE ;
-: RADIO-TRACK ( -- )
-  ?ON TX-ACTIVE? 0= TX-TRACK @ 5 < 0= AND IF PHY-TRACK 0 TX-TRACK ! THEN ;
+: RADIO-TRACK ( -- )   ?ON  TX-ACTIVE? 0= IF ?TRACK THEN ;
+: RADIO-TX-END ( -- )   \ let an asynchronous TX end: at most 200 ms, then cancel it
+  MILLIS BEGIN  TX-ACTIVE?  WHILE
+    RADIO-TX-POLL DROP
+    MILLIS OVER - 200 > IF  TX-CANCEL  THEN
+  REPEAT DROP ;
 : RADIO-STOP ( -- )   \ the radio off
   ON? IF
     TX-ACTIVE? IF TX-CANCEL ELSE 0 TX-CTRL ! THEN
+    KEYS-CLEAR
     RX-ON RX-CTRL BIC!  MAC-SOURCE INT-OFF  PHY-OFF
     TX-BLOCKED? IF MAC-RESET THEN
   THEN
-  FALSE TO ON?  0 TO CHANNEL  -1 TO HELD  FALSE TO BEACONS? FALSE TO STATION?
+  FALSE TO ON?  0 TO CHANNEL  -1 TO HELD  FALSE TO BEACONS? FALSE TO STATION? FALSE TO ACCESS?
+  FALSE TO AP-BOUND? AP-CLIENT 6 0 FILL
   FALSE TO SOFT-CCMP? ;
 END-PACKAGE
 : RADIO ( -- )   ESP32-RADIO ;   \ ALSO RADIO: the radio of this chip

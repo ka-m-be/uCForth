@@ -4,6 +4,9 @@
 \ ESP32-RADIO, lib/esp32/esp32/radio.fs). The words:
 \
 \   WIFI-SCAN ( -- u )            listen on the channels 1 to 13: u networks
+\   WIFI-SCAN-START ( -- )        the same scan in steps, for a word of IDLE:
+\   WIFI-SCAN-STEP ( -- done? )   a step takes the frames that wait; true at the end
+\   WIFI-SCAN-CANCEL ( -- )       end the scan before its end
 \   WIFI-NET ( i -- a n ch dbm )  network i (0 to u-1, the strongest first):
 \                                 its name (n bytes at a), channel and level
 \   .WIFI ( -- )                  the list: channel, level in dBm, name
@@ -46,6 +49,10 @@ PACKAGE WIFI  ALSO RADIO  ALSO BYTES
 VARIABLE #NETS                   \ the networks in the list
 /NET BUFFER: SPARE               \ room for one network while the list is sorted
 120 VALUE DWELL                  \ the time on each channel, in ms
+VARIABLE SCANNING
+VARIABLE SCAN-AT
+VARIABLE SCAN-CHANNEL
+VARIABLE SCAN-OLD
 
 \ ---- a network in the list: its level (a cell), channel, the length of
 \ ---- its name, its BSSID, its name
@@ -58,7 +65,6 @@ VARIABLE #NETS                   \ the networks in the list
 : >SEC ( a -- a' )   46 + ;
 : >RLEN ( a -- a' )  47 + ;
 : >RSN ( a -- a' )   48 + ;
-: LE16@ ( a -- u )  DUP C@ SWAP 1+ C@ 8 LSHIFT OR ;
 CREATE CCMP-SUITE 0 C, $0F C, $AC C, 4 C,
 CREATE PSK-SUITE 0 C, $0F C, $AC C, 2 C,
 VARIABLE RSN-A VARIABLE RSN-N VARIABLE RSN-WANT
@@ -106,10 +112,8 @@ VARIABLE RSN-A VARIABLE RSN-N VARIABLE RSN-WANT
   OVER C@ 0= IF  DROP 0  THEN ;
 
 \ ---- the list
-: SAME? ( a1 a2 u -- f )   \ the u bytes at a1 and at a2 are the same
-  BYTES= ;
 : FIND-NET ( a -- i | -1 )   \ the network with the BSSID at a
-  #NETS @ 0 ?DO  DUP I ENTRY >BSSID 6 SAME? IF  DROP I UNLOOP EXIT  THEN  LOOP  DROP -1 ;
+  #NETS @ 0 ?DO  DUP I ENTRY >BSSID 6 BYTES= IF  DROP I UNLOOP EXIT  THEN  LOOP  DROP -1 ;
 : NEW-NET ( a n -- )   \ the beacon of a new access point: into the list, if there is room
   #NETS @ #MAX = IF  2DROP EXIT  THEN
   #NETS @ ENTRY DUP /NET 0 FILL >R  1 #NETS +!
@@ -133,9 +137,9 @@ VARIABLE RSN-A VARIABLE RSN-N VARIABLE RSN-WANT
   #NETS @ 0 ?DO  #NETS @ 1- 0 ?DO
     I ENTRY @  I 1+ ENTRY @ < IF  I ENTRY  I 1+ ENTRY EXCHANGE  THEN
   LOOP  LOOP ;
-: LISTEN ( ms -- )   \ the beacons that come in ms into the list
-  MILLIS +  BEGIN  RADIO-RECEIVE ?DUP IF NOTE THEN  DUP MILLIS - 0 <  UNTIL DROP ;
-: .NAME ( a n -- )   \ a control character shows as ?
+: TAKE-ALL ( -- )   \ the frames that wait (at most 8: the receive list) into the list
+  8 0 DO  RADIO-RECEIVE ?DUP 0= IF LEAVE THEN  NOTE  LOOP ;
+: .SSID ( a n -- )   \ a control character shows as ?
   0 ?DO  DUP I + C@  DUP 32 < IF  DROP 63  THEN  EMIT  LOOP DROP ;
 
 PUBLIC
@@ -146,13 +150,28 @@ PUBLIC
 : WIFI-RSN ( i -- a n cap )
   DUP WIFI-WPA2? 0= ABORT" WIFI: WPA2-PSK/CCMP without required PMF needed"
   ENTRY DUP >RSN OVER >RLEN C@ ROT >CAP LE16@ ;
+: WIFI-SCAN-START ( -- )   \ a scan in steps begins on channel 1
+  SCANNING @ ABORT" WIFI: scan already active"
+  RADIO-CHANNEL@ SCAN-OLD ! RADIO-BEACONS 0 #NETS !
+  1 SCAN-CHANNEL ! 1 RADIO-CHANNEL! MILLIS SCAN-AT ! TRUE SCANNING ! ;
+: WIFI-SCAN-STEP ( -- done? )   \ the waiting frames; after DWELL ms the next channel
+  SCANNING @ 0= ABORT" WIFI: no stepped scan"
+  TAKE-ALL
+  MILLIS SCAN-AT @ - DWELL < IF FALSE EXIT THEN
+  SCAN-CHANNEL @ 13 = IF
+    SCAN-OLD @ RADIO-CHANNEL! SORT FALSE SCANNING ! TRUE EXIT
+  THEN
+  1 SCAN-CHANNEL +! SCAN-CHANNEL @ RADIO-CHANNEL! MILLIS SCAN-AT ! FALSE ;
+: WIFI-SCAN-CANCEL ( -- )   \ end a scan in steps; the radio goes back to its channel
+  SCANNING @ RADIO-CHANNEL@ AND IF  SCAN-OLD @ RADIO-CHANNEL!  THEN  FALSE SCANNING ! ;
+PRIVATE
+: SCAN-ALL ( -- )   BEGIN WIFI-SCAN-STEP UNTIL ;
+PUBLIC
 : WIFI-SCAN ( -- u )   \ listen on the channels 1 to 13: u networks, the strongest first
-  RADIO-CHANNEL@ >R  RADIO-BEACONS  0 #NETS !
-  14 1 DO  I RADIO-CHANNEL!  DWELL LISTEN  LOOP
-  R> RADIO-CHANNEL!  SORT  #NETS @ ;
+  WIFI-SCAN-START  ['] SCAN-ALL CATCH ?DUP IF  WIFI-SCAN-CANCEL THROW  THEN  #NETS @ ;
 : WIFI-NET ( i -- a n ch dbm )   \ network i of the last WIFI-SCAN: name, channel, level
   DUP #NETS @ U< 0= ABORT" WIFI: no such network"
   ENTRY  DUP >SSID OVER >NLEN C@  ROT DUP >CHAN C@  SWAP @ ;
 : .WIFI ( -- )   \ the networks of the last WIFI-SCAN: channel, level in dBm, name
-  #NETS @ 0 ?DO  I WIFI-NET  SWAP 3 .R  5 .R  2 SPACES  .NAME CR  LOOP ;
+  #NETS @ 0 ?DO  I WIFI-NET  SWAP 3 .R  5 .R  2 SPACES  .SSID CR  LOOP ;
 END-PACKAGE

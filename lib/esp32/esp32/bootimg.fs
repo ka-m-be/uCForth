@@ -49,6 +49,10 @@
 \
 \   ALSO BOOTIMG  FREEZE  XDATA-ON  FREEZE
 \
+\ XDATA-FREEZE does the first two steps, but only while XDATA is still off:
+\ so a loader can name it, and a second run of the loader does nothing.
+\ ?FREEZE freezes only when the dictionary has grown since the last FREEZE.
+\
 \ The code of the CODE words lies in SRAM0 after the code of the kernel
 \ (lib/esp32/esp32/asm.fs):
 \
@@ -194,5 +198,9 @@ PUBLIC
   FLASH-END S0 36 + U< ABORT" XDATA-ON: no frozen part in the flash yet (FREEZE first)"
   FLASH-END RAM-BASE + XDATA-END !
   XVP @ XSTART -  XDATA-END @ XSTART -  U> IF  XSTART XVP !  THEN ;   \ XVP of a frozen image stays
+: XDATA-FREEZE ( -- )   \ only the first time: FREEZE, then XDATA-ON (a loader of an application uses it)
+  XDATA-END @ IF EXIT THEN  FREEZE XDATA-ON ;
+: ?FREEZE ( -- )   \ FREEZE, if the dictionary grew since the last FREEZE
+  HERE FROZEN-END @ <> IF FREEZE THEN ;
 
 END-PACKAGE

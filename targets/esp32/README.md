@@ -67,13 +67,13 @@ The output ends with:
 
       saved: ucf.hex
       code: 10166 bytes at $40080000, start at $400818D0
-      image: $100-$00000B00 at $3FFE8100, $00010A00-$00018F80 at $3FFB0A00
+      image: $100-$00000B00 at $3FFE8100, $00010A00-$00019060 at $3FFB0A00
       start word: ON-BOOT
       dictionary: up to $0003FFF0 (DICT-END)
       FREEZE on the board: yes
       interrupts: yes
       Ctrl-C waits for NO-BREAK: yes
-      written: build/esp32.bin (46992 bytes)
+      written: build/esp32.bin (47216 bytes)
 
 1. `lib/package.fs` comes first: the packages for the board
    (`PACKAGE` ... `END-PACKAGE`) need it on the board too. Then
@@ -130,7 +130,7 @@ and `FREEZE` work as after a start from the flash:
 
     $ build/ucf run /dev/cu.usbserial-110 build/esp32.bin
     connecting .. ok
-    loading build/esp32.bin: 10168 bytes at $40080000 2560 bytes at $3FFE8100 34176 bytes at $3FFB0A00
+    loading build/esp32.bin: 10168 bytes at $40080000 2560 bytes at $3FFE8100 34400 bytes at $3FFB0A00
     started at $400818D0
     term on /dev/cu.usbserial-110: #help shows the commands
     board ok>
@@ -226,9 +226,10 @@ After the restart, the search order has only FORTH again. The system
 runs on after `FREEZE`, without a restart. A store into the frozen part
 gives the error -9. Measured on the WROOM at 240 MHz: the first `FREEZE`
 of the image of the section "Build" 0.3 to 0.5 s, a `FREEZE` that
-appends a few words 0.1 s; with all of N3f
-(`lib/esp32/esp32/test/n3fload.fs`: 137 KB of dictionary, 57 KB of
-code, 56 KB of RAM data) 1.0 to 1.3 s, and 0.7 s for the next. It uses
+appends a few words 0.1 s; with the IR bridge (`apps/irbridge/app.fs`:
+163 KB of dictionary, 57 KB of code, 89 KB of RAM data) 0.9 s. The
+first `FREEZE` of an image of `build.fs` also erases the 192 KB of the
+dictionary in the flash first. It uses
 the functions of the ROM for the flash (packages ROM, FLASH and BOOTIMG;
 `FLASH-SYSCALL` switches the cache off meanwhile). The image of
 `FREEZE` has no SHA-256 digest: the ROM of the ESP32 does not check it.
@@ -420,6 +421,13 @@ application data to make space: callers keep servicing `RADIO-RECEIVE`.
 The Forth MAC start agrees with the binary oracle on 69 registers and
 passes RX 25/0 and ACK 4/0. A reset invalidates WIFI list indices.
 
+**The WLAN:** the WROOM joins a WPA2 network as a station and keeps the
+connection (WLAN-BACK), or opens a temporary network for one device
+(SETUP-AP); our TCP/IP gives sockets over both. `apps/irbridge/app.fs`
+loads all of it onto the image of the section "Build" and freezes it;
+after a start the radio is off. The words: `lib/esp32/README.md`,
+"The WLAN of the WROOM".
+
 ## The RMT: pulses for IR
 
 The package RMT of the ESP32 (`lib/esp32/esp32/rmt.fs`) has the words
@@ -433,6 +441,7 @@ work with it unchanged. `#require RMT lib/esp32/rmt.fs` loads it
 | RAM | 8 blocks of 64 pulse words | 8 blocks of 48 |
 | clock (`RMT-HZ`) | the APB clock: 80 MHz with the PLL | 40 MHz |
 | demodulator | none: `RMT-DEMOD` takes only 0 | yes |
+| RX wrap | not supported | supported by hardware; I1 backend not implemented here |
 | interrupt source (`RMT-SOURCE`) | 47 | 40 |
 
 The receiver of the ESP32 keeps its state until `RMT-END` ticks pass
@@ -442,6 +451,12 @@ gets the rest of that frame. A channel that receives and is not asked
 frame; `RMT-RX-ON` ends it. The IR transceiver of Adafruit (product
 5990) demodulates itself, so the package IR needs no demodulator
 (`lib/esp32/ir.fs`).
+
+For the IR bridge, IR-CAPTURE and IR-QUEUE take the IR frames by a
+`CODE` handler and send in the background, with a check of the echo
+(`apps/irbridge/app.fs` loads them; `lib/esp32/README.md`, "IR for the
+bridge on the WROOM"). A frame has at most 256 pulse words and 400 times:
+the RMT of the ESP32 has no RX wrap.
 
 ## An application in the flash
 
@@ -604,35 +619,36 @@ by its xt, as any word.
 
 The whole memory of the board, measured on the WROOM. "Without Wi-Fi":
 the image of the section "Build" after the start, and after its first
-`FREEZE`. "With Wi-Fi": all of N3f loaded
-(`lib/esp32/esp32/test/n3fload.fs`: radio, WPA2, our TCP/IP, DNS), the
-radio on and a scan done, then `FREEZE` and `XDATA-ON`. The sizes are in
-bytes; 1 KB is 1 024 bytes.
+`FREEZE`. "With the IR bridge": all of `apps/irbridge/app.fs` (the radio,
+WPA2, our TCP/IP, DNS, the setup network, IR-QUEUE) frozen in the
+flash with `XDATA-ON`, after a start (the radio off; the radio on adds
+the stack of the ROM in use). The sizes are in bytes; 1 KB is 1 024
+bytes.
 
 **In the chip:**
 
-| Address | Size | Contents | Without Wi-Fi | With Wi-Fi |
+| Address | Size | Contents | Without Wi-Fi | With the IR bridge |
 | --- | --- | --- | --- | --- |
 | `$4000_0000`-`$4005_FFFF` | 384 KB | ROM 0: the code of the ROM (the bootloader, the functions for the flash, the cache, the UART, `ets_...`) | `SYSCALL` calls functions there | also the code of C of ESP32-PHY (7 functions) |
 | `$3FF9_0000`-`$3FF9_FFFF` | 64 KB | ROM 1: the data of the ROM | read only | read only |
 | `$4007_0000`-`$4007_7FFF` | 32 KB | SRAM0, POOL0: the cache of the flash for the CPU | in use (START switches it on) | in use |
 | `$4007_8000`-`$4007_FFFF` | 32 KB | SRAM0, POOL1: the cache of the second core | free: the second core does not run (as RAM of the instruction bus: cells only) | free |
 | `$4008_0000`-`$4008_27B7` | 10 168 | SRAM0: the code of the kernel and of the HAL: the table of the primitives, constants, the break table, at the next 1 KB the vectors | in use | in use |
-| `$4008_27B8`-`$4009_FFFF` | 120 904 | SRAM0: the code of the `CODE` words (`CODE-START` up to `CODE-HERE`) | free | 47 552 in use (ESP32-PHY 47 484), 73 352 free |
+| `$4008_27B8`-`$4009_FFFF` | 120 904 | SRAM0: the code of the `CODE` words (`CODE-START` up to `CODE-HERE`) | free | 47 948 in use (ESP32-PHY 47 484, IR-CAPTURE), 72 956 free |
 | `$3FFA_E000`-`$3FFA_E6DF` | 1 760 | SRAM2: the data of the ROM | the ROM | the ROM |
 | `$3FFA_E6E0`-`$3FFA_FFFF` | 6 432 | SRAM2 | free (not used) | free |
 | `$3FFB_0000`-`$3FFB_09FF` | 2 560 | SRAM2, VM `$10000`-`$109FF`: TIB, PAD, the return stack, the data stack | in use | in use |
-| `$3FFB_0A00`-`$3FFD_FFEF` | 194 032 | SRAM2, VM `S0` (`$10A00`) up to `$3FFEF`: the dictionary (the 8 cells of the guard first) | 34 176 in use, 159 856 free; after `FREEZE` the frozen part is in the flash, and 34 144 of its RAM are free for `XDATA-ON` | 137 796 in use, 56 236 free; after `FREEZE` and `XDATA-ON` 137 836 of its RAM hold RAM data |
+| `$3FFB_0A00`-`$3FFD_FFEF` | 194 032 | SRAM2, VM `S0` (`$10A00`) up to `$3FFEF`: the dictionary (the 8 cells of the guard first) | 34 400 in use, 159 632 free; after `FREEZE` the frozen part is in the flash, and 34 368 of its RAM are free for `XDATA-ON` | 166 600 in use, all of it frozen in the flash; 27 432 free; 166 568 of its RAM are RAM data (`XDATA-ON`): 67 548 in use, 99 020 free |
 | `$3FFD_FFF0`-`$3FFD_FFFF` | 16 | SRAM2, VM `$3FFF0`: the two cells of HALT, 8 bytes free | in use | in use |
 | `$3FFE_0000`-`$3FFE_043F` | 1 088 | SRAM1: the data of the ROM | the ROM | the ROM |
-| `$3FFE_0440`-`$3FFE_3F1F` | 15 072 | SRAM1: the stack of the ROM during the start, free afterwards | free | `$3FFE_0500`-`$3FFE_317F`: the 11 392 bytes of packets of WIFI-LINK (`lib/net/wlink.fs`); 3 680 free |
+| `$3FFE_0440`-`$3FFE_3F1F` | 15 072 | SRAM1: the stack of the ROM during the start, free afterwards | free | `$3FFE_0500`-`$3FFE_3F1F`: the packet RAM of the LINKs (`RADIO-POOL`, 14 880 bytes): WIFI-LINK uses 11 392 of it, AP-LINK 8 168; only one runs |
 | `$3FFE_3F20`-`$3FFE_434F` | 1 072 | SRAM1: the data of the ROM | the ROM | the ROM |
 | `$3FFE_4350`-`$3FFE_43FF` | 176 | SRAM1 | free | free |
 | `$3FFE_4400`-`$3FFE_7CAB` | 14 508 | SRAM1: ESP32-RADIO (`lib/esp32/esp32/radio.fs`): the reception (8 descriptors, 8 buffers of 1 600 bytes, up to `$3FFE_765F`), then a descriptor and a buffer for sending | free | in use |
 | `$3FFE_7CAC`-`$3FFE_7FFF` | 852 | SRAM1 | free | free |
 | `$3FFE_8000`-`$3FFE_80FF` | 256 | SRAM1, VM `$0`-`$FF` | not used by the VM | not used |
 | `$3FFE_8100`-`$3FFE_83FF` | 768 | SRAM1, VM `$100`-`$3FF`: SYS, the system variables | in use | in use |
-| `$3FFE_8400`-`$3FFF_7FFF` | 64 512 | SRAM1, VM `$400`-`$FFFF`: DATA, the RAM data (`VP`) | 1 792 in use, 62 720 free | 55 476 in use, 9 036 free |
+| `$3FFE_8400`-`$3FFF_7FFF` | 64 512 | SRAM1, VM `$400`-`$FFFF`: DATA, the RAM data (`VP`) | 1 792 in use, 62 720 free | 23 264 in use, 41 248 free |
 | `$3FFF_8000`-`$3FFF_816B` | 364 | SRAM1: the variables of the HAL, with the buffer of UART0 | in use | in use |
 | `$3FFF_816C`-`$3FFF_81FF` | 148 | SRAM1 | free | free |
 | `$3FFF_8200`-`$3FFF_85FF` | 1 024 | SRAM1: the copies of the table of the primitives and of the break table: TBL points to them (START makes them; the CPU reads SRAM0 on the data bus 8 cycles slower) | in use | in use |
@@ -646,20 +662,20 @@ bytes; 1 KB is 1 024 bytes.
 | `$400C_2000`-`$40BF_FFFF` | | code in the flash through the cache (IROM) | not used | not used |
 
 The SRAM of the chip is 520 KB: SRAM0 192 KB, SRAM2 200 KB, SRAM1
-128 KB. Free without Wi-Fi: 159 856 bytes of dictionary and 62 720
+128 KB. Free without Wi-Fi: 159 632 bytes of dictionary and 62 720
 bytes of RAM data for Forth, 120 904 bytes for the code of `CODE`
 words. Besides, uCForth leaves about 99 KB unused without Wi-Fi and
-about 73 KB with Wi-Fi: POOL1 (32 KB), most of the stack of the ROM
+about 73 KB with the IR bridge: POOL1 (32 KB), most of the stack of the ROM
 (about 30 KB), the gaps in SRAM1 and SRAM2, and without Wi-Fi the
 places of ESP32-RADIO and WIFI-LINK.
 
 **In the flash** (4 MB):
 
-| Flash address | Size | Contents | Without Wi-Fi | With Wi-Fi |
+| Flash address | Size | Contents | Without Wi-Fi | With the IR bridge |
 | --- | --- | --- | --- | --- |
 | `$0_0000`-`$0_0FFF` | 4 KB | not used: the ROM reads the image at `$1000` | | |
-| `$0_1000`-`$6_FFFF` | 444 KB | the boot image (section "The image format of the ROM bootloader"): the code of the kernel and of the `CODE` words, the RAM data, the dictionary after `FLASH-END` (0 to 3 bytes), with `XDATA-ON` the RAM data behind the frozen part. `FREEZE` checks that it ends before `$7_0000` | the image of `build.fs`: 46 992 (all of its dictionary in it); after `FREEZE` 12 784 (code 10 168, RAM data 2 560) | after `FREEZE` 114 016 (code 57 720, RAM data 56 244), and the RAM data behind the frozen part that are in use |
-| `$7_0000`-`$9_FFFF` | 192 KB | the frozen part of the dictionary: VM address a at `$6_0000` + a (`DICT-FLASH` of BOOTIMG and `build.fs`), from `$7_0A00` | 34 176 after `FREEZE` | 137 868 after `FREEZE` |
+| `$0_1000`-`$6_FFFF` | 444 KB | the boot image (section "The image format of the ROM bootloader"): the code of the kernel and of the `CODE` words, the RAM data, the dictionary after `FLASH-END` (0 to 3 bytes), with `XDATA-ON` the RAM data behind the frozen part. `FREEZE` checks that it ends before `$7_0000` | the image of `build.fs`: 47 216 (all of its dictionary in it); after `FREEZE` 12 784 (code 10 168, RAM data 2 560) | after `FREEZE` 149 696 and the headers: code 58 116, RAM data 24 032, the RAM data behind the frozen part 67 548 |
+| `$7_0000`-`$9_FFFF` | 192 KB | the frozen part of the dictionary: VM address a at `$6_0000` + a (`DICT-FLASH` of BOOTIMG and `build.fs`), from `$7_0A00` | 34 400 after `FREEZE` | 166 600 after `FREEZE` |
 | `$A_0000`-`$3F_DFFF` | 3 448 KB | free for the package FLASH. It can still hold old bytes, for example of the factory firmware: erase before a write | free | free |
 | `$3F_E000`-`$3F_FFFF` | 8 KB | the profile of the network (WLSAVE), in the last two sectors | | in use when saved |
 
@@ -705,9 +721,9 @@ After the start, with the image of the section "Build":
 
 | Area | Size | Free |
 | --- | --- | --- |
-| dictionary: words, `ALLOT`, `,` | 189.5 KB | 156 KB (159 856 bytes) |
+| dictionary: words, `ALLOT`, `,` | 189.5 KB | 156 KB (159 632 bytes) |
 | RAM data: `VARIABLE`, `VALUE`, `BUFFER:`, vocabularies | 63 KB | 61 KB (62 720 bytes) |
-| the RAM below `FLASH-END` (`XDATA-ON`) | after `FREEZE` | 33 KB after the first `FREEZE` of this image (34 144 bytes); with all of N3f 134 KB (137 836 bytes) |
+| the RAM below `FLASH-END` (`XDATA-ON`) | after `FREEZE` | 34 KB after the first `FREEZE` of this image (34 368 bytes); with the IR bridge 163 KB (166 568 bytes) |
 | the code of the `CODE` words: SRAM0 from `CODE-START` (`$4008_27B8`) | 118 KB | 118 KB |
 | data stack, return stack | 256 cells each | |
 | the input line | 256 characters | |
@@ -731,9 +747,9 @@ RX keeps 12 896 bytes of SRAM1; the TX descriptor and buffer reserve
 1 612 more, up to `$3FFE_7CAB` (the table above). Servicing the receive
 list remains necessary even when waiting for a TX ACK.
 
-With all of N3f (`lib/esp32/esp32/test/n3fload.fs`) 56 236 bytes of
-dictionary and 9 036 bytes of RAM data are free; after `FREEZE` and
-`XDATA-ON` also 137 836 bytes of RAM below `FLASH-END`.
+With the IR bridge (`apps/irbridge/app.fs`) 27 432 bytes of dictionary
+and 41 248 bytes of RAM data are free, and 99 020 of the 166 568 bytes
+of RAM below `FLASH-END`.
 
 The kernel keeps IP, W, SP and RP as chip addresses; the cells in
 memory hold VM addresses. `@ ! C@ C!` and the other memory words take

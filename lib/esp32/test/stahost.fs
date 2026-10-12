@@ -1,6 +1,6 @@
 \ stahost.fs - normal STA register fields and strict delivery of selected BSS
 ONLY FORTH DEFINITIONS ALSO FILES
-INCLUDE lib/esp32/test/radiohost.fs
+[DEFINED] MOCK-MAC S" lib/esp32/test/radiohost.fs" ?INCLUDED
 ONLY FORTH DEFINITIONS ALSO BYTES ALSO MOCK-MAC ALSO ESP32-RADIO ALSO ESP32-RADIO.I
 CREATE PEER 2 C, $51 C, $52 C, $53 C, $54 C, $55 C,
 CREATE STA-OWN 2 C, $41 C, $42 C, $43 C, $44 C, $45 C,

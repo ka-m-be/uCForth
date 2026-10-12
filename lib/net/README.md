@@ -194,8 +194,17 @@ code writes `ALSO NETIF` or `ALSO SYSTEM`.
 | `tcpip.fs` | | loads our TCP/IP over the LINK that is there, then NET and DNS |
 | `nolink.fs` | NO-LINK | a LINK without a network: only the loop works; at the end `LINK` |
 | `../linux/tap.fs` | TAP | a LINK on Linux: a TAP device; at the end `LINK` |
-| `bytes.fs` | BYTES | exact `BYTES= ( a b n -- f )` for packet fields, independent of name/text case rules; load before WIFI and ESP32-RADIO |
-| `wifi.fs` | WIFI | the Wi-Fi networks around: `WIFI-SCAN`, `WIFI-NET`, `.WIFI`; over `ALSO RADIO` and BYTES (section "The contract WIFI") |
+| `bytes.fs` | BYTES | exact `BYTES= ( a b n -- f )` for packet fields, independent of name/text case rules; `LE16@`, `LE16!`; load before WIFI and ESP32-RADIO |
+| `wifi.fs` | WIFI | the Wi-Fi networks around: `WIFI-SCAN` (also in steps: `WIFI-SCAN-START`, `WIFI-SCAN-STEP`), `WIFI-NET`, `.WIFI`; over `ALSO RADIO` and BYTES (section "The contract WIFI") |
+| `wpakey.fs` | WPAKEY | the keys of WPA2: PMK, PTK (section "WPA2 key derivation") |
+| `wpasta.fs` | WLAN | the WPA2 station: join, the 4-way handshake, group keys, leave (section "WPA2 station") |
+| `wlsetup.fs` | WLAN-SETUP | the passphrase typed at the board, the profile saved (section "Local input and saved profiles") |
+| `ccmp.fs` | CCMP | the CCMP header, AAD, nonce and the 48-bit packet numbers |
+| `wlink.fs` | WIFI-LINK | the contract LINK over the station; the CCMP in the radio, or with `wlsoft.fs` |
+| `wlsoft.fs` | WLINK-SOFT | the CCMP of WIFI-LINK in Forth, for a radio without CCMP in its hardware (needs CCM) |
+| `aplink.fs` | AP-LINK | the contract LINK over an open access point for one device (section "The setup network") |
+| `dhcps.fs` | DHCP-SERVER | the address for that device |
+| `linksel.fs` | RADIO-LINK | one LINK of the two for LINK-NET: the station or the AP; at the end `LINK` |
 | `test/` | | the tests (section "Test") |
 
 `hostsys.fs` finds the system so: on Linux, `/proc/self/exe` is the
@@ -262,6 +271,13 @@ word waits. At the end of a LINK file, `: LINK ( -- ) package ;`.
 | `a LINK-RECEIVE ( -- u )` | the next frame to a, with room for `LINK-MTU` + 14 bytes; 0: none |
 | `ip LINK-JOIN ( -- ior )` | let the frames of the group ip in (multicast) |
 
+Two optional words are empty on an immediate LINK: `LINK-TICK` does
+one bounded step of the data path; `LINK-CONTROL` does the work that
+may wait, in the foreground. WIFI-LINK, AP-LINK and RADIO-LINK have
+both. LINK-NET calls the first inside its lock (in `NET-STEP`, also
+from the timer), the second from `NET-CONTROL` (in IDLE, never from a
+timer).
+
 A new system or board needs only its lowest layer: a system with
 sockets a layer like POSIX-NET (or only a SYSTEM layer, if it has the
 calls of POSIX); a board a LINK. A board with WLAN also has the
@@ -283,6 +299,14 @@ radio must be on (`RADIO-START`).
 | `WIFI-WPA2? ( i -- f )` | true for PSK/CCMP with no required PMF, from the cached beacon |
 | `WIFI-PEER ( i -- a )` | BSSID, 6 read-only bytes |
 | `WIFI-RSN ( i -- a n cap )` | cached RSN body (up to 128 bytes) and capabilities; error for an unsupported AP |
+
+For background recovery, `WIFI-SCAN-START` begins the same passive
+scan and `WIFI-SCAN-STEP ( -- done? )` takes the frames that wait (at
+most 8) and, after 120 ms on a channel, goes to the next. Call it from
+the foreground until done. `WIFI-SCAN-CANCEL` ends it before its end:
+the radio goes back to its channel. `WIFI-SCAN` is the same scan in one
+word. It never prints
+network identities. Do not run a synchronous scan at the same time.
 
 On the ESP32, in `ucf term`, in the folder `ucf`, right after a reset
 (the loads take about 67 s; the names here are examples):
@@ -327,11 +351,24 @@ The contract RADIO, under WIFI (on the ESP32 in
 | `RADIO-LEVEL ( -- dbm )` | the level of that frame |
 | `RADIO-MAC! ( a -- )`, `RADIO-MAC@ ( -- a )` | own 6-byte address after each start, copied into the radio; getter bytes are read-only |
 | `RADIO-SEND ( a n ack? -- )` | foreground only; ACK needs matching own source MAC and free RX descriptors; broadcast and ACK are tested on the WROOM |
+| `a n ack? RADIO-TX-START ( -- )`, `RADIO-TX-POLL ( -- n )` | send without waiting (WIFI-LINK, AP-LINK); the result later: 1 at work, 0 done, else the code |
+| `RADIO-TX-BUSY? RADIO-TX-BLOCKED? ( -- f )`, `RADIO-TX-CANCEL ( -- )`, `RADIO-TX-END ( -- )` | the state of such a send; cancel it; let it end first (a stop does that) |
+| `RADIO-TRACK ( -- )` | the PHY follows the PLL after some sends; from the foreground |
+| `RADIO-FACTORY ( -- )`, `a n RADIO-RANDOM ( -- )` | the own address of the chip; random bytes of the hardware (WLAN) |
+| `bssid RADIO-STATION ( -- )`, `RADIO-SOFT-CCMP ( -- )` | the filters of a station; protected frames in software (`wlsoft.fs`) |
+| `RADIO-AP ( -- )`, `peer RADIO-AP-PEER! ( -- )` | the filters of an AP (AP-LINK): authentications and probes, then only the frames of the device peer |
 | `RADIO-STOP ( -- )` | the radio off |
 
-WLAN (`wpasta.fs`, below) now provides WIFI-JOIN, WIFI-LEAVE and
-WIFI-STATUS. WIFI-AP and WIFI-RSSI come later. These contracts may
-still change with the remaining network work.
+A radio with CCMP in its hardware also has `key peer id group? RADIO-CCMP-KEY!`,
+`RADIO-KEYS-CLEAR`, `RADIO-CCMP? ( -- f )` and `RADIO-DECRYPTED? ( -- f )`
+(ESP32-RADIO: `lib/esp32/README.md`, "The WLAN of the WROOM"). They are
+optional: WLAN and WIFI-LINK define empty ones with `?:` when the radio
+has none, and then WIFI-LINK needs the CCMP in software (`wlsoft.fs`).
+The chip gives the packet RAM of the LINKs (ESP32-RADIO: `RADIO-POOL`).
+
+WLAN (`wpasta.fs`, below) provides WIFI-JOIN, WIFI-LEAVE and
+WIFI-STATUS. AP-LINK provides the explicitly started open WIFI-AP
+(section "The setup network"). WIFI-RSSI is not provided yet.
 
 ### WPA2 key derivation (N3d)
 
@@ -383,13 +420,19 @@ The search order holds 16 wordlists.
 | `WIFI-ERROR ( -- ior )` | 0, or the last failure |
 | `WIFI-TK ( -- a )` | 16-byte pairwise key, only in state 6; caller must not change or print it |
 | `WIFI-GROUP ( -- a id rsc )` | GTK, key id and 6-byte receive counter, only in state 6; read-only |
-| `WIFI-LEAVE ( -- )` | erase RAM keys and identity, return to scan filters; no over-air deauthentication is sent |
+| `WIFI-LEAVE ( -- )` | after an association: a deauthentication to the AP (reason 3: the station goes), so a new join works at once; then erase RAM keys and identity, return to scan filters |
 
 States: **0** idle, **1** deriving, **2** open authentication,
 **3** association, **4** waiting for EAPOL message 1,
 **5** waiting for message 3, **6** authenticated with keys installed,
 **7** failed. Leave before starting another join. Failure prints only
 the stage and error code, never packet bytes or credentials.
+
+The RSN group update accepts Key Length 0 (as sent by hostap), or 16;
+pairwise messages still require 16. Ethernet padding after the declared
+EAPOL length is excluded from MIC checks and duplicate comparisons.
+The complete declared packet must be present. Group updates retain the
+pairwise packet number and do not reinstall an identical group key.
 
 The profile is WPA2-Personal, CCMP for both pairwise and group traffic,
 EAPOL descriptor version 2, no required PMF. Open, TKIP, enterprise
@@ -444,8 +487,15 @@ On the 4-MB WROOM only, `lib/esp32/esp32/wlsave.fs` is package WLSAVE:
 | --- | --- |
 | `WLAN-SAVE ( -- )` | only after state 6; save SSID and PMK, never the plaintext passphrase |
 | `WLAN-SAVED? ( -- f )` | a valid saved profile exists; temporary read buffers are erased |
+| `WLAN-SAVED-NET ( -- i )` | strongest supported entry of the latest scan whose SSID matches the saved profile; no names or credentials are printed |
 | `WLAN-JOIN ( i -- )` | selected current entry must match the saved SSID exactly; use the PMK privately on the board |
 | `WLAN-FORGET ( -- )` | erase both reserved sectors and leave the station |
+
+Call `WIFI-SCAN` just before `WLAN-SAVED-NET WLAN-JOIN`. The index is
+not kept across scans or resets. No matching supported network raises
+an explicit error; no saved profile throws -431. Temporary profile
+buffers are wiped on both paths. Matching an SSID selects a candidate,
+not an authenticated peer; the WPA2 exchange still checks the PMK.
 
 Reserve **0x3FE000 and 0x3FF000**, 4096 bytes each. They must not hold
 an image, filesystem or another application. Get the owner's approval
@@ -477,15 +527,15 @@ In `ucf`, without a real network:
     build/ucf-c -32 host/files.fs lib/esp32/test/wlsave.fs </dev/null
     build/ucf-c -32 host/files.fs lib/net/test/wlsetup.fs </dev/null
 
-Expected: **wpasta 24/0**, **wlsave 13/0**, **wlsetup 2/0**.
+Expected: **wpasta 29/0**, **wlsave 20/0**, **wlsetup 2/0**.
 The latter loaders repeat the station vectors too. The synthetic AP,
 beacon and key packets are generated test data, with independently
 computed Node crypto MIC/key-wrap fixtures. No captured frames.
-The existing runner includes them (C 32 bit **11117/0**);
-the 16-bit suite remains **2742/0**.
+`tools/test.fs` runs them with the other tests.
 
-The same 24 station vectors pass on C, awk, JavaScript, native macOS and
-the WROOM. The WROOM synthetic exchange took **426 ms**, with a timer
+The station vectors (25, with the deauthentication at the leave) pass
+on C and awk; the first 24 also on JavaScript, native macOS and the
+WROOM. The WROOM synthetic exchange took **426 ms**, with a timer
 running, no PHY/radio/flash access. This is not a data-plane IR test.
 Real WROOM: owner-selected AP, local password input, first join and
 join after reset with saved PMK both **state 6, error 0, one installation,
@@ -541,25 +591,61 @@ The words of LINK-NET besides NETIF:
 | --- | --- |
 | `ip mask gateway dns NET-STATIC ( -- )` | fixed addresses, no DHCP |
 | `NET-DHCP ( -- )` | the addresses from DHCP again (at the start): the next `NET-UP` asks |
+| `NET-DOWN ( -- )` | drop addresses, ARP, queued IP/UDP data; active TCP handles report NET-UNREACHABLE and must be closed; listeners and UDP ports remain |
 | `a u NET-HOSTNAME ( -- )` | the name for the router (at most 32 characters) |
 | `NET-STEP ( -- )` | a step of the network (below); a timer runs it |
+| `NET-CONTROL ( -- )` | foreground-only LINK control under the network lock, then NET-SERVICE |
 
-**A step of the network:** at most 2 frames from the LINK, the loop,
+**A step of the network:** one bounded LINK step, at most one frame
+from the LINK and one from the loop,
 and the timers of ARP, TCP and DHCP. `NET-POLL` runs a step, and each
 word of NET that waits runs it with `NET-POLL`. A step does not run
 while a word of NETIF runs (a lock): it waits for the end of that word,
-which runs it then. `NET-STEP` does not wait, shows nothing and keeps
+which runs it then. Synchronous socket words still flush the loop
+before returning. `NET-STEP` does not wait, shows nothing and keeps
 its errors, so it may run as a handler of an interrupt.
 
 **In the background of a board:** `lib/esp32/nettimer.fs` (package
 NET-TIMER) has `NET-START`: a timer runs `NET-STEP` every 1 ms, also
 while the console computes or loads a file (level 1;
-`targets/esp32s3/README.md`, "Two levels"). `NET-STOP` ends it. The
+`targets/esp32s3/README.md`, "Two levels"). `NET-START` also puts
+`NET-CONTROL` in IDLE; `NET-STOP` removes both. Foreground NET-POLL
+runs the same control. The
 services of an application (MQTT, a web page) run in the chain of IDLE
 (level 2) and use the words of NET as everywhere. Ctrl-C waits while a
 word of NETIF or a step runs (`-BREAK` of the package IDLE). Measured on
 the ESP32-S3: the 85 tests of `test/board.fs` with `NET-START`, 0
 errors.
+
+**Over the WLAN of a board:** RADIO-LINK (`linksel.fs`) gives LINK-NET
+one LINK of two: WIFI-LINK (the station, `wlink.fs`) or AP-LINK (an
+open access point for one device, `aplink.fs`). Only one of them runs;
+the board never routes between them, and the mode changes only while
+the radio is off. Both use the same packet RAM (`LINK-POOL!`). On the
+WROOM: `lib/esp32/README.md`, "The WLAN of the WROOM".
+
+### The setup network
+
+`aplink.fs` (AP-LINK) is the contract LINK over an open access point:
+beacons, probe responses, open authentication and (re)association, the
+data frames of one device. The first device that logs on is the only
+one until `WIFI-AP-STOP`, which sends it a deauthentication. A device
+in power save can miss it; it then sees the end some seconds later,
+when no beacons come. The AP does not hold frames back for a device in
+power save. `dhcps.fs`
+(DHCP-SERVER) gives that device its address; the answer names the
+netmask, but no router and no DNS server. On the WROOM,
+`lib/esp32/esp32/wlap.fs` (SETUP-AP) puts both together: `SETUP-START`,
+`SETUP-STOP`, `.SETUP`. The network is open and its data readable: use
+it only for a short time, and send no secret over it.
+
+| Word | Effect |
+| --- | --- |
+| `a AP-POOL! ( -- )`, `AP-POOL-SIZE ( -- n )` | the packet RAM of AP-LINK |
+| `a n ch WIFI-AP ( -- )`, `WIFI-AP-STOP ( -- )` | the AP on, off |
+| `WIFI-AP-READY? ( -- f )`, `WIFI-AP-PEER ( -- a )` | the device has logged on; its MAC address |
+| `mac ip DHCPS-START ( -- )`, `DHCPS-TICK ( -- )`, `DHCPS-STOP ( -- )` | serve the device mac with the address ip; one message per tick |
+| `a n LINK-POOL! ( -- )`, `LINK-STATION ( -- )`, `LINK-ACCESS ( -- )`, `LINK-AP? ( -- f )` | RADIO-LINK: the RAM of both LINKs; select one |
 
 **Memory and speed**, measured on the ESP32-S3 at 240 MHz: TEXT, INET,
 NO-LINK, our TCP/IP, NET and DNS take 35.7 KB of the dictionary and
@@ -618,8 +704,13 @@ answers between them.
 | `test/loop.fs` | our TCP/IP over NO-LINK | each system with files | `loop: 85 tests, 0 errors` (1.1 s on a Mac) |
 | `test/board.fs` | our TCP/IP over NO-LINK, the steps in a timer (`NET-START`) | an ESP32 board, in `ucf term` | `board: 85 tests, 0 errors` |
 | `test/tap.fs` | our TCP/IP over a TAP device, against the kernel | Linux, as root | `tap: 99 tests, 0 errors` (8 to 12 s) |
-| `test/wifi.fs` | WIFI over MOCK-RADIO, with beacons that the test makes | each system with files and 32-bit cells | `wifi: 16 tests, 0 errors` (0.1 s) |
-| `test/bytes.fs` | exact packet-byte comparison, including unequal case bytes and empty ranges | each system with files, 16- or 32-bit cells | `bytes: 7 tests, 0 errors` |
+| `test/wifi.fs` | WIFI over MOCK-RADIO, with beacons that the test makes; also the scan in steps | each system with files and 32-bit cells | `wifi: 22 tests, 0 errors` (0.1 s) |
+| `test/bytes.fs` | exact packet-byte comparison, including unequal case bytes and empty ranges; `LE16@`, `LE16!` | each system with files, 16- or 32-bit cells | `bytes: 9 tests, 0 errors` |
+| `test/hwrekey.fs` | with `wpasta.fs`, `wlink.fs`, `hwlink.fs`, `rekey.fs`: the station, WIFI-LINK with CCMP in software and in the radio, a new group key | each system with files and 32-bit cells | `hwrekey: 4 tests, 0 errors` after the others |
+| `test/linksel.fs` | RADIO-LINK: the two LINKs, the mode, the shared RAM | the same | `linksel: 6 tests, 0 errors` |
+| `test/aphttp.fs` | with `loop.fs` and `dhcps.fs`: DHCP-SERVER, the test reply of the setup network | the same | `aphttp: 4 tests, 0 errors` after the others |
+| `test/netdown.fs` | with `loop.fs` and `ping.fs`: `NET-DOWN`, the echo check of `AIR-PING` | the same | `netdown: 10 tests, 0 errors` after the others |
+| `test/echopeer.fs` | not a test: the peer on a host for `lib/esp32/esp32/test/airsock.fs` (TCP and UDP echo) | macOS, Linux | |
 
 `test/wifi.fs` checks the parts of a beacon (its elements, channel and
 name; 4 bytes more in its header when bit 7 of byte 1 is set), the

@@ -6,8 +6,8 @@
 \ The tester comes first, then t0.fs (the virtual machine), hayes.fs
 \ (the core words), host/test/files.fs (the package FILES) and the
 \ tests of the packages in lib/ and asm/ (8086 with each cell size;
-\ elf, aarch64, sha256, md5, n3d, xtensa, disxt, disx32, disx64, disa64, x86
-\ and x64 only with 32-bit cells). Each file runs in a sandbox (TEST). At
+\ elf, aarch64, sha256, md5, n3d, the WLAN and IR packages of the ESP32,
+\ xtensa, disxt, disx32, disx64, disa64, x86 and x64 only with 32-bit cells). Each file runs in a sandbox (TEST). At
 \ the end: the line "all: n tests, e errors", then the exit status 0 (no
 \ error) or 1. MAIN runs everything in one line: a bootstrap VM stops a
 \ file after a line with an error message, but the line itself runs to
@@ -54,6 +54,7 @@ VARIABLE TA   VARIABLE TU            \ the name of the file: not on the stack (D
   S" lib/test/ircode.fs"  TEST
   S" lib/test/kelon168.fs" TEST
   S" lib/test/rty3.fs"    TEST
+  S" lib/net/test/bytes.fs" TEST
   S" asm/test/8086.fs"    TEST
   S" asm/monitor/test/disx86.fs" TEST
   CELL 4 = IF                       \ these need 32-bit cells
@@ -65,6 +66,16 @@ VARIABLE TA   VARIABLE TU            \ the name of the file: not on the stack (D
     S" lib/net/test/wpasta.fs" TEST
     S" lib/esp32/test/wlsave.fs" TEST
     S" lib/net/test/wlsetup.fs" TEST
+    S" lib/net/test/wifi.fs"    TEST    \ the WLAN, the setup AP and IR-QUEUE of the ESP32
+    S" lib/net/test/hwrekey.fs" TEST    \ wpasta wlink hwlink rekey hwrekey
+    S" lib/net/test/linksel.fs" TEST
+    S" lib/net/test/aphttp.fs"  TEST    \ loop dhcps aphttp
+    S" lib/net/test/netdown.fs" TEST    \ loop ping netdown
+    S" lib/esp32/test/ackhost.fs" TEST  \ radiohost txhost txdone ackhost retry
+    S" lib/esp32/test/ccmpreg.fs" TEST  \ radiohost stahost starx ccmpreg
+    S" lib/esp32/test/setup.fs"  TEST   \ radiohost stahost aphost setup
+    S" lib/esp32/test/wlback.fs" TEST
+    S" lib/esp32/test/irqueue.fs" TEST
     S" asm/test/xtensa.fs"    TEST
     S" asm/monitor/test/disxt.fs" TEST
     S" asm/monitor/test/disx32.fs" TEST

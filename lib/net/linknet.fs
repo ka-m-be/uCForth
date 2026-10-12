@@ -11,7 +11,7 @@
 \ So the loop works as in the kernel of a system: after TCP-OPEN to
 \ 127.0.0.1 the server has the connection already.
 \
-\ A step of the network: at most 2 frames from the LINK, the loop, the
+\ A step of the network: one frame from the LINK, one from the loop, the
 \ timers of ARP, TCP and DHCP. (NET-POLL) runs a step, then waits ms.
 \ On a board a timer runs the steps (NET-START, lib/esp32/nettimer.fs);
 \ a step that comes while a word of NETIF runs waits for the end of the
@@ -34,6 +34,8 @@ VARIABLE BUSY        \ a word of NETIF runs
 VARIABLE WANTED      \ a step came meanwhile: the word does it at its end
 VARIABLE STATIC      \ true: the addresses of NET-STATIC; false: DHCP
 LINK-MTU 14 + BUFFER: RX   \ the frame that came
+?: LINK-TICK ( -- ) ;
+?: LINK-CONTROL ( -- ) ;
 
 : FRAME-IN ( a u -- )   \ a frame from the LINK: ARP or IPv4, to our MAC or to a group
   DUP 14 < IF 2DROP EXIT THEN
@@ -44,8 +46,9 @@ LINK-MTU 14 + BUFFER: RX   \ the frame that came
     >R 2DROP R>
   ENDCASE ;
 : WORK ( -- )
-  2 0 DO  RX LINK-RECEIVE ?DUP 0= IF LEAVE THEN  RX SWAP FRAME-IN  LOOP
-  IP-FLUSH  ARP-TICK  TCP-TICK  DHCP-TICK ;
+  LINK-TICK
+  RX LINK-RECEIVE ?DUP IF RX SWAP FRAME-IN THEN
+  IP-STEP ARP-TICK TCP-TICK DHCP-TICK ;
 : FINISH ( -- )   IP-FLUSH  WANTED @ IF  FALSE WANTED !  WORK  THEN ;
 : LOCKED ( i*x xt -- j*x )   \ run xt, a word of UDP or TCP, while a step and Ctrl-C wait
   -BREAK  1 BUSY +!  CATCH
@@ -55,6 +58,7 @@ LINK-MTU 14 + BUFFER: RX   \ the frame that came
 PUBLIC
 DEFER NET-SERVICE
 ' NOOP IS NET-SERVICE
+: NET-CONTROL ( -- ) ['] LINK-CONTROL LOCKED NET-SERVICE ;
 : NET-STEP ( -- )   \ a step of the network, but not while a word of NETIF runs
   BUSY @ IF  TRUE WANTED !  EXIT  THEN
   -BREAK  1 BUSY !  ['] WORK CATCH  0 BUSY !  FALSE WANTED !  +BREAK
@@ -81,13 +85,15 @@ DEFER NET-SERVICE
 : (GATEWAY) ( -- ip )       IP-GATEWAY @ ;
 : (NETMASK) ( -- ip )       IP-MASK @ ;
 : (DNS-SERVER) ( -- ip )    IP-DNS @ ;
-: (NET-POLL) ( ms -- )   NET-SERVICE NET-STEP MS ;
+: (NET-POLL) ( ms -- )   NET-CONTROL NET-STEP MS ;
 PRIVATE
 : FIXED ( ip mask gateway dns -- )   DHCP-STOP  IP-CONFIG  TRUE STATIC ! ;
 : NO-ADDRESS ( -- )   DHCP-STOP  0 0 0 0 IP-CONFIG  FALSE STATIC ! ;
+: DOWN ( -- ) NO-ADDRESS ARP-FORGET IP-FORGET UDP-FORGET TCP-DOWN ;
 PUBLIC
 : NET-STATIC ( ip mask gateway dns -- )   ['] FIXED LOCKED ;
 : NET-DHCP ( -- )   ['] NO-ADDRESS LOCKED ;
+: NET-DOWN ( -- ) ['] DOWN LOCKED ;
 : NET-HOSTNAME ( a u -- )   ['] DHCP-NAME! LOCKED ;
 
 END-PACKAGE

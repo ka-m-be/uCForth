@@ -283,13 +283,29 @@ here the port is `/dev/cu.usbserial-110`:
     ...
     $ build/ucf flash /dev/cu.usbserial-110 build/esp32.bin 0x1000
     ...
-    38 KB in 4.2 s
+    47 KB in 5.2 s
     The board waits in the bootloader; reset starts it.
     $ build/ucf reset /dev/cu.usbserial-110
     $ build/ucf term /dev/cu.usbserial-110
 
 The words are the same as on the ESP32-S3, and so is the line for an
 application: `apps/aircon/app.fs` runs on both boards.
+
+**The IR bridge on the WROOM** (in work: the WLAN with a saved
+network, a setup network, sockets, IR in the background): after the
+steps above, one line loads it and freezes it into the flash (about 2
+minutes):
+
+    $ build/ucf term /dev/cu.usbserial-110 apps/irbridge/app.fs
+    ...
+    irbridge: ready; WBACK-START joins the saved WLAN, 4 14 IR-Q-START starts IR
+    board ok> WBACK-START
+    WLAN back: link and DHCP ready
+
+Then the words of NET work as on a host. `WBACK-START` needs the
+profile of the network in the flash, and the passphrase is typed only
+at the board: apps/irbridge/README.md has these steps, the setup
+network, IR, and what to do when it does not work.
 
 ## 7 Where next
 

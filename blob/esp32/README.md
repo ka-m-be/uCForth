@@ -38,7 +38,7 @@ This README is about all three libraries. The README in `libphy/`,
 **Origin and license:** The archives are those of the crate
 `esp-wifi-sys-esp32` 0.2.0 (checked with SHA-256). Copyright Espressif
 Systems (Shanghai) Co., Ltd., Apache License 2.0. The text of the
-license is in `LICENSE` in this folder; the file `LICENSE` root folder
+license is in `LICENSE` in this folder; the file `LICENSE` in the top folder
 names the files that it covers.
 
 ## 1 The files

@@ -11,16 +11,17 @@
 \ word (the lock of LINK-NET).
 \
 \   NET-START ( -- )   a step every millisecond from now on; after a
-\                      restart the program calls it again (TIMERS)
+\                      restart the program calls it again (TIMERS);
+\                      foreground control in IDLE
 \   NET-STOP ( -- )    no more steps in the background
 \
 \ On the board, in ucf term, after our TCP/IP (lib/net/tcpip.fs lists
 \ the packages):  #include lib/esp32/nettimer.fs
 
-PACKAGE NET-TIMER  ALSO TIMERS  ALSO NETIF   \ lib/package.fs
+PACKAGE NET-TIMER  ALSO TIMERS  ALSO NETIF ALSO IDLE   \ lib/package.fs
 
 PUBLIC
-: NET-START ( -- )   ['] NET-STEP 1 EVERY ;
-: NET-STOP ( -- )    ['] NET-STEP 0 EVERY ;
+: NET-START ( -- )   ['] NET-CONTROL IDLE+ ['] NET-STEP 1 EVERY ;
+: NET-STOP ( -- )    ['] NET-STEP 0 EVERY ['] NET-CONTROL IDLE- ;
 
 END-PACKAGE
