@@ -167,11 +167,14 @@ build/esp32.bin 0x1000`) puts the plain uCForth back into the flash.
 | --- | --- | --- |
 | RMT | `lib/esp32/rmt.fs` | the remote control unit of the chip, channel by channel; this file loads the one for the chip of the board (`esp32s3/rmt.fs` or `esp32/rmt.fs`) |
 | IR | `lib/esp32/ir.fs` | IR frames as times in us: the carrier of 38 kHz, send, receive |
-| IRCODE | `lib/irremote/ircode.fs` | the pulse distance code: bytes to times and back |
+| AC-BASE | `lib/irremote/acbase.fs` | what the frames of air conditioners share: the modes, the fields, the clock, the words that show a state |
+| IRCODE | `lib/irremote/ircode.fs` | the pulse distance code: bytes to times |
+| IRCODE-READ | `lib/irremote/irread.fs` | times back into bytes |
 | RTY3 | `lib/irremote/rty3.fs` | the frame of the remote control RCH-RTY3-0: the state, the checksum, the times |
+| RTY3-READ | `lib/irremote/rty3read.fs` | frames of RTY3 back into bytes, their check, a frame as the state, `.AC` |
 | AIRCON | `apps/aircon/aircon.fs` | the words above; `app.fs` loads all and starts them |
 
-IRCODE and RTY3 run on each system; their tests run on the host (`tools/test.fs`),
-with the frames and times that were measured from a real remote. The package KELON168
-(`lib/irremote/kelon168.fs`) is the frame of other Hisense remote controls (DG11R2-01,
-RCH-R0Y3).
+The packages of `lib/irremote/` run on each system; their tests run on the host
+(`tools/test.fs`), with the frames and times that were measured from a real remote.
+The package KELON168 (`lib/irremote/kelon168.fs`) is the frame of other Hisense remote
+controls (DG11R2-01, RCH-R0Y3). All IR files: `lib/irremote/README.md`.

@@ -14,8 +14,11 @@
 
 #require RMT ../../lib/esp32/rmt.fs
 #require IR ../../lib/esp32/ir.fs
+#require AC-BASE ../../lib/irremote/acbase.fs
 #require IRCODE ../../lib/irremote/ircode.fs
+#require IRCODE-READ ../../lib/irremote/irread.fs
 #require RTY3 ../../lib/irremote/rty3.fs
+#require RTY3-READ ../../lib/irremote/rty3read.fs
 #require AIRCON aircon.fs
 ONLY FORTH DEFINITIONS  ALSO AIRCON  AIRCON-START
 .( aircon: ready; AIRCON-HELP shows the commands) CR

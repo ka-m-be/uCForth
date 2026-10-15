@@ -40,13 +40,17 @@ T{ $1234 BUF BE16!  BUF C@  BUF 1+ C@  BUF BE16@ -> $12 $34 $1234 }T
 T{ S" 10.1.2.3" RESOLVE -> 10 1 2 3 IP 0 }T
 T{ S" localhost" RESOLVE -> 127 0 0 1 IP 0 }T
 
-\ ---- TCP over 127.0.0.1
+\ ---- TCP over 127.0.0.1: each side with 2 KB to receive and 2 KB to send
 47011 CONSTANT PORT
 VARIABLE SERVER   VARIABLE CLIENT   VARIABLE PEER   \ PEER: the end of the connection at the server
-T{ PORT TCP-LISTEN SWAP SERVER ! -> 0 }T
-T{ PORT TCP-LISTEN -> 0 NET-IN-USE }T
+4096 BUFFER: S-ROOM   4096 BUFFER: C-ROOM           \ the buffers of the server and of the client
+: TO-SERVER ( port -- sock ior )   >R C-ROOM 4096 S" 127.0.0.1" R> TCP-OPEN ;
+T{ S-ROOM 4096 PORT TCP-LISTEN SWAP SERVER ! -> 0 }T
+T{ S-ROOM 4096 PORT TCP-LISTEN -> 0 NET-IN-USE }T
+T{ 0 4096 PORT 3 + TCP-LISTEN -> 0 NET-NO-BUFFER }T       \ no buffer
+T{ C-ROOM 1 S" 127.0.0.1" PORT TCP-OPEN -> 0 NET-NO-BUFFER }T   \ too small
 T{ SERVER @ TCP-ACCEPT -> FALSE }T              \ nobody yet
-T{ S" 127.0.0.1" PORT TCP-OPEN SWAP CLIENT ! -> 0 }T
+T{ PORT TO-SERVER SWAP CLIENT ! -> 0 }T
 T{ SERVER @ TCP-ACCEPT SWAP PEER ! -> TRUE }T
 T{ CLIENT @ SOCK-OPEN?  PEER @ SOCK-OPEN? -> TRUE TRUE }T
 T{ S" hello" CLIENT @ SOCK-WRITE -> 0 }T
@@ -99,7 +103,7 @@ T{ BUF 100 PEER @ SOCK-READ -> 0 0 }T          \ the end: no wait
 T{ PEER @ SOCK-CLOSE -> 0 }T
 
 \ the server closes; then the client writes into a closed connection
-T{ S" 127.0.0.1" PORT TCP-OPEN SWAP CLIENT ! -> 0 }T
+T{ PORT TO-SERVER SWAP CLIENT ! -> 0 }T
 T{ SERVER @ TCP-ACCEPT SWAP PEER ! -> TRUE }T
 T{ PEER @ SOCK-CLOSE -> 0 }T
 T{ 10 MS  CLIENT @ SOCK-OPEN? -> FALSE }T
@@ -111,7 +115,7 @@ T{ CLIENT @ SOCK-CLOSE -> 0 }T
 \ counts only seconds (awk) steps by 1000 and can end a wait early
 \ (forth/test/t0.fs): so the upper limit is 2000, and only the waits
 \ from here on have 200 ms.
-T{ S" 127.0.0.1" PORT TCP-OPEN SWAP CLIENT ! -> 0 }T
+T{ PORT TO-SERVER SWAP CLIENT ! -> 0 }T
 T{ SERVER @ TCP-ACCEPT SWAP PEER ! -> TRUE }T
 200 NET-TIMEOUT !
 : TIMED-READ ( -- u ior ms )   MILLIS >R  BUF 100 CLIENT @ SOCK-READ  MILLIS R> - ;
@@ -120,14 +124,15 @@ T{ CLIENT @ SOCK-OPEN? -> TRUE }T
 T{ CLIENT @ SOCK-CLOSE  PEER @ SOCK-CLOSE -> 0 0 }T
 
 \ errors
-T{ S" 127.0.0.1" PORT 1+ TCP-OPEN -> 0 NET-REFUSED }T     \ no server at the port
+T{ PORT 1+ TO-SERVER -> 0 NET-REFUSED }T                  \ no server at the port
 T{ SERVER @ SOCK-CLOSE -> 0 }T
 T{ SERVER @ SOCK-CLOSE -> NET-CLOSED }T                   \ not open
 
-\ ---- UDP
+\ ---- UDP: each socket with its buffer
 VARIABLE U1   VARIABLE U2
-T{ 47013 UDP-OPEN SWAP U1 ! -> 0 }T
-T{ 47014 UDP-OPEN SWAP U2 ! -> 0 }T
+100 BUFFER: ROOM1   100 BUFFER: ROOM2   600 BUFFER: ROOM3
+T{ ROOM1 100 47013 UDP-OPEN SWAP U1 ! -> 0 }T
+T{ ROOM2 100 47014 UDP-OPEN SWAP U2 ! -> 0 }T
 T{ BUF 100 U2 @ UDP-RECEIVE -> FALSE }T
 T{ S" ping" 127 0 0 1 IP 47014 U1 @ UDP-SEND -> 0 }T
 T{ 10 MS  BUF 100 U2 @ UDP-RECEIVE -> 4 127 0 0 1 IP 47013 TRUE }T
@@ -136,13 +141,15 @@ T{ S" pong!" 127 0 0 1 IP 47013 U2 @ UDP-SEND -> 0 }T
 T{ 10 MS  BUF 100 U1 @ UDP-RECEIVE -> 5 127 0 0 1 IP 47014 TRUE }T
 T{ BUF 5 S" pong!" S= -> TRUE }T
 T{ 239 255 0 1 IP U1 @ UDP-JOIN -> 0 }T
-T{ 0 UDP-OPEN SWAP SOCK-CLOSE -> 0 0 }T                     \ any port
+T{ ROOM3 600 0 UDP-OPEN SWAP SOCK-CLOSE -> 0 0 }T          \ any port
+T{ 0 100 47016 UDP-OPEN -> 0 NET-NO-BUFFER }T              \ no buffer
+T{ ROOM3 8 47016 UDP-OPEN -> 0 NET-NO-BUFFER }T            \ too small for one byte
 T{ U1 @ SOCK-CLOSE  U2 @ SOCK-CLOSE -> 0 0 }T
 
 \ ---- DNS: a server in Forth on 127.0.0.1
 ALSO DNS  ALSO DNS.I
 VARIABLE FAKE
-T{ 47015 UDP-OPEN SWAP FAKE ! -> 0 }T
+T{ ROOM3 600 47015 UDP-OPEN SWAP FAKE ! -> 0 }T
 127 0 0 1 IP DNS-IP !   47015 DNS-PORT !
 
 512 BUFFER: Q          \ the server: the question that came, then the answer
@@ -162,7 +169,7 @@ VARIABLE TARGET        \ the place of the name in a CNAME record
 : SEND-REPLY ( -- )   Q  R @ Q -  FROM-IP @ FROM-PORT @ FAKE @ UDP-SEND DROP ;
 
 : ASK-FOR ( a u -- )   \ the client: the first steps of DNS-QUERY
-  DUP HOST-N !  HOST SWAP MOVE  0 UDP-OPEN DROP USOCK !  1 ID +!  ASK DROP ;
+  DUP HOST-N !  HOST SWAP MOVE  ROOM ROOM-SIZE 0 UDP-OPEN DROP USOCK !  1 ID +!  ASK DROP ;
 : GET ( -- ip ior )   \ the client: the last steps, with 200 ms for the answer
   MILLIS 200 + WAIT-ANSWER IF ANSWER ELSE 0 NET-TIMED-OUT THEN  USOCK @ SOCK-CLOSE DROP ;
 

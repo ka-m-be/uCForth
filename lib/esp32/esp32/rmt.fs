@@ -61,22 +61,29 @@
 
 PACKAGE RMT  ALSO CHIP  ALSO GPIO   \ lib/package.fs
 
+PROTECTED                           \ for IR-CAPTURE and IRC-BUILD (lib/esp32/esp32/ircap.fs)
 $3FF56000 CONSTANT RMT-BASE
+PRIVATE
 $3FF000C0 CONSTANT PERIP-CLK-EN     \ DPORT_PERIP_CLK_EN: bit 9, the clock of the RMT
 $3FF000C4 CONSTANT PERIP-RST-EN     \ DPORT_PERIP_RST_EN: bit 9, the RMT in reset
+PROTECTED
 RMT-BASE $A0 + CONSTANT INT-RAW     \ bits: 3 ch the end of sending, 3 ch + 1 the end
 RMT-BASE $A8 + CONSTANT INT-ENA     \ of receiving, 3 ch + 2 an error, 24 + ch a part sent
 RMT-BASE $AC + CONSTANT INT-CLR
+PRIVATE
 RMT-BASE $F0 + CONSTANT APB-CONF    \ bit 0: the CPU reaches the RAM; bit 1: sending wraps
 87 CONSTANT OUT0                    \ GPIO matrix: out of channel 0
 83 CONSTANT IN0                     \ into channel 0
 
 : ?CH ( ch -- ch )   DUP 0 8 WITHIN 0= ABORT" RMT: the channels are 0 to 7" ;
 : CONF0 ( ch -- a )   8 * RMT-BASE $20 + + ;
+PROTECTED
 : CONF1 ( ch -- a )   8 * RMT-BASE $24 + + ;
+PRIVATE
 : DUTY ( ch -- a )    CELLS RMT-BASE $B0 + + ;        \ sending: the carrier
 : TX-LIM ( ch -- a )  CELLS RMT-BASE $D0 + + ;
 : BIT ( n -- mask )   1 SWAP LSHIFT ;
+PROTECTED
 : BLOCKS@ ( ch -- n )   CONF0 @ 24 RSHIFT $F AND ;
 
 PUBLIC

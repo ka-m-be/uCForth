@@ -49,7 +49,7 @@ and files: `ucf.html?args=-check` or `ucf.html?args=host/files.fs%20tools/test.f
 ## In Node.js
 
     $ node bootstrap/js/ucf.js
-    uCForth - JavaScript bootstrap VM - 16 bit - 163 words in FORTH - built in 80 ms
+    uCForth - JavaScript bootstrap VM - 16 bit - 165 words in FORTH - built in 80 ms
     ok> 3 4 + .
     7
     ok> BYE
@@ -111,7 +111,7 @@ bootstrap VM.
 
 In a browser, over a web server (see above): `ucf.html?args=-check`,
 `ucf.html?args=-32%20-check` and `ucf.html?args=host/files.fs%20tools/test.fs`
-end with "the same" and `all: 2742 tests, 0 errors`, then
+end with "the same" and `all: 2882 tests, 0 errors`, then
 `[the end, exit status 0]`.
 
 Tested (2026): Node.js 20 on macOS, also Ctrl-C at a terminal; Google

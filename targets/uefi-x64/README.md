@@ -20,7 +20,7 @@ In the folder `ucf`, with a bootstrap VM with 32-bit cells:
 The output ends with:
 
       saved: ucf.hex
-      code: 8817 bytes, image: 86824 bytes
+      code: 8817 bytes, image: 88700 bytes
       written: build/ucf-x64.efi (271872 bytes)
 
 Each bootstrap VM builds the same file, byte for byte. `build.fs` does
@@ -127,7 +127,7 @@ processor, or a Mac with Intel. uCForth writes only to the stick (step
 
        ok> ALSO FILES  INCLUDE tools/test.fs
 
-   Expected, at the end: `all: 10979 tests, 0 errors`. Then the tests
+   Expected, at the end: `all: 12186 tests, 0 errors`. Then the tests
    end uCForth with `BYE`, and the firmware comes back: start from the
    stick again.
 6. `FREEZE` and a new start:
@@ -179,7 +179,7 @@ terminal. Then:
 
     ok> ALSO FILES  INCLUDE tools/test.fs
 
-The output ends with `all: 10979 tests, 0 errors`, after about 8 s (in
+The output ends with `all: 12186 tests, 0 errors`, after about 8 s (in
 Docker on a Mac with M4; the start of the firmware takes 2 s more).
 Ctrl-A X ends QEMU. For `FREEZE`, take a disk
 image with FAT32 instead of the folder (`-drive format=raw,file=...`):
@@ -214,7 +214,7 @@ After the start, with the image of `build.fs` (base and FILES):
 
 | Area | Size | Free |
 | --- | --- | --- |
-| dictionary: words, `ALLOT`, `,` | 189 KB | 171 KB |
+| dictionary: words, `ALLOT`, `,` | 189 KB | 169 KB |
 | RAM data: `VARIABLE`, `VALUE`, `BUFFER:`, vocabularies | 63 KB | 61 KB |
 | data stack, return stack | 256 cells each | |
 | the input line | 256 characters | |

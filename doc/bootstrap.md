@@ -69,7 +69,7 @@ the parts in this order, and test each one as soon as it is there:
 | Test | Command (C bootstrap VM as the example) | Expected |
 | --- | --- | --- |
 | the images | `build/ucf-c -check` and `-32 -check` | four times "the same" |
-| all words | `build/ucf-c host/files.fs tools/test.fs </dev/null` (and `-32`) | `all: 2742 tests, 0 errors` (`10979` with `-32`) |
+| all words | `build/ucf-c host/files.fs tools/test.fs </dev/null` (and `-32`) | `all: 2882 tests, 0 errors` (`12186` with `-32`) |
 | an image again | `FREEZE`, then `-image ucf.hex` | the new words are there |
 | the images of the others | `-image` with an image of another bootstrap VM | it starts |
 | the fixed point | `host/files.fs tools/genesis.fs </dev/null` | twice "the same" |

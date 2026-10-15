@@ -37,7 +37,7 @@ Three later things are important here:
 - **The standards**: Forth-79, Forth-83, ANS Forth (1994) and
   Forth-2012. uCForth takes its names and their effects from
   Forth-2012, so a reader of a Forth book knows the words. It is not a
-  standard system: the base has only the 163 words that a small
+  standard system: the base has only the 165 words that a small
   controller needs.
 - **The books of Leo Brodie**, *Starting Forth* (1981) and *Thinking
   Forth* (1984), teach Forth and its style of small words with clear

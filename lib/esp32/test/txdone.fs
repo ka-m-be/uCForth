@@ -52,7 +52,7 @@ T{ #TX-STARTS @ #TX @ TX-CTRL @ -> 1 1 0 }T
 T{ TX-COMPLETE-STATUS @ TX-ERROR-STATUS @ INT-STATUS @ -> 0 0 0 }T
 T{ PMD-READS @ TX-CLEAR-READS @ -> 1 1 }T
 T{ TX-CONFIG @ $3FF000 AND -> $F000 }T
-T{ TX-TEST TX-BUF 24 SAME-BYTES?  RX-CTRL @ RX-ON AND -> TRUE RX-ON }T
+T{ TX-TEST TX-BUF 24 BYTES=  RX-CTRL @ RX-ON AND -> TRUE RX-ON }T
 
 \ Ordinary channel access errors are terminal, not a software timeout.
 2 0 $40000 $1234 PLAN

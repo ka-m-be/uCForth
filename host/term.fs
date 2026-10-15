@@ -35,8 +35,8 @@ VARIABLE SKIP-LF        \ Ctrl-C went out: the new line of the board comes here 
   DUP 6 < IF 2DROP FALSE EXIT THEN  + 6 -  6 S" ~sync~" S= ;
 : LINE-END ( -- )   \ a line from the board is complete
   IN-LINE IN-N @  2DUP ANSWER PLACE  0 IN-N !  0 SHOWN !
-  2DUP ERROR-LINE? IF TRUE FAILED ! THEN
-  2DUP SYNC-LINE? IF  2DROP TRUE SYNCED !  0 PROMPTED !  EXIT  THEN
+  2DUP ERROR-LINE? IF FAILED ON! THEN
+  2DUP SYNC-LINE? IF  2DROP SYNCED ON!  0 PROMPTED !  EXIT  THEN
   QUIET @ MUTE @ 0= AND IF TYPE CR ELSE 2DROP THEN ;
 : PROMPT? ( -- n )   \ 1: IN-LINE holds "ok> ", 2: "c> ", 0: neither
   IN-LINE IN-N @ S" ok> " S= IF 1 EXIT THEN
@@ -49,13 +49,13 @@ VARIABLE SKIP-LF        \ Ctrl-C went out: the new line of the board comes here 
   IN-LINE SHOWN @ +  IN-N @ SHOWN @ -  TYPE  IN-N @ SHOWN ! ;
 : FROM-BOARD ( c -- )   \ at the keyboard each byte shows at once, but a prompt only when complete
   DUP 13 = IF DROP EXIT THEN
-  SKIP-LF @ IF  0 SKIP-LF !  DUP 10 = IF DROP EXIT THEN  THEN
+  SKIP-LF @ IF  SKIP-LF OFF!  DUP 10 = IF DROP EXIT THEN  THEN
   MILLIS BYTE-AT !
   DUP 10 = IF  QUIET @ IF DROP ELSE SHOW-REST EMIT THEN  LINE-END EXIT  THEN
   IN-N @ 256 < 0= IF  QUIET @ IF DROP ELSE EMIT THEN  EXIT  THEN
   IN-LINE IN-N @ + C!  1 IN-N +!
   PROMPT? ?DUP IF
-    PROMPTED !  FALSE RUNNING !  QUIET @ 0= IF  SHOWN @ IF SHOW-REST ELSE .PROMPT THEN  THEN
+    PROMPTED !  RUNNING OFF!  QUIET @ 0= IF  SHOWN @ IF SHOW-REST ELSE .PROMPT THEN  THEN
     0 IN-N !  0 SHOWN !  EXIT
   THEN
   QUIET @ IF EXIT THEN
@@ -76,14 +76,14 @@ VARIABLE SENT-AT                        \ MILLIS when the last line went out
 : SEND-LINE ( a u -- )   \ a line to the board, with CR at the end
   DUP 256 > ABORT" the line is too long (at most 256 characters)"
   TUCK OUT-LINE SWAP MOVE  13 OVER OUT-LINE + C!
-  0 PROMPTED !  0 FAILED !  TRUE RUNNING !  MILLIS SENT-AT !  OUT-LINE SWAP 1+ SEND ;
+  0 PROMPTED !  FAILED OFF!  RUNNING ON!  MILLIS SENT-AT !  OUT-LINE SWAP 1+ SEND ;
 : WAIT-PROMPT ( -- f )   \ show the output until the prompt comes; false after PATIENCE
   MILLIS PATIENCE +
   BEGIN PROMPTED @ 0= WHILE
     POLL-BOARD 0= IF  DUP MILLIS - 0< IF DROP FALSE EXIT THEN  1 MS  THEN
   REPEAT  DROP TRUE ;
 : READY ( -- )   \ wait until the board has done all lines and waits at a prompt
-  QUIET @ >R  TRUE QUIET !  0 SYNCED !
+  QUIET @ >R  QUIET ON!  SYNCED OFF!
   S" .( ~sync~)" SEND-LINE                 \ each prompt before its answer is old
   BEGIN
     WAIT-PROMPT 0= IF  R> QUIET !  TRUE ABORT" no prompt from the board"  THEN
@@ -94,8 +94,8 @@ VARIABLE SENT-AT                        \ MILLIS when the last line went out
 256 BUFFER: QUERY
 : DEFINED? ( a u -- f )   \ ask the board if it knows the word a u
   S" [DEFINED] " QUERY PLACE  QUERY +PLACE  S"  ." QUERY +PLACE  READY
-  QUIET @ >R  TRUE QUIET !  TRUE MUTE !
-  QUERY COUNT SEND-LINE  WAIT-PROMPT  FALSE MUTE !  R> QUIET !
+  QUIET @ >R  QUIET ON!  MUTE ON!
+  QUERY COUNT SEND-LINE  WAIT-PROMPT  MUTE OFF!  R> QUIET !
   0= ABORT" no prompt from the board"
   FAILED @ ABORT" the board does not know [DEFINED]"
   ANSWER COUNT -TRAILING S" 0" S= 0= ;
@@ -154,7 +154,7 @@ VARIABLE DONE                           \ #bye came
 : RESET-BOARD ( -- )   \ a line that runs ends first (FREEZE!); then the start, up to its prompt
   LINES? 0= ABORT" the port has no DTR and RTS"
   RUNNING @ IF WAIT-PROMPT DROP THEN
-  PULSE-RTS  0 PROMPTED !  FALSE RUNNING !  WAIT-PROMPT DROP ;   \ each at most PATIENCE
+  PULSE-RTS  0 PROMPTED !  RUNNING OFF!  WAIT-PROMPT DROP ;      \ each at most PATIENCE
 : COMMAND? ( a u -- f )   \ run the line if it is a command of term; false if not
   -LEADING  DUP 0= IF 2DROP FALSE EXIT THEN
   OVER C@ '#' <> IF 2DROP FALSE EXIT THEN
@@ -164,7 +164,7 @@ VARIABLE DONE                           \ #bye came
   2DUP S" when"    S= IF 2DROP WHEN TRUE EXIT THEN
   2DUP S" reset"   S= IF 2DROP RESET-BOARD TRUE EXIT THEN
   2DUP S" help"    S= IF 2DROP .HELP TRUE EXIT THEN
-  2DUP S" bye"     S= IF 2DROP 100 SHOW  TRUE DONE ! TRUE EXIT THEN
+  2DUP S" bye"     S= IF 2DROP 100 SHOW  DONE ON! TRUE EXIT THEN
   2DROP FALSE ;
 
 : INCLUDE-STEP ( -- )   \ one line of the file that loads now
@@ -176,15 +176,15 @@ VARIABLE DONE                           \ #bye came
   FAILED @ IF STOP-LOADING THEN ;
 CREATE CTRL-C  3 C,
 : BREAK-BOARD ( -- )   \ the board stops the word that runs
-  CTRL-C 1 SEND  TRUE SKIP-LF ! ;       \ the break of the host has written a new line
+  CTRL-C 1 SEND  SKIP-LF ON! ;          \ the break of the host has written a new line
 : STOPPED ( n -- )   \ an error while files load; Ctrl-C (-28) goes to the board too
   DUP -28 = IF BREAK-BOARD THEN  .ERROR STOP-LOADING ;
 : LOAD ( -- )   \ load the files that #include opened; show the prompt again
-  TRUE QUIET !  ['] READY CATCH ?DUP IF STOPPED THEN
+  QUIET ON!  ['] READY CATCH ?DUP IF STOPPED THEN
   BEGIN NESTED @ WHILE
     ['] INCLUDE-STEP CATCH ?DUP IF STOPPED THEN
   REPEAT
-  FALSE QUIET !  .PROMPT ;
+  QUIET OFF!  .PROMPT ;
 
 \ ---- the terminal ---------------------------------------------------------
 
@@ -204,14 +204,14 @@ CREATE CTRL-C  3 C,
 : STEP ( -- )   \ show what the board sends, else take what the user types
   POLL-BOARD IF EXIT THEN
   HELD? IF SHOW-REST THEN
-  TAKE-KEYS? IF  TYPED? IF
-    ['] TYPED-LINE CATCH ?DUP IF  .ERROR 2DROP  FALSE QUIET !  FALSE MUTE !  .PROMPT  THEN  EXIT
+  TAKE-KEYS? IF  TYPED? IF                     \ Ctrl-C in a command (#reset waits) goes to the board too
+    ['] TYPED-LINE CATCH ?DUP IF  DUP -28 = IF BREAK-BOARD THEN  .ERROR 2DROP  QUIET OFF!  MUTE OFF!  .PROMPT  THEN  EXIT
   THEN THEN  1 MS ;
 : ?BREAK ( n -- )   \ Ctrl-C (-28) goes to the board; another error goes on
   DUP -28 <> IF THROW THEN  DROP  BREAK-BOARD  0 TYPED-N ! ;
 : TERM-START ( -- )
-  0 NESTED !  FALSE QUIET !  FALSE MUTE !  FALSE DONE !  FALSE SKIP-LF !
-  0 PROMPTED !  FALSE RUNNING !  0 IN-N !  0 SHOWN !  0 TYPED-N !  MILLIS SENT-AT !   \ a prompt may come first
+  0 NESTED !  QUIET OFF!  MUTE OFF!  DONE OFF!  SKIP-LF OFF!
+  0 PROMPTED !  RUNNING OFF!  0 IN-N !  0 SHOWN !  0 TYPED-N !  MILLIS SENT-AT !      \ a prompt may come first
   ." term on " PORT$ TYPE ." : #help shows the commands" CR ;
 : TERM-RUN ( -- )
   BEGIN  ['] STEP CATCH ?DUP IF ?BREAK THEN  DONE @ UNTIL

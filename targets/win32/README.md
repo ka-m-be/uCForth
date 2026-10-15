@@ -21,8 +21,8 @@ In the folder `ucf`, with a bootstrap VM with 32-bit cells:
 The output ends with:
 
       saved: ucf.hex
-      code: 9368 bytes, image: 86824 bytes
-      written: build/ucf-win32.exe (98304 bytes), build/ucf-win32.exe.hex (6144 lines)
+      code: 9368 bytes, image: 88700 bytes
+      written: build/ucf-win32.exe (100352 bytes), build/ucf-win32.exe.hex (6272 lines)
 
 Each bootstrap VM builds the same two files, byte for byte (tested:
 bash, awk, C, Python, JavaScript, JScript). On Windows itself, the
@@ -75,7 +75,7 @@ A double click on the file opens a console window with the prompt too.
 
     C:\ucf>echo ALSO FILES  INCLUDE tools/test.fs | build\ucf-win32
     ...
-    all: 10979 tests, 0 errors
+    all: 12186 tests, 0 errors
     C:\ucf>echo %ERRORLEVEL%
     0
 
@@ -104,7 +104,7 @@ Then, in the folder `ucf`:
     docker run --rm --platform linux/386 -v "$PWD":/u -w /u ucf-wine386 \
       sh -c 'echo "ALSO FILES  INCLUDE tools/test.fs" | wine build/ucf-win32.exe'
 
-The output ends with `all: 10979 tests, 0 errors`, after about 9 s:
+The output ends with `all: 12186 tests, 0 errors`, after about 9 s:
 first Wine makes its folder in the new container and writes some
 messages of its own; the tests themselves take about 2 s. A serial line
 in Wine: `socat` makes two connected pseudo terminals, and a link in
@@ -246,7 +246,7 @@ of memory. The memory of the VM has the standard map (doc/vm.md, section
 
 | Area | Size | Free |
 | --- | --- | --- |
-| dictionary: words, `ALLOT`, `,` | 189 KB | 171 KB |
+| dictionary: words, `ALLOT`, `,` | 189 KB | 169 KB |
 | RAM data: `VARIABLE`, `VALUE`, `BUFFER:`, vocabularies | 63 KB | 61 KB |
 | data stack, return stack | 256 cells each | |
 | the input line | 256 characters | |

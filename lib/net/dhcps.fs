@@ -25,6 +25,7 @@
 PACKAGE DHCP-SERVER ALSO NET ALSO NETIF ALSO INET ALSO BYTES
 576 BUFFER: MSG                  \ the message that came (DHCP: at most 576 bytes)
 576 BUFFER: REPLY
+584 BUFFER: ROOM                 \ the buffer of port 67: one message, 8 bytes before it
 6 BUFFER: CLIENT                 \ the MAC of the client
 VARIABLE CLIENT-IP
 VARIABLE SOCK                    \ UDP port 67
@@ -99,11 +100,11 @@ PUBLIC
   DUP MY-IP = ABORT" DHCPS: client and server have the same address"
   CLIENT-IP !
   DUP C@ 1 AND ABORT" DHCPS: client address must be unicast"
-  CLIENT 6 MOVE 67 UDP-OPEN THROW SOCK !
-  0 ERROR ! 0 REPLIES ! TRUE RUNNING ! ;
+  CLIENT 6 MOVE ROOM 584 67 UDP-OPEN THROW SOCK !
+  0 ERROR ! 0 REPLIES ! RUNNING ON! ;
 : DHCPS-STOP ( -- )
-  RUNNING @ IF SOCK @ SOCK-CLOSE THROW THEN FALSE RUNNING !
-  CLIENT 6 0 FILL MSG 576 0 FILL REPLY 576 0 FILL ;
+  RUNNING @ IF SOCK @ SOCK-CLOSE THROW THEN RUNNING OFF!
+  CLIENT 6 0 FILL MSG 576 0 FILL REPLY 576 0 FILL ROOM 584 0 FILL ;
 : DHCPS-RUNNING? ( -- f ) RUNNING @ ;
 : DHCPS-TICK ( -- ) RUNNING @ IF TICK THEN ;
 : .DHCPS ( -- ) ." DHCP server replies/code: " REPLIES @ . ERROR @ . CR ;

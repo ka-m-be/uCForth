@@ -10,12 +10,16 @@
 
 #require RMT ../../rmt.fs
 #require IR ../../ir.fs
+#require AC-BASE ../../../irremote/acbase.fs
 #require IRCODE ../../../irremote/ircode.fs
+#require IRCODE-READ ../../../irremote/irread.fs
 #require KELON168 ../../../irremote/kelon168.fs
-ONLY FORTH DEFINITIONS  ALSO INTERNALS  ALSO GPIO  ALSO RMT  ALSO IR  ALSO IR.I  ALSO KELON168  DECIMAL
+#require KELON168-READ ../../../irremote/kelonrd.fs
+ONLY FORTH DEFINITIONS  ALSO INTERNALS  ALSO GPIO  ALSO RMT  ALSO IR  ALSO IR.I
+ALSO AC-BASE  ALSO KELON168  ALSO KELON168-READ  DECIMAL
 
 : LOOPBACK ( -- )   \ out and in at GPIO 2
-  2 2 IR-PINS  TX 2 RMT-OUT  2 RX RMT-IN  RX 38000 RMT-DEMOD  TRUE IR-ECHO !  RX RMT-RX-ON ;
+  2 2 IR-PINS  TX 2 RMT-OUT  2 RX RMT-IN  RX 38000 RMT-DEMOD  IR-ECHO ON!  RX RMT-RX-ON ;
 : SAME-BYTES? ( a1 a2 u -- f )
   0 ?DO  OVER I + C@  OVER I + C@ <> IF 2DROP UNLOOP FALSE EXIT THEN  LOOP  2DROP TRUE ;
 : WAIT-FRAME ( -- a n true | false )   \ a frame, or false after 500 ms
@@ -53,7 +57,7 @@ T{ 0 HEARD-N !  ' HEARD-IT IR-LISTEN  AC-TIMINGS IR-SEND  50 MS  HEARD-N @ -> 34
 T{ 0 IR-LISTEN  0 HEARD-N !  AC-TIMINGS IR-SEND  50 MS  HEARD-N @  WAIT-FRAME NIP NIP -> 0 TRUE }T
 
 \ ---- IR-ECHO false: the receiver does not listen while the board sends
-T{ FALSE IR-ECHO !  AC-TIMINGS IR-SEND  WAIT-FRAME -> FALSE }T
+T{ IR-ECHO OFF!  AC-TIMINGS IR-SEND  WAIT-FRAME -> FALSE }T
 2 INPUT
 
 S" ir" .RESULTS

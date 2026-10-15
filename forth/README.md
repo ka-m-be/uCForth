@@ -18,5 +18,5 @@ doc/start.md):
 
     bash bootstrap/bash/ucf.sh host/files.fs tools/test.fs </dev/null
 
-Expected: `t0: 183 tests, 0 errors`, `hayes: 872 tests, 0 errors`, and at
+Expected: `t0: 183 tests, 0 errors`, `hayes: 875 tests, 0 errors`, and at
 the end `all: 1474 tests, 0 errors`.

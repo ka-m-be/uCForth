@@ -1,40 +1,44 @@
 \ udp.fs - package UDP: datagrams over our TCP/IP
 \
 \ UDP (RFC 768): a head of 8 bytes (the ports of sender and receiver,
-\ the length, a checksum), then the data. 4 sockets; each has a port and
-\ a buffer of 1.5 KB for the datagrams that came and wait. A datagram
-\ that finds no room is lost, as UDP allows. Port 0 at (UDP-OPEN): a
-\ free port from 49152 on.
+\ the length, a checksum), then the data. 4 sockets; each is a small
+\ block: its port, and the buffer of the program for the datagrams that
+\ came and wait (each with 8 bytes before it). A datagram that finds no
+\ room is lost, as UDP allows. A buffer at the address 0 takes nothing.
+\ Port 0 at (UDP-OPEN): a free port from 49152 on.
 \
 \ The words have the names of the contract NETIF (lib/net/README.md);
 \ the layer NETIF (lib/net/linknet.fs) gives them to the package NET:
 \
-\   port (UDP-OPEN) ( -- h ior )
+\   a u port (UDP-OPEN) ( -- h ior )   a u: the buffer
 \   a u ip port h (SENDTO) ( -- ior )   at most 1472 bytes
 \   a u h (RECVFROM) ( -- u2 ip port true | false )
 \   ip h (JOIN) ( -- ior )
-\   h (UDP-CLOSE) ( -- ior )
+\   h (UDP-CLOSE) ( -- ior )   then the buffer belongs to the program again
 \   h UDP-HANDLE? ( -- f )   h is a handle of UDP (17 to 20)
 
 PACKAGE UDP  ALSO IPV4  ALSO ARP  ALSO LINK  ALSO INET   \ lib/package.fs
 
 4 CONSTANT #SOCKETS
-1536 CONSTANT ROOM              \ the buffer of a socket: each datagram with 8 bytes before it
 17 CONSTANT FIRST               \ the handle of socket 0
 8 CONSTANT HEAD
 17 CONSTANT PROTO-UDP
 
-#SOCKETS CELLS BUFFER: PORTS    \ the port of each socket; 0: free
-#SOCKETS CELLS BUFFER: FILLED   \ the bytes in its buffer
-PORTS #SOCKETS CELLS 0 FILL   FILLED #SOCKETS CELLS 0 FILL   \ BUFFER: does not clear
-#SOCKETS ROOM * BUFFER: ROOMS   \ each datagram: its length (2 bytes), the IP and the port of its sender, the data
+\ a socket: its port (0: free), the bytes in its buffer, the buffer, its size;
+\ in the buffer each datagram: its length (2 bytes), the IP and the port of its sender, the data
+4 CELLS CONSTANT /SOCKET
+#SOCKETS /SOCKET * BUFFER: SOCKETS   SOCKETS #SOCKETS /SOCKET * 0 FILL   \ BUFFER: does not clear
 VARIABLE NEXT-PORT
 VARIABLE TO-IP
 VARIABLE IN-I   VARIABLE AT
 
-: PORT@ ( i -- a )   CELLS PORTS + ;
-: FILL@ ( i -- a )   CELLS FILLED + ;
-: ROOM@ ( i -- a )   ROOM * ROOMS + ;
+: PORT@ ( i -- a )   /SOCKET * SOCKETS + ;
+: FILL@ ( i -- a )   PORT@ CELL+ ;
+: ROOM@ ( i -- a )   PORT@ 2 CELLS + @ ;   \ the buffer
+: SIZE@ ( i -- u )   PORT@ 3 CELLS + @ ;
+: SOCKET! ( a u port i -- )   \ socket i gets the port and the buffer a u; a 0: no room
+  PORT@ >R  R@ !  0 R@ CELL+ !
+  OVER 0= IF DROP 0 THEN  R@ 3 CELLS + !  R> 2 CELLS + ! ;
 : SOCKET? ( h -- i true | false )   \ the socket of the handle h, if it is open
   FIRST -  DUP #SOCKETS U< IF  DUP PORT@ @ IF TRUE EXIT THEN  THEN  DROP FALSE ;
 : BOUND? ( port -- f )   FALSE  #SOCKETS 0 DO  OVER I PORT@ @ = OR  LOOP  NIP ;
@@ -63,7 +67,7 @@ VARIABLE IN-I   VARIABLE AT
   2DUP BAD? IF 2DROP EXIT THEN
   DROP  DUP 2 + BE16@ OWNER 0= IF DROP EXIT THEN  IN-I !       ( a )
   DUP 4 + BE16@ HEAD -                                         ( a n )
-  IN-I @ FILL@ @  OVER + 8 +  ROOM > IF 2DROP EXIT THEN        \ no room: the datagram is lost
+  IN-I @ FILL@ @  OVER + 8 +  IN-I @ SIZE@ > IF 2DROP EXIT THEN   \ no room: the datagram is lost
   IN-I @ ROOM@  IN-I @ FILL@ @ +  AT !
   DUP AT @ BE16!  IP-SRC @ AT @ 2 + BE32!  OVER BE16@ AT @ 6 + BE16!
   DUP 8 + IN-I @ FILL@ +!
@@ -72,14 +76,14 @@ VARIABLE IN-I   VARIABLE AT
 
 PUBLIC
 : UDP-HANDLE? ( h -- f )   FIRST -  #SOCKETS U< ;
-: UDP-FORGET ( -- ) FILLED #SOCKETS CELLS 0 FILL ;
-: (UDP-OPEN) ( port -- h ior )
+: UDP-FORGET ( -- )   #SOCKETS 0 DO  0 I FILL@ !  LOOP ;
+: (UDP-OPEN) ( a u port -- h ior )   \ a u: the buffer for the datagrams that wait
   ?DUP 0= IF FREE-PORT THEN
-  DUP BOUND? IF DROP 0 NET-IN-USE EXIT THEN
+  DUP BOUND? IF DROP 2DROP 0 NET-IN-USE EXIT THEN
   #SOCKETS 0 DO
-    I PORT@ @ 0= IF  I PORT@ !  0 I FILL@ !  I FIRST + 0 UNLOOP EXIT  THEN
-  LOOP  DROP 0 NET-FAILED ;
-: (UDP-CLOSE) ( h -- ior )   SOCKET? 0= IF NET-CLOSED EXIT THEN  0 SWAP PORT@ !  0 ;
+    I PORT@ @ 0= IF  I SOCKET!  I FIRST + 0 UNLOOP EXIT  THEN
+  LOOP  DROP 2DROP 0 NET-FAILED ;
+: (UDP-CLOSE) ( h -- ior )   SOCKET? 0= IF NET-CLOSED EXIT THEN  PORT@ /SOCKET 0 FILL  0 ;
 : (SENDTO) ( a u ip port h -- ior )
   SOCKET? 0= IF 2DROP 2DROP NET-CLOSED EXIT THEN             ( a u ip port i )
   PORT@ @ IP-DATA BE16!  IP-DATA 2 + BE16!  TO-IP !          ( a u )

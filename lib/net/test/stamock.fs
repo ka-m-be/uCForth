@@ -12,14 +12,14 @@ VARIABLE CHANNEL VARIABLE FILTERED
 : RADIO-START ( -- ) 1 CHANNEL ! ;
 : RADIO-CHANNEL! ( n -- ) CHANNEL ! ;
 : RADIO-CHANNEL@ ( -- n ) CHANNEL @ ;
-: RADIO-BEACONS ( -- ) FALSE FILTERED ! ;
+: RADIO-BEACONS ( -- ) FILTERED OFF! ;
 : RADIO-LEVEL ( -- n ) -40 ;
 : RADIO-MAC@ ( -- a ) OWN ;
-: RADIO-STATION ( a -- ) AP 6 BYTES= 0= ABORT" test: wrong peer" TRUE FILTERED ! ;
+: RADIO-STATION ( a -- ) AP 6 BYTES= 0= ABORT" test: wrong peer" FILTERED ON! ;
 : RADIO-RANDOM ( a n -- )
   BAD-RNG @ IF 0 FILL ELSE 0 DO $40 I + OVER I + C! LOOP DROP THEN 1 RANDS +! ;
 : RADIO-RECEIVE ( -- a n | 0 )
-  RF-READY @ IF FALSE RF-READY ! RF RF-N @ ELSE 0 THEN ;
+  RF-READY @ IF RF-READY OFF! RF RF-N @ ELSE 0 THEN ;
 : RADIO-SEND ( a n ack -- )
   0= ABORT" test: ACK not requested"
   OVER 4 + AP 6 BYTES= 0= ABORT" test: TX peer mismatch"
@@ -28,6 +28,6 @@ VARIABLE CHANNEL VARIABLE FILTERED
 : RF-HEADER ( fc flags -- )
   RF 512 0 FILL RF 1+ C! RF C!
   OWN RF 4 + 6 MOVE AP RF 10 + 6 MOVE AP RF 16 + 6 MOVE ;
-: RECEIVE ( n -- ) RF-N ! TRUE RF-READY ! ;
+: RECEIVE ( n -- ) RF-N ! RF-READY ON! ;
 END-PACKAGE
 : RADIO ( -- ) TEST-STA ;

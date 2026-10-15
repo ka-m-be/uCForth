@@ -31,7 +31,7 @@ but it is not tested yet.
 ## Start
 
     $ build/ucf-c
-    uCForth - C bootstrap VM - 16 bit - 163 words in FORTH - built in 4 ms
+    uCForth - C bootstrap VM - 16 bit - 165 words in FORTH - built in 4 ms
     ok> 3 4 + .
     7
     ok> BYE
@@ -59,7 +59,7 @@ folders above it. From another folder, give `-core` and `-base`.
 Files and `INCLUDE` come with the package FILES:
 
     $ build/ucf-c host/files.fs
-    uCForth - C bootstrap VM - 16 bit - 163 words in FORTH - built in 4 ms
+    uCForth - C bootstrap VM - 16 bit - 165 words in FORTH - built in 4 ms
     ok> INCLUDE examples/hello.fs
     Hello from uCForth
 
@@ -69,7 +69,7 @@ the other bootstrap VMs, so each of them starts the images of the
 others:
 
     $ build/ucf-c
-    uCForth - C bootstrap VM - 16 bit - 163 words in FORTH - built in 4 ms
+    uCForth - C bootstrap VM - 16 bit - 165 words in FORTH - built in 4 ms
     ok> : HELLO  ." Hello" CR ;
     ok> FREEZE
       saved: ucf.hex
@@ -280,7 +280,7 @@ Then all tests of the words, with 16 and 32 bit (`-32`):
 Expected, and the exit status 0:
 
     t0: 183 tests, 0 errors
-    hayes: 872 tests, 0 errors
+    hayes: 875 tests, 0 errors
     files: 26 tests, 0 errors
     ihex: 11 tests, 0 errors
     vm: 9 tests, 0 errors
@@ -288,12 +288,12 @@ Expected, and the exit status 0:
     text: 10 tests, 0 errors
     package: 8 tests, 0 errors
     slip: 6 tests, 0 errors
-    all: 2742 tests, 0 errors
+    all: 2882 tests, 0 errors
 
 Between these lines, some tests show messages such as `redefined HD-A`
 or `cannot open host/test/none.tmp`: the tests cause them on purpose.
 The output is the same as the output of the awk bootstrap VM, line for
-line. With `-32`: `all: 10979 tests, 0 errors`.
+line. With `-32`: `all: 12186 tests, 0 errors`.
 
 The fixed point (`tools/README.md`): uCForth builds its reference
 images again, in 1.5 s:

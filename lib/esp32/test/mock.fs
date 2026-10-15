@@ -20,7 +20,7 @@ END-PACKAGE
 
 PACKAGE ASM  ALSO XTENSA  ALSO ROM
 $3FFE8000 $3FFA0000 - DATA-OFF !    \ as lib/esp32/esp32/asm.fs on the board
-TRUE FLASH-DICT? !
+FLASH-DICT? ON!
 PUBLIC
 VARIABLE QUIET                      \ true: END-CODE and HOST! show nothing
 : H8 ( u -- )   BASE @ >R HEX 0 <# # # # # # # # # #> TYPE R> BASE ! ;

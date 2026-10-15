@@ -5,7 +5,7 @@
 \ board. Words that the VM may supply as primitives
 \ are defined with "?:"; ';' then drops the Forth version.
 
-\ ==== 1  DOES>, VALUE, DEFER ===========================================
+\ ==== 1  DOES>, VALUE, DEFER, ON!, OFF! ================================
 
 >INTERNALS
 : >BODY   ( xt -- a )   2 CELLS + ;
@@ -15,6 +15,8 @@
 : VALUE    ( x "name" -- )  CELL VALLOT  TUCK !  CREATE ,  DOES> @ @ ;
 : TO       ( x "name" -- )
   ' >BODY @  STATE @ IF POSTPONE LITERAL POSTPONE ! EXIT THEN  ! ;  IMMEDIATE
+: ON!      ( a -- )         TRUE SWAP ! ;
+: OFF!     ( a -- )         FALSE SWAP ! ;
 
 >INTERNALS
 : DEFER    ( "name" -- )    CELL VALLOT  ['] NOOP OVER !  CREATE ,  DOES> @ @ EXECUTE ;
@@ -78,8 +80,9 @@
 \ A wordlist record in the RAM data region: head, link, nt of the name.
 
 >INTERNALS
-: WORDLIST ( -- wl )
-  3 CELLS VALLOT  0 OVER !  VOC-LINK @ OVER CELL+ !  0 OVER 2 CELLS + !  DUP VOC-LINK ! ;
+: WL-INIT  ( a -- wl )   \ an empty wordlist record at a, the newest of VOC-LINK
+  0 OVER !  VOC-LINK @ OVER CELL+ !  0 OVER 2 CELLS + !  DUP VOC-LINK ! ;
+: WORDLIST ( -- wl )    3 CELLS VALLOT WL-INIT ;
 : TOP      ( -- a )     #ORDER @ 1- CELLS CONTEXT + ;
 : VOC      ( wl "name" -- )    \ give a wordlist a name
   CREATE DUP ,  LATEST @ SWAP 2 CELLS + !
@@ -125,7 +128,7 @@ WL-INTERNALS VOC INTERNALS
       DUP NAME>XT R@ = IF NIP R> DROP EXIT THEN  @
     REPEAT DROP  CELL+ @
   REPEAT  R> DROP ;
-: .NAME    ( xt -- )  >NAME ?DUP IF .ID ELSE ." ?" THEN ;
+: .NAME    ( xt -- )  DUP >NAME ?DUP IF NIP .ID ELSE ." ?" .HEX THEN ;   \ no name: ? and the xt
 : UMAX     ( u1 u2 -- u )  2DUP U< IF SWAP THEN DROP ;
 : BRANCHY? ( xt -- f )    \ words with an address in the next cell
   DUP ['] BRANCH = OVER ['] ?BRANCH = OR  OVER ['] (DO) = OR
@@ -170,17 +173,21 @@ WL-INTERNALS VOC INTERNALS
 VARIABLE 'SETUP   ' NOOP 'SETUP !
 VARIABLE 'LOOP    ' NOOP 'LOOP !
 : RUN     ( -- )  'SETUP @ EXECUTE  BEGIN 'LOOP @ EXECUTE AGAIN ;
-: TURNKEY ( -- )  TRUE AUTORUN ! ;
-: FREEZE  ( -- )  HERE FROZEN-END !  SAVE-IMAGE THROW ;
+: TURNKEY ( -- )  AUTORUN ON! ;
+: FREEZE  ( -- )
+  TEMP-START @ DICT-END <> ABORT" FREEZE: a package is open (END-PACKAGE)"
+  HERE FROZEN-END !  SAVE-IMAGE THROW ;
 : EMPTY   ( -- )  FALSE REBOOT ;
 : FACTORY ( -- )  ERASE-IMAGE  FALSE REBOOT ;
 : COLD    ( -- )  TRUE REBOOT ;
 : MARKER  ( "name" -- )   \ the name later forgets itself and all newer words
-  XVP @  VP @  VOC-LINK @  CREATE  LATEST @ , , , ,
+  CURRENT @ TEMP? ABORT" MARKER: not among the PRIVATE words of a package"
+  TEMP-START @  XVP @  VP @  VOC-LINK @  CREATE  LATEST @ , , , , ,
   VOC-LINK @ BEGIN ?DUP WHILE DUP , DUP @ , CELL+ @ REPEAT  0 ,
   DOES>
     DUP @ FROZEN-END @ U< ABORT" marker is frozen"
-    DUP @ >R  CELL+ DUP @ VOC-LINK !  CELL+ DUP @ VP !  CELL+ DUP @ XVP !  CELL+
+    DUP @ >R  CELL+ DUP @ VOC-LINK !  CELL+ DUP @ VP !  CELL+ DUP @ XVP !
+    CELL+ DUP @ TEMP-START !  CELL+
     BEGIN DUP @ ?DUP WHILE
       OVER CELL+ @  DUP R@ = IF DROP R@ @ THEN  SWAP !  2 CELLS +
     REPEAT DROP
@@ -213,6 +220,6 @@ VARIABLE 'LOOP    ' NOOP 'LOOP !
     UNTIL DROP
     ['] RUN CATCH ?DUP IF .ERROR THEN
   THEN  QUIT ;
-: CASE-SENSITIVE   ( -- )  TRUE CASE-SENSE ! ;
-: CASE-INSENSITIVE ( -- )  FALSE CASE-SENSE ! ;
+: CASE-SENSITIVE   ( -- )  CASE-SENSE ON! ;
+: CASE-INSENSITIVE ( -- )  CASE-SENSE OFF! ;
 >FORTH

@@ -79,7 +79,7 @@ The seed and `base.fs`, then the keyboard:
 
     C:\UCF>UCF -image SEED.HEX FORTH\BASE.FS
     uCForth - DOS bootstrap VM - 16 bit - 122 words in FORTH - image SEED.HEX
-    uCForth - DOS bootstrap VM - 16 bit - 163 words in FORTH - built in 329 ms
+    uCForth - DOS bootstrap VM - 16 bit - 165 words in FORTH - built in 329 ms
     ok> 3 4 + .
     7
 
@@ -119,14 +119,14 @@ The options of UCF:
 ## Test
 
 1. All tests: `UCF -image SEED.HEX FORTH\BASE.FS HOST\FILES.FS
-   TOOLS\TEST.FS`. The last line: `all: 2742 tests, 0 errors`.
+   TOOLS\TEST.FS`. The last line: `all: 2882 tests, 0 errors`.
 2. The base image must be the reference, byte for byte: with the pure
    seed of the project (`SEED\CORE16.HEX`, only the 32 mandatory
    primitives):
 
        C:\UCF>UCF -image SEED\CORE16.HEX FORTH\BASE.FS -dump B16.HEX
        uCForth - DOS bootstrap VM - 16 bit - 119 words in FORTH - image SEED\CORE16.HEX
-       uCForth - DOS bootstrap VM - 16 bit - 163 words in FORTH - built in 494 ms
+       uCForth - DOS bootstrap VM - 16 bit - 165 words in FORTH - built in 494 ms
        ok> BYE
        C:\UCF>FC /B B16.HEX SEED\BASE16.HEX
        Comparing B16.HEX and SEED\BASE16.HEX

@@ -15,7 +15,7 @@ are there.
 | Folder | Application | Hardware |
 | --- | --- | --- |
 | `aircon/` | a Hisense air conditioner over infrared: on, off, mode, temperature, fan, timers; hears the remote control | an ESP32-S3 board or an ESP32 board, the IR transceiver of Adafruit (product 5990) |
-| `irbridge/` | the IR bridge, in work: its base so far: the WLAN (a saved network, a setup network), sockets, IR in the background | an ESP32 board with the module ESP32-WROOM-32, the IR transceiver of Adafruit (product 5990) |
+| `irbridge/` | the IR bridge: IR frames over MQTT (heard ones as events, requests in three forms), a web page, the setup of the WLAN and the broker over a setup network (the button BOOT), the start without a terminal | an ESP32 board with the module ESP32-WROOM-32, the IR transceiver of Adafruit (product 5990) |
 
 Each app should name the main file `app.fs`. The main file should:
 
@@ -46,7 +46,7 @@ application does not see it:
   file that chooses it on the board: `lib/esp32/rmt.fs` holds `#when
   ESP32S3 esp32s3/rmt.fs` and `#when ESP32 esp32/rmt.fs`. The
   application loads the front file.
-- Packages that do not touch the chip (IRCODE, RTY3 in
+- Packages that do not touch the chip (IRCODE, RTY3 and the others in
   `lib/irremote/`) run on each system, also on the host, where their
   tests run.
 

@@ -6,8 +6,9 @@ the system. On macOS and Linux it uses the TCP/IP of the system. A
 system without one (the ESP32 boards) gets our own TCP/IP in Forth:
 ARP, IPv4 with ping, UDP, TCP and DHCP over Ethernet frames. Its tests
 run on each system over the loop (127.0.0.1), and on Linux against the
-kernel over a TAP device. The ESP32 boards get WLAN later; Windows
-comes later too.
+kernel over a TAP device. On the ESP32 WROOM it runs over the WLAN
+(section "Our TCP/IP"); Windows comes later. Over NET runs a client of
+MQTT (section "MQTT").
 
 ## Start
 
@@ -23,11 +24,14 @@ On macOS or Linux, in the folder `ucf`:
 `host.fs` loads all packages for the system that runs the program. After
 it, the search order is `FORTH FILES INET NET`.
 
-A server and a client in one program, over the computer itself:
+A server and a client in one program, over the computer itself. Each
+gets a buffer of the program, here 4 KB: 2 KB to receive, 2 KB to send
+("The buffers" in the next section):
 
-    ok> 7007 TCP-LISTEN . CONSTANT SERVER
+    ok> 4096 BUFFER: SERVER-ROOM  4096 BUFFER: CLIENT-ROOM
+    ok> SERVER-ROOM 4096 7007 TCP-LISTEN . CONSTANT SERVER
     0
-    ok> S" localhost" 7007 TCP-OPEN . CONSTANT CLIENT
+    ok> CLIENT-ROOM 4096 S" localhost" 7007 TCP-OPEN . CONSTANT CLIENT
     0
     ok> SERVER TCP-ACCEPT . CONSTANT PEER
     -1
@@ -36,16 +40,19 @@ A server and a client in one program, over the computer itself:
     ok> CREATE BUF 100 ALLOT
     ok> BUF 100 PEER SOCK-READ . BUF SWAP TYPE
     0 hello
-    ok> S" 127.0.0.1" 7008 TCP-OPEN . .
+    ok> CLIENT SOCK-CLOSE . PEER SOCK-CLOSE .
+    0 0
+    ok> CLIENT-ROOM 4096 S" 127.0.0.1" 7008 TCP-OPEN . .
     -301 0
 
 -301 is `NET-REFUSED`: no server at port 7008.
 
 Our TCP/IP instead of that of the system, without a network (only the
-loop works); the same words:
+loop works); the same words and the same answers:
 
     ok> ALSO FILES  INCLUDE lib/net/nolink.fs  INCLUDE lib/net/tcpip.fs
-    ok> 7007 TCP-LISTEN . CONSTANT SERVER
+    ok> 4096 BUFFER: SERVER-ROOM
+    ok> SERVER-ROOM 4096 7007 TCP-LISTEN . CONSTANT SERVER
     0
 
 On Linux, as root, our TCP/IP gets a TAP device, and the kernel is the
@@ -72,8 +79,10 @@ no error.
 | `NET-TIMEOUT ( -- a )` | a variable: a word waits at most so many ms (5000) |
 | `NET-POLL ( -- )` | the network works one step of at most 1 ms |
 | `a u RESOLVE ( -- ip ior )` | the address of a host: `192.168.1.10`, `localhost`, or a name (with the package DNS) |
-| `a u port TCP-OPEN ( -- sock ior )` | a connection to the host a u (as for `RESOLVE`) |
-| `port TCP-LISTEN ( -- server ior )` | a server at port |
+| `a u ha hu port TCP-OPEN ( -- sock ior )` | a connection to the host ha hu (as for `RESOLVE`); a u: its buffer, at least 2 bytes |
+| `a u ha hu port TCP-CONNECT ( -- sock ior )` | the same, but it does not wait: `SOCK-STATE` tells when the connection stands |
+| `sock SOCK-STATE ( -- n )` | 1 the connection stands (or bytes wait); 0 it comes; else the ior why it ended (it comes once) |
+| `a u port TCP-LISTEN ( -- server ior )` | a server at port; a u: the buffer of its connections, one at a time; at least 2 bytes |
 | `server TCP-ACCEPT ( -- sock true \| false )` | a new connection; does not wait |
 | `a u sock SOCK-WRITE ( -- ior )` | all bytes |
 | `a u sock SOCK-READ ( -- u2 ior )` | the bytes that are there; waits for the first. u2 0: none in time, or the end of the connection |
@@ -82,10 +91,23 @@ no error.
 | `sock SOCK-CLOSE ( -- ior )` | also for a server and a UDP socket |
 | `sock >SOCKET`, `>CONSOLE` | the output (`TYPE`, `.`, `EMIT`) goes to the connection, then back to the console |
 | `xt sock SOCK-PRINT ( -- ior )` | xt ( -- ) runs with its output to the connection; then the output goes back to the console in each case |
-| `port UDP-OPEN ( -- usock ior )` | port 0: any port |
+| `a u port UDP-OPEN ( -- usock ior )` | a u: the buffer for the datagrams that wait, at least 9 bytes; port 0: any port |
 | `a u ip port usock UDP-SEND ( -- ior )` | a datagram; ip `255.255.255.255`: to each computer of the network |
 | `a u usock UDP-RECEIVE ( -- u2 ip port true \| false )` | a datagram, with its sender; does not wait |
 | `ip usock UDP-JOIN ( -- ior )` | a group for multicast (mDNS) |
+
+**The buffers.** The program gives each connection, server and UDP
+socket its buffer, for example `4096 BUFFER: ROOM`; so the network takes
+only the RAM that the program wants. A connection receives into the
+first half and sends from the second half: with 4 KB, 2 KB each way.
+The connections of a server use its buffer, one at a time. The
+datagrams of a UDP socket wait in its buffer, each with 8 bytes before
+it; one that finds no room is lost. A buffer at the address 0 or one
+too small gives `NET-NO-BUFFER`. On macOS and Linux the sockets of the
+system have their own buffers and do not use it. With our TCP/IP the
+buffer belongs to the socket until `SOCK-CLOSE`; a connection sends
+its last bytes after `SOCK-CLOSE` from it, until the other side has
+acknowledged them (section "Our TCP/IP").
 
 Package INET:
 
@@ -116,6 +138,7 @@ The same numbers on each system:
 | -304 | `NET-CLOSED` | the connection is closed or broken; also a socket that is not open |
 | -305 | `NET-NO-HOST` | no address for the name (DNS) |
 | -306 | `NET-IN-USE` | the port is in use (`TCP-LISTEN`, `UDP-OPEN`) |
+| -307 | `NET-NO-BUFFER` | no buffer (the address 0), or one too small (`TCP-OPEN`, `TCP-CONNECT`, `TCP-LISTEN`, `UDP-OPEN`) |
 
 `ior THROW` shows the number: `error: error -301`. Writing into a connection
 that the other side closed gives -304; the program goes on (no signal
@@ -129,7 +152,8 @@ SIGPIPE).
 - Ctrl-C stops the wait, as it stops `MS`. With our TCP/IP on a board
   it waits until a word of NETIF ends: it never stops TCP in the middle
   of a segment.
-- `TCP-ACCEPT`, `UDP-RECEIVE` and `SOCK-AVAILABLE` do not wait. A
+- `TCP-CONNECT`, `SOCK-STATE`, `TCP-ACCEPT`, `UDP-RECEIVE` and
+  `SOCK-AVAILABLE` do not wait. A
   loop that serves more than one thing asks them, then calls `NET-POLL`
   (`examples/echo.fs`). `NET-POLL` waits 1 ms; with our TCP/IP it
   first runs a step of it (section "Our TCP/IP").
@@ -152,6 +176,155 @@ Its ior is the error of the word, or of the connection:
 
     : TEMPERATURE ( -- )   ." temperature " 22 . ;
     : REPORT ( sock -- ior )   ['] TEMPERATURE SWAP SOCK-PRINT ;
+
+## MQTT
+
+The package MQTT (`mqtt.fs`) is a client of MQTT 3.1.1 (OASIS, 2014)
+over the words of NET: the same words on each system and on a board.
+MQTT carries short messages through a broker, a server such as
+Mosquitto. A client sends a text to a topic, a name such as
+`home/kitchen/temperature`; the broker gives it to each client that
+subscribed to the topic. The client never waits for the broker:
+`MQTT-STEP` does one step, in the chain of IDLE (`MQTT-START` puts it
+there, and KEY runs the chain while the console waits) or in a loop of
+the program. When the connection breaks, it connects again after 1 s,
+then 2, 4 ... at most 32 s, until `MQTT-STOP`, and it subscribes again.
+
+On a Mac with a broker of its own (Mosquitto, port 1883, no password):
+
+    $ build/ucf-macos-a64
+    ok> ALSO FILES  INCLUDE lib/net/host.fs  INCLUDE lib/net/bytes.fs
+    ok> INCLUDE lib/idle.fs  INCLUDE lib/net/mqtt.fs
+    ok> ALSO MQTT  : SHOW ( pa pu ta tu -- )  CR TYPE ." : " TYPE CR ;
+    ok> 6144 BUFFER: ROOM  ROOM 6144 MQTT-ROOM!
+    ok> ' SHOW MQTT-ON-MESSAGE  S" 127.0.0.1" 1883 MQTT-BROKER  MQTT-START
+    ok> MQTT-READY? .
+    -1
+    ok> S" ucf/#" MQTT-SUBSCRIBE .
+    0
+    ok> : HELLO ( -- ior )  S" hello" S" ucf/test" MQTT-PUBLISH ;
+    ok> HELLO .
+    0
+    ok>
+    ucf/test: hello
+    .MQTT
+    MQTT state/attempts/connects/code/connack: 4 1 1 0 0
+    MQTT sent/received/dropped/pings/faults: 1 1 0 0 0
+    ok> MQTT-STOP
+
+The connection came while the console waited for the next line. The
+own message comes back from the broker, for the client subscribed to
+`ucf/#`. It comes while the console waits, after the prompt: so `SHOW`
+starts with `CR`. `HELLO` is a definition because the second `S"` of a
+line at the prompt overwrites the first one.
+
+| Word | Effect |
+| --- | --- |
+| `a u MQTT-ROOM! ( -- )` | the room of the program, at least 1 536 bytes: a third for a packet out, a third for a packet in, a third for the TCP connection (half each way); before `MQTT-START`, not while it runs |
+| `a u port MQTT-BROKER ( -- )` | the broker: its IP address as text (or a name, with the package DNS) and its port, mostly 1883 |
+| `MQTT-BROKER@ ( -- a u port )` | the broker that `MQTT-BROKER` set; u 0: none |
+| `a u MQTT-ID ( -- )` | the client identifier, at most 64 bytes; each broker takes 1 to 23 of `0-9 a-z A-Z`. None: the broker gives one |
+| `ma mu ta tu MQTT-WILL ( -- )` | the last will: when the connection breaks, the broker sends the text ma mu to the topic ta tu, retained. `0 0 0 0 MQTT-WILL`: none |
+| `MQTT-KEEPALIVE ( -- a )` | a variable: the keep alive in seconds (60); 0: none |
+| `xt MQTT-ON-MESSAGE ( -- )` | xt ( pa pu ta tu -- ) gets each message: its text and its topic, valid only while xt runs |
+| `MQTT-START ( -- )`, `MQTT-STOP ( -- )` | connect now and stay connected; `DISCONNECT` (the broker drops the will), then close |
+| `MQTT-STEP ( -- )` | one step: connect, read, hand on, ping; it does not wait |
+| `MQTT-READY? ( -- f )` | connected: the broker accepted |
+| `pa pu ta tu MQTT-PUBLISH ( -- ior )` | the text pa pu to the topic ta tu |
+| `pa pu ta tu MQTT-RETAIN ( -- ior )` | the same; the broker keeps the text for the clients that subscribe later. An empty text removes it |
+| `a u MQTT-SUBSCRIBE ( -- ior )` | the messages of the filter a u (`+` is one level, `#` the rest), now and after each new connection |
+| `.MQTT ( -- )` | the state (0 off, 1 wait for the next attempt, 2 TCP comes, 3 wait for CONNACK, 4 ready), the attempts, the connections, the code of the last failure, the code of CONNACK; the messages sent, received, dropped, the pings, the faults of the word of `MQTT-ON-MESSAGE` |
+
+The topic comes last, on top of the stack: a program sets it just before
+it sends, and computes the text before.
+
+| ior | Name | Meaning |
+| --- | --- | --- |
+| -460 | `MQTT-REFUSED` | the broker refused the connection; `.MQTT` shows its code: 1 the version, 2 the identifier, 3 the server, 4 the name or password, 5 not authorized |
+| -461 | `MQTT-NO-ANSWER` | no CONNACK within `NET-TIMEOUT` |
+| -462 | `MQTT-TOO-BIG` | a packet, topic or text too big for its buffer, or a fifth filter |
+| -463 | `MQTT-PROTOCOL` | against the protocol: an empty topic, or a packet from the broker that must not come |
+| -464 | `MQTT-NOT-READY` | not connected |
+| -465 | `MQTT-NO-PING` | no PINGRESP within half of the keep alive |
+| -466 | `MQTT-SUB-FAILED` | the broker refused a filter (SUBACK) |
+
+`MQTT-PUBLISH` and `MQTT-SUBSCRIBE` give their code. `MQTT-STEP` keeps
+the code of a failure for `.MQTT` (with the codes of NET: -301 no
+broker at the port, -304 the connection ended ...) and connects again
+later. An error of the word of `MQTT-ON-MESSAGE` is counted and kept;
+the connection stays.
+
+**How it works:**
+
+- QoS 0 in both ways (the broker gives each message once, as TCP does
+  in the home network), a clean session, the will always retained.
+- Keep alive: after half of the keep alive without a packet out, the
+  step sends PINGREQ; without PINGRESP within another half, the
+  connection ends (-465). The broker ends it after one and a half times
+  the keep alive without a packet from the client.
+- A step reads at most 256 bytes. A packet may come in pieces of any
+  size. A packet bigger than 4096 bytes is read and dropped
+  (`.MQTT` counts it); the next one comes as before.
+- `MQTT-PUBLISH` gives the whole packet to `SOCK-WRITE`: it waits while
+  TCP takes no more bytes, at most `NET-TIMEOUT`.
+- Words of level 2 only, as all of NET: the console, the chain of IDLE;
+  not in a handler or a timer (`targets/esp32s3/README.md`, "Words
+  that run later").
+- With one core, the chain of IDLE rests while the console computes or
+  loads a file. After one and a half times the keep alive the broker
+  ends the connection and sends the will; when the console waits again,
+  the step connects again.
+
+**Limits:** one connection; a packet at most a third of the room less 8
+bytes in each way (with 6 144 bytes: 2 040; with 12 312: 4 096); a
+filter and each part of the will at most 128 bytes, the host and the
+identifier 64; 4 filters; no TLS, no QoS 1 or 2, no session that stays,
+no name and password.
+
+**Memory:** 7 752 bytes of dictionary and 1 324 bytes of RAM data, and
+the room of the program. On the WROOM, after `XDATA-ON`, the RAM data
+come from XDATA.
+
+**On the WROOM:** MQTT is in the image of `apps/irbridge/app.fs`; the
+bridge gives it a room of 9 216 bytes (packets of 3 064 bytes). With the
+station joined, the test `lib/esp32/esp32/test/airmqtt.fs` talks to a
+broker on a host over the WLAN (`lib/esp32/README.md`, "Tests").
+
+## HTTP
+
+The package HTTP (`http.fs`) is a small server of HTTP/1.0 over the
+words of NET, for the page of a board: one connection at a time (the
+buffer of the server serves one of them), each answer with `Connection:
+close`. A step in the chain of IDLE reads a request up to its end, finds
+its route, and the word of the route answers. On a Mac, with the sockets
+of the system:
+
+    $ build/ucf-macos-a64
+    ok> ALSO FILES  INCLUDE lib/net/host.fs  INCLUDE lib/idle.fs  INCLUDE lib/net/http.fs
+    ok> ALSO HTTP  : HELLO ( -- )  S" hello" S" text/plain" HTTP-ANSWER ;
+    ok> ' HELLO S" /" HTTP-GET  4096 BUFFER: ROOM  ROOM 4096 8080 HTTP-START
+
+Then `curl http://127.0.0.1:8080/` gives `hello`, and any other path the
+answer 404.
+
+| Word | Effect |
+| --- | --- |
+| `a u port HTTP-START ( -- )`, `HTTP-STOP ( -- )` | the server at port; a u: the buffer of its connections, at least 2 KB |
+| `xt a u HTTP-GET ( -- )`, `xt a u HTTP-POST ( -- )` | a route: xt ( -- ) answers GET of the path a u; xt ( ba bu -- ) answers POST, with the body |
+| `ba bu ta tu HTTP-ANSWER ( -- )` | in the word of a route: 200, the body ba bu of the type ta tu |
+| `a u HTTP-SEE-OTHER ( -- )`, `HTTP-BAD ( -- )` | in the word of a route: 303 to the path a u; 400 |
+| `ba bu ka ku HTTP-FIELD ( -- va vu true \| false )` | the value of a field of a form (`ip=1.2.3.4&port=1883`), without `%XX` |
+| `va vu HTTP-DECODE ( -- va vu' )` | the value as it was typed, in place: `+` a space, `%XX` the byte XX; a `%` without two hex digits stays |
+| `.HTTP ( -- )` | the requests, the answers 404 and 400, the code of the last error |
+
+**Limits:** a request of at most 1 KB, which ends within 5 s, else 400;
+a path without a route: 404; 8 routes, a path of at most 31 characters,
+a query (`?...`) does not count; the methods GET and POST.
+
+**Memory** (32 bits, with `TEMP-HEADS ON!`): 3 252 bytes of dictionary
+and 1 656 bytes of RAM data, and the buffer of the program. The test:
+`test/http.fs`, a client in Forth over NO-LINK. On the WROOM HTTP is in
+the image of `apps/irbridge/app.fs`, for the page of the bridge.
 
 ## The layers
 
@@ -187,8 +360,8 @@ code writes `ALSO NETIF` or `ALSO SYSTEM`.
 | `../linux/a64.fs`, `x64.fs`, `i386.fs` | LINUX-A64, LINUX-X64, LINUX-I386 | SYSTEM of Linux on each processor |
 | `arp.fs` | ARP | our TCP/IP: the head of the Ethernet frames, ARP |
 | `ipv4.fs` | IPV4 | packets of IPv4, the checksum, the way (own network or gateway), ping, the loop |
-| `udp.fs` | UDP | 4 sockets for UDP |
-| `tcp.fs` | TCP | 4 connections and 4 servers |
+| `udp.fs` | UDP | 4 sockets for UDP, each with the buffer of the program |
+| `tcp.fs` | TCP | 4 connections and 4 servers, each with the buffer of the program |
 | `dhcp.fs` | DHCP | the own address from the router |
 | `linknet.fs` | LINK-NET | NETIF over our TCP/IP; at the end `NETIF` |
 | `tcpip.fs` | | loads our TCP/IP over the LINK that is there, then NET and DNS |
@@ -214,9 +387,9 @@ Mac takes `lib/macos/system.fs`: the HAL of `macos-x64` adds the class
 of the call itself.
 
 The packages need 32-bit cells: an address is one cell. On macOS INET,
-POSIX-NET, NET, DNS and SYSTEM take 11.8 KB of the dictionary and 1.5 KB
-of the RAM data; the package TEXT 0.8 KB and 0.3 KB more. Our TCP/IP:
-section "Our TCP/IP".
+POSIX-NET, NET, DNS and SYSTEM take 12.2 KB of the dictionary and 1.9 KB
+of the RAM data (with the buffer of DNS); the package TEXT 0.8 KB and
+0.3 KB more. Our TCP/IP: section "Our TCP/IP".
 
 ### The contract NETIF
 
@@ -224,18 +397,20 @@ A handle `h` is the number of a socket. No word waits.
 
 | Word | Effect |
 | --- | --- |
-| `(TCP-CONNECT) ( ip port -- h ior )` | the connection begins |
+| `(TCP-CONNECT) ( a u ip port -- h ior )` | the connection begins; a u: its buffer |
 | `(TCP-STATE) ( h -- n )` | 1: it stands, or bytes wait; 0: it comes; else the ior why it ended (`NET-CLOSED`, `NET-REFUSED` ...) |
-| `(TCP-LISTEN) ( port -- h ior )`, `(TCP-ACCEPT) ( h -- h2 true \| false )` | a server |
+| `(TCP-LISTEN) ( a u port -- h ior )`, `(TCP-ACCEPT) ( h -- h2 true \| false )` | a server; a u: the buffer of its connections |
 | `(SEND) ( a u h -- u2 ior )` | as many bytes as the system takes now |
 | `(RECV) ( a u h -- u2 ior )` | the bytes that are there now; 0 0 also at the end of the connection |
 | `(AVAILABLE) ( h -- n )`, `(CLOSE) ( h -- ior )` | |
-| `(UDP-OPEN) ( port -- h ior )`, `(SENDTO) ( a u ip port h -- ior )`, `(RECVFROM) ( a u h -- u2 ip port true \| false )`, `(JOIN) ( ip h -- ior )` | UDP |
+| `(UDP-OPEN) ( a u port -- h ior )`, `(SENDTO) ( a u ip port h -- ior )`, `(RECVFROM) ( a u h -- u2 ip port true \| false )`, `(JOIN) ( ip h -- ior )` | UDP |
 | `(NET-UP) ( -- n )` | 1: the network is up; 0: it comes (DHCP asks); else the ior why not |
 | `(MY-IP)`, `(GATEWAY)`, `(NETMASK)`, `(DNS-SERVER) ( -- ip )` | the addresses of the network |
 | `(NET-POLL) ( ms -- )` | wait at most ms; on a board, run the TCP/IP meanwhile |
 
-POSIX-NET makes each socket non-blocking. `(MY-IP)` asks the system
+NET tests the buffer a u (`NET-NO-BUFFER`); the layer does not. POSIX-NET
+drops it: the system has its own buffers. POSIX-NET makes each socket
+non-blocking. `(MY-IP)` asks the system
 which of its addresses goes to the network: a UDP socket with `connect`
 to 192.0.2.1 (an address for examples; no packet goes out), then
 `getsockname`. `(DNS-SERVER)` is the first line `nameserver a.b.c.d` of
@@ -297,6 +472,7 @@ radio must be on (`RADIO-START`).
 | `i WIFI-NET ( -- a n ch dbm )` | network i (0 to u-1) of the last `WIFI-SCAN`: its name (n bytes at a), its channel and its level in dBm |
 | `.WIFI ( -- )` | the list of the last `WIFI-SCAN`: channel, level, name |
 | `WIFI-WPA2? ( i -- f )` | true for PSK/CCMP with no required PMF, from the cached beacon |
+| `a n WIFI-FIND ( -- i true \| false )` | the strongest network of the last scan with WPA2 and the name a n (WLSAVE and the setup of the IR bridge use it) |
 | `WIFI-PEER ( i -- a )` | BSSID, 6 read-only bytes |
 | `WIFI-RSN ( i -- a n cap )` | cached RSN body (up to 128 bytes) and capabilities; error for an unsupported AP |
 
@@ -433,6 +609,12 @@ pairwise messages still require 16. Ethernet padding after the declared
 EAPOL length is excluded from MIC checks and duplicate comparisons.
 The complete declared packet must be present. Group updates retain the
 pairwise packet number and do not reinstall an identical group key.
+The answer to a group update (message 2) goes protected while WIFI-LINK
+runs: the station gives it to the link (a hook of WLAN that wlink.fs
+sets), and the link sends it as a data frame with CCMP and the key of
+the pair. With that key in use, an access point takes no EAPOL frame
+without CCMP. Without a running link the answer goes plain over the
+radio, as in the tests of the station alone.
 
 The profile is WPA2-Personal, CCMP for both pairwise and group traffic,
 EAPOL descriptor version 2, no required PMF. Open, TKIP, enterprise
@@ -504,7 +686,8 @@ separate. This reservation is not yet a contract for the S3.
 
 Each record has magic/version, a 32-bit sequence, SSID length and
 32-byte slot, a 32-byte PMK, a SHA1 checksum, and a 4-byte commit at
-offset 96. Save erases only the inactive sector, writes 96 bytes,
+offset 96: the two sectors are a pair of FLASH-PAIR
+(`lib/esp32/flpair.fs`), which does the work with the two records. Save erases only the inactive sector, writes 96 bytes,
 commits last and compares all 100 written bytes after reading them
 back. Power loss leaves the previous committed record. Damage is
 reported; a surviving valid older record is used with a warning.
@@ -565,10 +748,20 @@ LINK that is there; a board loads them in `ucf term` (as
   to the LINK. Each word of NETIF lets these packets come in before it
   ends, as the kernel of a system does: after `TCP-OPEN` to 127.0.0.1
   the server has the connection already.
-- **UDP** (RFC 768): 4 sockets with 1.5 KB each for the datagrams that
-  wait; a datagram that finds no room is lost.
-- **TCP** (RFC 9293), small: 4 connections with 2 KB to receive and 2 KB
-  to send each, and 4 servers. In order only (a segment after a gap is
+- **UDP** (RFC 768): 4 sockets; each is a small block with its port and
+  the address of the buffer of the program, in which the datagrams
+  wait. A datagram that finds no room is lost. After `SOCK-CLOSE` the
+  block has the address 0 again; a buffer at the address 0 takes
+  nothing.
+- **TCP** (RFC 9293), small: 4 connections and 4 servers, each a small
+  block with the address of the buffer of the program: the first half
+  receives (its size is the window), the second sends. A server gives
+  its buffer to one connection at a time: while a connection has it,
+  the SYN of the next client is lost and comes again (after 1 s, 3 s
+  ...). After `SOCK-CLOSE` the bytes that the other side has not
+  acknowledged still go from the buffer; with their acknowledgement the
+  buffer belongs to the program again. A new connection with that
+  buffer before then ends the old one with RST. In order only (a segment after a gap is
   lost; the acknowledgement tells the other side where the gap
   starts). An acknowledgement for each segment with data, at once;
   data goes at once (no Nagle). The only option is MSS. The time to send
@@ -609,7 +802,8 @@ its errors, so it may run as a handler of an interrupt.
 NET-TIMER) has `NET-START`: a timer runs `NET-STEP` every 1 ms, also
 while the console computes or loads a file (level 1;
 `targets/esp32s3/README.md`, "Two levels"). `NET-START` also puts
-`NET-CONTROL` in IDLE; `NET-STOP` removes both. Foreground NET-POLL
+`NET-CONTROL` in IDLE; `NET-STOP` removes both; `NET-RUNNING?` tells
+whether the steps run. Foreground NET-POLL
 runs the same control. The
 services of an application (MQTT, a web page) run in the chain of IDLE
 (level 2) and use the words of NET as everywhere. Ctrl-C waits while a
@@ -647,11 +841,13 @@ it only for a short time, and send no secret over it.
 | `mac ip DHCPS-START ( -- )`, `DHCPS-TICK ( -- )`, `DHCPS-STOP ( -- )` | serve the device mac with the address ip; one message per tick |
 | `a n LINK-POOL! ( -- )`, `LINK-STATION ( -- )`, `LINK-ACCESS ( -- )`, `LINK-AP? ( -- f )` | RADIO-LINK: the RAM of both LINKs; select one |
 
-**Memory and speed**, measured on the ESP32-S3 at 240 MHz: TEXT, INET,
-NO-LINK, our TCP/IP, NET and DNS take 35.7 KB of the dictionary and
-35.5 KB of the RAM data (there in the PSRAM). Over the loop, TCP brings
-200 KB (100 times 1000 bytes in each way) in 365 ms. The checksum in
-Forth costs 0.74 ms for a segment of 1460 bytes.
+**Memory and speed:** TEXT, INET, NO-LINK, our TCP/IP, NET and DNS take
+39.1 KB of the dictionary and 15.1 KB of the RAM data (measured with
+32-bit cells on the C VM; on a board the RAM data are in the PSRAM or
+in XDATA). The buffers of the connections and sockets come from the
+program. Measured on the ESP32-S3 at 240 MHz, with 2 KB each way: over
+the loop, TCP brings 200 KB (100 times 1000 bytes in each way) in 365
+ms. The checksum in Forth costs 0.74 ms for a segment of 1460 bytes.
 
 The fields of a packet go over bytes (`C@`, `BE16@`, `BE32@`), never
 over `@`: the ESP32-S3 reads an `@` at an address that 4 does not
@@ -688,11 +884,16 @@ work with `SYSCALL`.
 
 The tests of NET (`test/sockets.fs`) run over each layer NETIF. They
 need no other computer, and no packet goes to the network: a server and
-a client in the program talk over 127.0.0.1 (ports 47011 to 47015):
+a client in the program talk over 127.0.0.1 (ports 47011 to 47019):
 connect, accept, both ways, 64 KB in each way, the output with
 `>SOCKET` and `SOCK-PRINT`, the end from each side, a closed
-connection, a peer that sends nothing, a port without a server, UDP
-both ways. A small DNS server in Forth answers on 127.0.0.1: an
+connection, a peer that sends nothing, a port without a server, no
+buffer or one too small, UDP both ways. Over our TCP/IP, `test/rooms.fs`
+tests the buffers themselves (ports 47017 to 47019, 47041, 47042): a
+full buffer of UDP, a buffer after `SOCK-CLOSE`, a buffer at the
+address 0, a connection with 32 bytes each way, a server with one
+connection at a time, the last bytes after `SOCK-CLOSE`, RST for an old
+connection whose buffer a new one takes. A small DNS server in Forth answers on 127.0.0.1: an
 address, a CNAME with its address, only a CNAME, no such name, an
 answer with a wrong number, no answer. The program has one thread, so
 these tests run the steps of `DNS-QUERY` one by one, and the server
@@ -700,16 +901,18 @@ answers between them.
 
 | File | Over | Where | At the end |
 | --- | --- | --- | --- |
-| `test/net.fs` | the sockets of the system; with the 4 tests of `SYSCALL` | macOS, Linux | `net: 89 tests, 0 errors` (1.3 s) |
-| `test/loop.fs` | our TCP/IP over NO-LINK | each system with files | `loop: 85 tests, 0 errors` (1.1 s on a Mac) |
-| `test/board.fs` | our TCP/IP over NO-LINK, the steps in a timer (`NET-START`) | an ESP32 board, in `ucf term` | `board: 85 tests, 0 errors` |
+| `test/net.fs` | the sockets of the system; with the 4 tests of `SYSCALL` | macOS, Linux | `net: 93 tests, 0 errors` (1.3 s) |
+| `test/loop.fs` | our TCP/IP over NO-LINK; with `test/rooms.fs` | each system with files | `loop: 128 tests, 0 errors` (1.1 s on a Mac) |
+| `test/board.fs` | our TCP/IP over the LINK of the board (on a base image NO-LINK), the steps in a timer (`NET-START`); with `test/rooms.fs` | an ESP32 board, in `ucf term` | `board: 128 tests, 0 errors` |
 | `test/tap.fs` | our TCP/IP over a TAP device, against the kernel | Linux, as root | `tap: 99 tests, 0 errors` (8 to 12 s) |
 | `test/wifi.fs` | WIFI over MOCK-RADIO, with beacons that the test makes; also the scan in steps | each system with files and 32-bit cells | `wifi: 22 tests, 0 errors` (0.1 s) |
 | `test/bytes.fs` | exact packet-byte comparison, including unequal case bytes and empty ranges; `LE16@`, `LE16!` | each system with files, 16- or 32-bit cells | `bytes: 9 tests, 0 errors` |
-| `test/hwrekey.fs` | with `wpasta.fs`, `wlink.fs`, `hwlink.fs`, `rekey.fs`: the station, WIFI-LINK with CCMP in software and in the radio, a new group key | each system with files and 32-bit cells | `hwrekey: 4 tests, 0 errors` after the others |
+| `test/hwrekey.fs` | with `wpasta.fs`, `wlink.fs`, `hwlink.fs`, `rekey.fs`: the station, WIFI-LINK with CCMP in software and in the radio, a new group key and the protected answer | each system with files and 32-bit cells | `hwrekey: 9 tests, 0 errors` after the others |
 | `test/linksel.fs` | RADIO-LINK: the two LINKs, the mode, the shared RAM | the same | `linksel: 6 tests, 0 errors` |
-| `test/aphttp.fs` | with `loop.fs` and `dhcps.fs`: DHCP-SERVER, the test reply of the setup network | the same | `aphttp: 4 tests, 0 errors` after the others |
-| `test/netdown.fs` | with `loop.fs` and `ping.fs`: `NET-DOWN`, the echo check of `AIR-PING` | the same | `netdown: 10 tests, 0 errors` after the others |
+| `test/aphttp.fs` | our TCP/IP over NO-LINK, with `dhcps.fs`: DHCP-SERVER, the test reply of the setup network | the same | `aphttp: 4 tests, 0 errors` after the others |
+| `test/netdown.fs` | our TCP/IP over NO-LINK, with `ping.fs`: `NET-DOWN`, the echo check of `AIR-PING` | the same | `netdown: 10 tests, 0 errors` after the others |
+| `test/mqtt.fs` | MQTT with a broker in Forth, over the layer that is there: our TCP/IP over NO-LINK, or after `host.fs` the sockets of the system | each system with files and 32-bit cells | `mqtt: 71 tests, 0 errors` (0.3 s with the C VM) |
+| `test/mqttnet.fs` | MQTT against a real broker at 127.0.0.1, port 1883, without a password, over the sockets of the system | macOS, Linux | `mqttnet: 15 tests, 0 errors` (5 s) |
 | `test/echopeer.fs` | not a test: the peer on a host for `lib/esp32/esp32/test/airsock.fs` (TCP and UDP echo) | macOS, Linux | |
 
 `test/wifi.fs` checks the parts of a beacon (its elements, channel and
@@ -780,7 +983,8 @@ echo server, `curl` to a page of a small HTTP server in Forth.
 - `GATEWAY` and `NETMASK` give 0 on macOS and Linux.
 - A UDP datagram larger than the buffer of `UDP-RECEIVE` loses its rest.
 - Our TCP/IP: no fragments; TCP in order only, without window scale; 4
-  connections with 2 KB in each way; no IGMP (a group of `UDP-JOIN`
+  connections, 4 servers (one connection at a time each) and 4 UDP
+  sockets, with the buffers of the program; no IGMP (a group of `UDP-JOIN`
   comes in, but the router does not hear of it: enough for 224.0.0.x,
   for example mDNS); no test of a new address with ARP before DHCP uses
   it (RFC 5227); no protection against an attacker in the own network.

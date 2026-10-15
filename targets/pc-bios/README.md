@@ -21,7 +21,7 @@ default):
 output ends with:
 
       saved: ucf.hex
-      code: 3370 bytes, image: 10306 bytes
+      code: 3370 bytes, image: 11410 bytes
       written: build/ucf-pc.img (2880 sectors, 1440 KB)
 
 1. `lib/package.fs` and `lib/pc/bios.fs`: the package BIOS (SYSCALL,
@@ -279,8 +279,8 @@ In Docker, with the image `ucf-qemu` (doc/qemu.md) and
       ./build/ucf-linux-a64 < targets/pc-bios/test.fs > build/test.log; echo "status $?"
       tail -c 80 build/test.log; kill $!; rm build/ser.in build/ser.out'
 
-Expected, after about 20 s: `status 0` and `all: 1110 tests, 0 errors`
-(t0 183, hayes 872, the package BIOS 10: `lib/pc/test/bios.fs`; then
+Expected, after about 20 s: `status 0` and `all: 1113 tests, 0 errors`
+(t0 183, hayes 875, the package BIOS 10: `lib/pc/test/bios.fs`; then
 TEXT, the assembler I8086 and `CODE` words 14: `lib/pc/test/asm.fs`;
 then the monitor 31: `asm/monitor/test/monpc.fs`).
 
@@ -357,7 +357,7 @@ section "Build" (base and the package BIOS):
 
 | Area | Size | Free |
 | --- | --- | --- |
-| dictionary: words, `ALLOT`, `,` | 58 KB | 49 KB |
+| dictionary: words, `ALLOT`, `,` | 58 KB | 48 KB |
 | RAM data: `VARIABLE`, `VALUE`, `BUFFER:`, vocabularies | 3.5 KB | 3.4 KB |
 | data stack, return stack | 256 cells each | |
 | the input line | 256 characters | |

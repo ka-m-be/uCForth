@@ -15,15 +15,13 @@
 \                   of a 0), the gap, and blocks: a counted list of the
 \                   bytes in each block (see the example)
 \   name ( -- )     this shape is the shape of >TIMINGS and TIMINGS>
+\   SHAPE-NOW ( -- a )   it holds the address of that shape. A program may
+\                   set it to a shape of its own: 7 cells, hm hs bm one zero
+\                   gap blocks, as SHAPE lays them out
 \   a n t >TIMINGS ( -- m )     n bytes at a as m times at t
-\   t m a u TIMINGS> ( -- bits )   m times at t back into bytes at a, at
-\                               most u bytes; bits: the number of bits that
-\                               came (8 for each byte), also those after u bytes
 \
-\ TIMINGS> reads what a receiver measured, so it is not strict: a space
-\ longer than the middle of the two bit spaces is a 1, and a space of 2/3
-\ of the gap or more ends a block. It skips the header when the first
-\ mark and space are near (1/3) to the header of the shape.
+\ This package only makes frames. Received times back into bytes:
+\ package IRCODE-READ (irread.fs, TIMINGS>).
 \
 \ Load: ALSO FILES S" lib/irremote/ircode.fs" INCLUDED (on the host), or in ucf
 \ term: #include lib/irremote/ircode.fs (on a board). Example, the NEC code (4
@@ -33,23 +31,28 @@
 \   CREATE NEC-BLOCKS  1 C, 4 C,          \ one block of 4 bytes
 \   9000 4500 560 1690 560 0 NEC-BLOCKS SHAPE NEC
 \   CREATE BYTES  $04 C, $FB C, $08 C, $F7 C,
-\   CREATE TIMES  80 CELLS ALLOT   CREATE BACK 4 ALLOT
+\   CREATE TIMES  80 CELLS ALLOT
 \   NEC  BYTES 4 TIMES >TIMINGS .         \ 67 times: 2 + 32 * 2 + 1
-\   TIMES 67 BACK 4 TIMINGS> .            \ 32 bits; BACK holds the 4 bytes again
 
 PACKAGE IRCODE   \ lib/package.fs
 
+PUBLIC
 VARIABLE SHAPE-NOW                  \ the shape of >TIMINGS and TIMINGS>
-: FIELD@ ( i -- x )   CELLS SHAPE-NOW @ + @ ;
-: HDR-MARK ( -- us )   0 FIELD@ ;
-: HDR-SPACE ( -- us )  1 FIELD@ ;
-: BIT-MARK ( -- us )   2 FIELD@ ;
-: ONE ( -- us )        3 FIELD@ ;
-: ZERO ( -- us )       4 FIELD@ ;
-: GAP ( -- us )        5 FIELD@ ;
-: BLOCKS ( -- a )      6 FIELD@ ;
+
+PRIVATE
+: SHAPE@ ( i -- x )   CELLS SHAPE-NOW @ + @ ;
+
+PROTECTED                           \ the shape now, for IRCODE-READ (irread.fs)
+: HDR-MARK ( -- us )   0 SHAPE@ ;
+: HDR-SPACE ( -- us )  1 SHAPE@ ;
+: BIT-MARK ( -- us )   2 SHAPE@ ;
+: ONE ( -- us )        3 SHAPE@ ;
+: ZERO ( -- us )       4 SHAPE@ ;
+: GAP ( -- us )        5 SHAPE@ ;
+: BLOCKS ( -- a )      6 SHAPE@ ;
 : ?SHAPE ( -- )   SHAPE-NOW @ 0= ABORT" IRCODE: no shape (SHAPE name, then name)" ;
 
+PRIVATE
 VARIABLE T-AT                       \ >TIMINGS: the place of the next time
 VARIABLE LEFT                       \ the bytes that are still to go
 : T, ( us -- )   T-AT @ !  CELL T-AT +! ;
@@ -57,24 +60,6 @@ VARIABLE LEFT                       \ the bytes that are still to go
   8 0 DO  BIT-MARK T,  DUP 1 AND IF ONE ELSE ZERO THEN T,  1 RSHIFT  LOOP  DROP ;
 : BLOCK, ( a k -- a' )   \ k bytes from a, at most LEFT
   LEFT @ MIN  DUP NEGATE LEFT +!  0 ?DO  DUP C@ BYTE,  1+  LOOP ;
-
-VARIABLE DEST                       \ TIMINGS>: the address of the bytes
-VARIABLE ROOM                       \ so many bytes fit at DEST
-VARIABLE #BITS                      \ the bits so far
-: BIT! ( f -- )   \ the next bit into the bytes at DEST, if there is room
-  #BITS @ 3 RSHIFT  DUP ROOM @ < IF
-    DEST @ +                                         ( f a )
-    #BITS @ 7 AND 0= IF  0 OVER C!  THEN             \ a new byte starts at 0
-    SWAP IF  1 #BITS @ 7 AND LSHIFT  OVER C@ OR  SWAP C!  ELSE DROP THEN
-  ELSE 2DROP THEN
-  1 #BITS +! ;
-: NEAR? ( us ref -- f )   \ us is near ref: less than 1/3 of ref away
-  DUP 3 /  2DUP - >R  + 1+  R> SWAP WITHIN ;
-: PAIR? ( end t -- end t f )   \ a mark at t and its space are there
-  2DUP CELL+ > ;
-: HEADER? ( end t -- end t f )   \ a header of the shape is at t
-  HDR-MARK 0= IF FALSE EXIT THEN
-  PAIR? IF  DUP @ HDR-MARK NEAR?  OVER CELL+ @ HDR-SPACE NEAR? AND  ELSE FALSE THEN ;
 
 PUBLIC
 : SHAPE ( hm hs bm one zero gap blocks "name" -- )
@@ -91,15 +76,5 @@ PUBLIC
   LOOP  DROP
   CELL NEGATE T-AT +!                                \ no gap after the last block
   T-AT @ R> - CELL / ;
-
-: TIMINGS> ( t m a u -- bits )
-  ?SHAPE  ROOM !  DEST !  0 #BITS !
-  CELLS OVER + SWAP                                  ( end t )
-  HEADER? IF 2 CELLS + THEN
-  BEGIN PAIR? WHILE
-    DUP CELL+ @                                      ( end t space )
-    DUP GAP 2 3 */ <  GAP 0= OR  IF  ONE ZERO + 2/ > BIT!  ELSE DROP THEN
-    2 CELLS +
-  REPEAT  2DROP  #BITS @ ;
 
 END-PACKAGE

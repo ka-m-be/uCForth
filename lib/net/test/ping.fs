@@ -1,6 +1,8 @@
 \ ping.fs - AIR-PING (airping.fs): the check of the echo from the gateway, over the loop, no network
 ONLY FORTH DEFINITIONS ALSO FILES
-[DEFINED] NO-LINK S" lib/net/test/loop.fs" ?INCLUDED
+[DEFINED] T{ S" forth/test/tester.fs" ?INCLUDED
+ONLY FORTH ALSO FILES  [DEFINED] NO-LINK  S" lib/net/nolink.fs"  ?INCLUDED
+ONLY FORTH ALSO FILES  [DEFINED] LINK-NET  S" lib/net/tcpip.fs"  ?INCLUDED
 ONLY FORTH DEFINITIONS ALSO FILES
 INCLUDE lib/esp32/esp32/test/airping.fs
 ONLY FORTH DEFINITIONS ALSO INET ALSO NET ALSO NETIF ALSO IPV4 ALSO AIR-IP ALSO AIR-IP.I

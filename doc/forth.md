@@ -8,7 +8,7 @@ is true for each Forth system. A paragraph that starts with
 Try each example. Start a bootstrap VM (`doc/start.md`, step 1):
 
     $ LC_ALL=C awk -f bootstrap/awk/ucf.awk
-    uCForth - awk bootstrap VM - 16 bit - 163 words in FORTH - built in 1 s
+    uCForth - awk bootstrap VM - 16 bit - 165 words in FORTH - built in 1 s
     ok>
 
 You type the text after `ok>` and press the return key. The lines below
@@ -334,7 +334,7 @@ primitive (section 6.1). `>INTERNALS` and `>FORTH` in `core.fs` and
 
 ## 6 The common words
 
-The tables of this section and of section 4 have all 163 words of the
+The tables of this section and of section 4 have all 165 words of the
 vocabulary FORTH. The column "Kind" tells where a word comes from
 (section 6.1).
 
@@ -521,6 +521,8 @@ the cell at an address, `!` ("store") writes it. A cell has 2 bytes
 | `C@` | `( a -- c )` | P | read the byte at a |
 | `C!` | `( c a -- )` | P | write the byte c to a |
 | `+!` | `( n a -- )` | O | add n to the cell at a |
+| `ON!` | `( a -- )` | F | write `TRUE` into the cell at a: the flag is set |
+| `OFF!` | `( a -- )` | F | write `FALSE` into the cell at a: the flag is clear |
 | `MOVE` | `( a1 a2 u -- )` | O | copy u bytes from a1 to a2 |
 | `FILL` | `( a u c -- )` | O | fill u bytes from a on with the byte c |
 | `CELLS` | `( n -- n' )` | F | the size of n cells in bytes |
@@ -546,6 +548,8 @@ new word that gives the address, or the value:
     ok> VARIABLE TOTAL
     ok> 5 TOTAL !  3 TOTAL +!  TOTAL @ .
     8
+    ok> VARIABLE DONE  DONE ON!  DONE @ .  DONE OFF!  DONE @ .
+    -1 0
     ok> 10 CONSTANT TEN
     ok> 100 VALUE LIMIT
     ok> LIMIT TEN + .  150 TO LIMIT  LIMIT .
@@ -956,7 +960,7 @@ a computer with files, the package FILES adds them (`host/files.fs`).
 Put it on the command line:
 
     $ LC_ALL=C awk -f bootstrap/awk/ucf.awk -- host/files.fs
-    uCForth - awk bootstrap VM - 16 bit - 163 words in FORTH - built in 1 s
+    uCForth - awk bootstrap VM - 16 bit - 165 words in FORTH - built in 1 s
     ok> INCLUDE examples/hello.fs
     Hello from uCForth
     ok> ORDER
@@ -971,12 +975,14 @@ of the tool `ucf` sends a file line by line (`host/README.md`).
 
 A *package* is one file with words for one task: a driver, an
 assembler, a tool. It has two vocabularies: `name` for the words that
-it gives to you, and `name.I` for its helpers (I: internals). After the
-load only `name` is in the search order (`lib/README.md`). Here the
+it gives to you (`PUBLIC`), and `name.I` for its helpers (I: internals;
+`PROTECTED` and `PRIVATE`). After the load only `name` is in the search
+order. With `TEMP-HEADS ON!` the `PRIVATE` words keep no names: an image
+for a small board has more room (`lib/README.md`). Here the
 package TEXT loads from the command line, after FILES:
 
     $ LC_ALL=C awk -f bootstrap/awk/ucf.awk -- host/files.fs lib/text.fs
-    uCForth - awk bootstrap VM - 16 bit - 163 words in FORTH - built in 1 s
+    uCForth - awk bootstrap VM - 16 bit - 165 words in FORTH - built in 1 s
     ok> ORDER
     TEXT FILES FORTH   current: FORTH
     ok> VOCS

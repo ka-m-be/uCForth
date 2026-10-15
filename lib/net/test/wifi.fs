@@ -7,7 +7,7 @@
 \ RADIO-RECEIVE gives each frame of the channel once, then 0.
 \ Each system with files and 32-bit cells runs it; in the folder ucf:
 \   build/ucf-c -32 host/files.fs lib/net/test/wifi.fs </dev/null
-\ At the end: "wifi: 22 tests, 0 errors".
+\ At the end: "wifi: 25 tests, 0 errors".
 
 ONLY FORTH DEFINITIONS  ALSO FILES
 [DEFINED] T{ S" forth/test/tester.fs" ?INCLUDED
@@ -23,11 +23,11 @@ VARIABLE ON   VARIABLE CH   VARIABLE POS   VARIABLE LEVEL
 : ?ON ( -- )   ON @ 0= ABORT" MOCK-RADIO: the radio is off" ;
 PUBLIC
 VARIABLE BEACONS-ON
-: RADIO-START ( -- )   TRUE ON !  1 CH !  0 POS !  FALSE BEACONS-ON ! ;
-: RADIO-STOP ( -- )   FALSE ON !  FALSE BEACONS-ON ! ;
+: RADIO-START ( -- )   ON ON!  1 CH !  0 POS !  BEACONS-ON OFF! ;
+: RADIO-STOP ( -- )   ON OFF!  BEACONS-ON OFF! ;
 : RADIO-CHANNEL! ( ch -- )   ?ON  CH !  0 POS ! ;
 : RADIO-CHANNEL@ ( -- ch )   ON @ IF CH @ ELSE 0 THEN ;
-: RADIO-BEACONS ( -- )   ?ON  TRUE BEACONS-ON ! ;
+: RADIO-BEACONS ( -- )   ?ON  BEACONS-ON ON! ;
 : RADIO-RECEIVE ( -- a n | 0 )   \ the next frame on the channel
   ?ON  BEGIN  POS @ #HEARD @ <  WHILE
     POS @ REC  1 POS +!
@@ -99,6 +99,14 @@ T{ 3 S" gamma" NET? -> 11 -70 TRUE }T
 T{ 4 S" alpha" NET? -> 11 -85 TRUE }T
 T{ 5 ' WIFI-NET CATCH NIP -> -2 }T
 T{ RADIO-CHANNEL@  BEACONS-ON @ -> 6 TRUE }T   \ the channel as before; the filter stays
+
+\ A network by its name: the strongest one with WPA2.
+T{ S" alpha" WIFI-FIND -> FALSE }T                  \ none of them has WPA2
+1 4 ENTRY >SEC C!
+T{ S" alpha" WIFI-FIND  S" alph" WIFI-FIND  S" delta" WIFI-FIND -> 4 TRUE FALSE FALSE }T
+1 0 ENTRY >SEC C!
+T{ S" alpha" WIFI-FIND -> 0 TRUE }T
+0 0 ENTRY >SEC C!  0 4 ENTRY >SEC C!
 
 \ Room for 32 networks: 30 more on channel 12, the last channel with
 \ beacons; 27 of them find room, the others are not in the list.

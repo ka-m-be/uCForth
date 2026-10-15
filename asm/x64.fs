@@ -182,7 +182,7 @@ VARIABLE IMM     \ the number of the instruction
 : RX+ ( bits -- )   RX @ OR RX ! ;
 : BYTE-REG ( op -- )   \ note what SPL to DIL and AH to BH need
   DUP R8? 0= IF DROP EXIT THEN
-  NUM  DUP 4 8 WITHIN IF TRUE RX! ! THEN  19 > IF TRUE NO-RX ! THEN ;
+  NUM  DUP 4 8 WITHIN IF RX! ON! THEN  19 > IF NO-RX ON! THEN ;
 : EXT? ( n -- f )   8 AND 0<> ;          \ R8 to R15: the fourth bit goes to REX
 : REG-RX ( op -- )   \ the register op is in the field reg
   DUP BYTE-REG  NUM EXT? IF 4 RX+ THEN ;
@@ -197,7 +197,7 @@ VARIABLE IMM     \ the number of the instruction
   RX @ 0<>  RX! @ OR IF
     NO-RX @ ABORT" AH CH DH BH do not go with a REX prefix (R8-R15, SPL-DIL, 64 bits)"
     RX @ $40 OR TC,
-  THEN  0 RX !  FALSE RX! !  FALSE NO-RX ! ;
+  THEN  0 RX !  RX! OFF!  NO-RX OFF! ;
 : OPC, ( opc -- )   \ one byte, or two: $0F05 is $0F, then 5
   DUP $FF > IF  DUP 8 RSHIFT TC,  THEN  TC, ;
 
@@ -400,7 +400,7 @@ PUBLIC
 : ORG ( ta -- )   \ new code in TARGET; its first byte goes to the target address ta
   TARGET 0= IF  ALIGN HERE TARGET-SIZE ALLOT TO TARGET  THEN
   TORG !  0 TDP !  TARGET TARGET-SIZE 0 FILL  JUMPS #JUMPS 2* CELLS 0 FILL  NEW-SCOPE
-  0 RX !  FALSE RX! !  FALSE NO-RX !  0 FOLLOW ! ;
+  0 RX !  RX! OFF!  NO-RX OFF!  0 FOLLOW ! ;
 
 \ ==== Jumps =============================================================
 \ A jump is short (8 bits: -128 to 127 from its end) or near (32 bits).

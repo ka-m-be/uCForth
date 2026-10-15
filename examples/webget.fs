@@ -9,13 +9,14 @@
 \ network (package DNS). Only http: no https (no TLS).
 
 ALSO FILES  INCLUDE lib/net/host.fs
-ONLY FORTH DEFINITIONS  ALSO INET  ALSO NET
+ONLY FORTH DEFINITIONS  ALSO TEXT  ALSO INET  ALSO NET
 
 CREATE PAGE-BUF 512 ALLOT
+CREATE PAGE-ROOM 4096 ALLOT   \ the buffer of the connection: our TCP/IP uses it, a system has its own
 : REQUEST ( a u -- )   \ the request for the page / of the host a u; CR gives CR LF
   ." GET / HTTP/1.0" CR  ." Host: " TYPE CR  CR ;
 : WEBGET ( a u -- )   \ the page / of the web server a u
-  2DUP 80 TCP-OPEN THROW >R
+  2DUP PAGE-ROOM 4096 2SWAP 80 TCP-OPEN THROW >R
   R@ >SOCKET  REQUEST  >CONSOLE
   BEGIN  PAGE-BUF 512 R@ SOCK-READ THROW  ?DUP WHILE  PAGE-BUF SWAP TYPE  REPEAT
   R> SOCK-CLOSE THROW ;

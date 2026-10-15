@@ -18,7 +18,7 @@ In the folder `ucf`, with a bootstrap VM with 16-bit or 32-bit cells:
 The output ends with:
 
       saved: ucf.hex
-      written: build/ucf-web.html (122514 bytes, 32-bit cells)
+      written: build/ucf-web.html (128140 bytes, 32-bit cells)
 
 Without `-32`, the page has 16-bit cells (98537 bytes): 64 KB of memory
 for uCForth instead of 256 KB. Each bootstrap VM builds the same file,
@@ -113,11 +113,11 @@ Then open `http://localhost:8000/build/ucf-web.html?args=tools/test.fs`.
 The page takes the files from the server and loads `tools/test.fs`
 after the image. The output ends with:
 
-    all: 11125 tests, 0 errors
+    all: 12186 tests, 0 errors
 
     [the end, exit status 0]
 
-With 16-bit cells: `all: 2742 tests, 0 errors`. The lines are the same
+With 16-bit cells: `all: 2882 tests, 0 errors`. The lines are the same
 as from the C bootstrap VM (`bootstrap/c/README.md`, section "Tests");
 only the first line differs.
 
@@ -198,7 +198,7 @@ base and FILES):
 
 | Area | Size | Free |
 | --- | --- | --- |
-| dictionary: words, `ALLOT`, `,` | 189 KB | 171 KB |
+| dictionary: words, `ALLOT`, `,` | 189 KB | 169 KB |
 | RAM data: `VARIABLE`, `VALUE`, `BUFFER:`, vocabularies | 63 KB | 61 KB |
 | data stack, return stack | 256 cells each | |
 | the input line | 256 characters | |

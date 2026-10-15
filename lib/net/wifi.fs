@@ -11,6 +11,8 @@
 \                                 its name (n bytes at a), channel and level
 \   .WIFI ( -- )                  the list: channel, level in dBm, name
 \   WIFI-WPA2? ( i -- f )         PSK/CCMP, without required PMF
+\   a n WIFI-FIND ( -- i true | false )   the strongest network with WPA2
+\                                 and the name a n
 \   WIFI-PEER ( i -- a )          the selected BSSID (read-only)
 \   WIFI-RSN ( i -- a n cap )     RSN body and capabilities, for a supported AP
 \
@@ -46,7 +48,9 @@ PACKAGE WIFI  ALSO RADIO  ALSO BYTES
 176 CONSTANT /NET                \ identity, capabilities and up to 128 RSN bytes
 32 CONSTANT #MAX                 \ the networks in the list, at most
 #MAX /NET * BUFFER: ENTRIES      \ the list
+PROTECTED                        \ for WLSAVE (lib/esp32/esp32/wlsave.fs)
 VARIABLE #NETS                   \ the networks in the list
+PRIVATE
 /NET BUFFER: SPARE               \ room for one network while the list is sorted
 120 VALUE DWELL                  \ the time on each channel, in ms
 VARIABLE SCANNING
@@ -139,6 +143,8 @@ VARIABLE RSN-A VARIABLE RSN-N VARIABLE RSN-WANT
   LOOP  LOOP ;
 : TAKE-ALL ( -- )   \ the frames that wait (at most 8: the receive list) into the list
   8 0 DO  RADIO-RECEIVE ?DUP 0= IF LEAVE THEN  NOTE  LOOP ;
+: NAMED? ( a n i -- f )   \ network i has the name a n
+  ENTRY  2DUP >NLEN C@ = IF  >SSID SWAP BYTES=  ELSE  DROP 2DROP FALSE  THEN ;
 : .SSID ( a n -- )   \ a control character shows as ?
   0 ?DO  DUP I + C@  DUP 32 < IF  DROP 63  THEN  EMIT  LOOP DROP ;
 
@@ -153,17 +159,17 @@ PUBLIC
 : WIFI-SCAN-START ( -- )   \ a scan in steps begins on channel 1
   SCANNING @ ABORT" WIFI: scan already active"
   RADIO-CHANNEL@ SCAN-OLD ! RADIO-BEACONS 0 #NETS !
-  1 SCAN-CHANNEL ! 1 RADIO-CHANNEL! MILLIS SCAN-AT ! TRUE SCANNING ! ;
+  1 SCAN-CHANNEL ! 1 RADIO-CHANNEL! MILLIS SCAN-AT ! SCANNING ON! ;
 : WIFI-SCAN-STEP ( -- done? )   \ the waiting frames; after DWELL ms the next channel
   SCANNING @ 0= ABORT" WIFI: no stepped scan"
   TAKE-ALL
   MILLIS SCAN-AT @ - DWELL < IF FALSE EXIT THEN
   SCAN-CHANNEL @ 13 = IF
-    SCAN-OLD @ RADIO-CHANNEL! SORT FALSE SCANNING ! TRUE EXIT
+    SCAN-OLD @ RADIO-CHANNEL! SORT SCANNING OFF! TRUE EXIT
   THEN
   1 SCAN-CHANNEL +! SCAN-CHANNEL @ RADIO-CHANNEL! MILLIS SCAN-AT ! FALSE ;
 : WIFI-SCAN-CANCEL ( -- )   \ end a scan in steps; the radio goes back to its channel
-  SCANNING @ RADIO-CHANNEL@ AND IF  SCAN-OLD @ RADIO-CHANNEL!  THEN  FALSE SCANNING ! ;
+  SCANNING @ RADIO-CHANNEL@ AND IF  SCAN-OLD @ RADIO-CHANNEL!  THEN  SCANNING OFF! ;
 PRIVATE
 : SCAN-ALL ( -- )   BEGIN WIFI-SCAN-STEP UNTIL ;
 PUBLIC
@@ -172,6 +178,8 @@ PUBLIC
 : WIFI-NET ( i -- a n ch dbm )   \ network i of the last WIFI-SCAN: name, channel, level
   DUP #NETS @ U< 0= ABORT" WIFI: no such network"
   ENTRY  DUP >SSID OVER >NLEN C@  ROT DUP >CHAN C@  SWAP @ ;
+: WIFI-FIND ( a n -- i true | false )   \ in the last scan: the strongest network with WPA2 and the name a n
+  #NETS @ 0 ?DO  2DUP I NAMED?  I WIFI-WPA2? AND IF  2DROP I TRUE UNLOOP EXIT  THEN  LOOP  2DROP FALSE ;
 : .WIFI ( -- )   \ the networks of the last WIFI-SCAN: channel, level in dBm, name
   #NETS @ 0 ?DO  I WIFI-NET  SWAP 3 .R  5 .R  2 SPACES  .SSID CR  LOOP ;
 END-PACKAGE

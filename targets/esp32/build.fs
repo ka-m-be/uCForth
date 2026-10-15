@@ -42,7 +42,7 @@ $3F400000 CONSTANT DROM-ADDR        \ the frozen part in the flash, for the CPU:
 $60000 CONSTANT DICT-FLASH          \ the same in the flash: DICT-FLASH + VM address (pages $70000 to $9FFFF)
 0 CONSTANT >DRAM                    \ the code is read where it is
 DATA-ADDR RAM-ADDR - DATA-OFF !     \ for >CHIP, and the kernel (asm/xtensa.fs)
-TRUE FLASH-DICT? !                 \ the frozen part of the dictionary can lie in the flash
+FLASH-DICT? ON!                    \ the frozen part of the dictionary can lie in the flash
 : VM>CHIP ( a -- a' )   DUP $10000 U< IF DATA-ADDR ELSE RAM-ADDR THEN + ;
 
 \ ==== The code ==========================================================
@@ -121,13 +121,13 @@ VARIABLE SEG-POS   VARIABLE SEG-LO   VARIABLE SEG-LEN
 : VM-SEGMENT ( lo hi -- )   \ the image from VM address lo to hi as one segment
   OVER - 4ALIGNED SEG-LEN !  DUP SEG-LO !
   VM>CHIP LE,  SEG-LEN @ LE,
-  WRITTEN SEG-POS !  TRUE SUMMING !
+  WRITTEN SEG-POS !  SUMMING ON!
   IMAGE-OPEN
   BEGIN IMAGE-RECORD WHILE                          ( n addr )
     2DUP PATCH
     SEG-LO @ -  DUP SEG-LEN @ U< IF  SEG-POS @ + PUT-ZEROS  IHEX-BUF SWAP PUT  ELSE 2DROP THEN
   REPEAT  IMAGE-CLOSE
-  SEG-POS @ SEG-LEN @ + PUT-ZEROS  FALSE SUMMING ! ;
+  SEG-POS @ SEG-LEN @ + PUT-ZEROS  SUMMING OFF! ;
 
 : WRITE-BIN ( -- )
   CHECK-FLASH
@@ -136,11 +136,11 @@ VARIABLE SEG-POS   VARIABLE SEG-LO   VARIABLE SEG-LEN
   SAVER XT-SAVE T!  TDP @ 4ALIGNED CODE-LEN T!  START ENTRY-A T!
   ISR-XT XT-ISR T!  FAULT-XT XT-FAULT T!  FAULT-REGS-AT FREGS-A T!
   OUT DATA-OFF @ + OUT-V T!  HOLD-ADDR HOLD-V T!   \ OUT: the code adds MEM
-  S" build/esp32.bin" WRITE-START  ['] SUM-PUT IS ON-PUT  $EF SUM !  FALSE SUMMING !
+  S" build/esp32.bin" WRITE-START  ['] SUM-PUT IS ON-PUT  $EF SUM !  SUMMING OFF!
   SHA-START
   START HEADER
   CODE-ADDR LE,  TDP @ 4ALIGNED LE,
-  TRUE SUMMING !  TARGET TDP @ 4ALIGNED PUT  FALSE SUMMING !
+  SUMMING ON!  TARGET TDP @ 4ALIGNED PUT  SUMMING OFF!
   $100 D-END @ VM-SEGMENT
   DICT-START @ DICT-END' @ VM-SEGMENT
   WRITTEN 15 OR PUT-ZEROS                           \ the next byte ends a block of 16

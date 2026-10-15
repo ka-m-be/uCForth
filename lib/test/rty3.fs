@@ -1,17 +1,24 @@
-\ rty3.fs - tests of the package RTY3 (lib/irremote/rty3.fs)
+\ rty3.fs - tests of the packages RTY3 and RTY3-READ (lib/irremote/rty3.fs, rty3read.fs)
 \
 \ Load (in the folder ucf), after the package FILES and the tester:
 \   ... host/files.fs forth/test/tester.fs lib/test/rty3.fs
 \ A1 to A16 and B1 to B21 are frames of the remote control RCH-RTY3-0,
-\ RAW the times of one frame: Kai's measurements on 2026-09-29 with the
-\ transceiver (LISTEN and .TIMES; archive/plan/002_Plan_Fassung73.md, 23.12 and 23.13).
+\ RAW the times of one frame (lib/test/rty3raw.fs): Kai's measurements on
+\ 2026-09-29 with the transceiver (LISTEN and .TIMES;
+\ archive/plan/002_Plan_Fassung73.md, 23.12 and 23.13).
 \ B19 is a short frame of another type ($78). The running clock needs
 \ 32-bit cells.
 
 ONLY FORTH DEFINITIONS  ALSO FILES
+S" lib/irremote/acbase.fs" INCLUDED
 S" lib/irremote/ircode.fs" INCLUDED
+S" lib/irremote/irread.fs" INCLUDED
 S" lib/irremote/rty3.fs" INCLUDED
-ONLY FORTH DEFINITIONS  ALSO INTERNALS  ALSO RTY3  ALSO RTY3.I
+S" lib/irremote/rty3read.fs" INCLUDED
+S" lib/test/rty3raw.fs" INCLUDED
+S" lib/text.fs" INCLUDED
+ONLY FORTH DEFINITIONS  ALSO INTERNALS  ALSO TEXT  ALSO AC-BASE  ALSO AC-BASE.I
+ALSO RTY3  ALSO RTY3.I  ALSO RTY3-READ
 DECIMAL
 
 CREATE A1  $60 C, $38 C, $13 C, $05 C, $FF C, $00 C, $50 C, $20 C, $DC C, $00 C, $15 C, $03 C, $00 C, $00 C, $00 C, $00 C, $03 C, $03 C, $00 C, $06 C, $00 C, $00 C, $46 C,
@@ -52,43 +59,9 @@ CREATE B19  $60 C, $78 C, $09 C, $03 C, $7F C, $00 C, $00 C, $00 C, $00 C, $00 C
 CREATE B20  $60 C, $38 C, $13 C, $07 C, $FF C, $00 C, $46 C, $20 C, $E6 C, $00 C, $15 C, $1B C, $00 C, $40 C, $00 C, $40 C, $00 C, $01 C, $00 C, $0D C, $00 C, $00 C, $7A C,
 CREATE B21  $60 C, $38 C, $13 C, $07 C, $FF C, $00 C, $46 C, $20 C, $E6 C, $00 C, $15 C, $9B C, $00 C, $40 C, $00 C, $40 C, $00 C, $01 C, $00 C, $24 C, $00 C, $00 C, $D3 C,
 CREATE R1  $60 C, $38 C, $13 C, $07 C, $FF C, $00 C, $46 C, $20 C, $E6 C, $00 C, $15 C, $18 C, $00 C, $00 C, $25 C, $2F C, $06 C, $04 C, $00 C, $06 C, $00 C, $00 C, $7B C,
-CREATE RAW
-  8991 , 4507 , 530 , 564 , 530 , 566 , 531 , 570 , 530 , 574 , 530 , 577 ,
-  530 , 1730 , 530 , 1735 , 530 , 574 , 530 , 564 , 529 , 567 , 530 , 570 ,
-  530 , 1723 , 530 , 1728 , 529 , 1732 , 529 , 585 , 529 , 575 , 530 , 1713 ,
-  530 , 1716 , 530 , 571 , 530 , 573 , 530 , 1728 , 529 , 581 , 530 , 584 ,
-  530 , 575 , 529 , 1713 , 530 , 1717 , 530 , 1720 , 530 , 574 , 530 , 577 ,
-  530 , 581 , 530 , 584 , 530 , 574 , 530 , 1714 , 529 , 1717 , 530 , 1720 ,
-  529 , 1724 , 530 , 1727 , 530 , 1730 , 530 , 1734 , 530 , 1725 , 529 , 564 ,
-  529 , 568 , 530 , 570 , 530 , 574 , 530 , 577 , 530 , 581 , 530 , 584 ,
-  530 , 575 , 530 , 563 , 530 , 1716 , 530 , 1721 , 529 , 575 , 529 , 578 ,
-  529 , 581 , 530 , 1735 , 529 , 575 , 530 , 563 , 530 , 567 , 530 , 571 ,
-  529 , 575 , 529 , 577 , 530 , 1731 , 530 , 584 , 530 , 575 , 529 , 564 ,
-  529 , 1717 , 530 , 1720 , 530 , 574 , 530 , 577 , 530 , 1730 , 530 , 1734 ,
-  530 , 1725 , 530 , 563 , 530 , 567 , 530 , 570 , 530 , 574 , 530 , 578 ,
-  529 , 582 , 529 , 585 , 530 , 574 , 530 , 1714 , 529 , 567 , 530 , 1721 ,
-  529 , 574 , 529 , 1728 , 530 , 581 , 530 , 585 , 529 , 575 , 530 , 564 ,
-  529 , 568 , 529 , 571 , 529 , 1724 , 529 , 1728 , 530 , 581 , 530 , 585 ,
-  529 , 575 , 530 , 563 , 530 , 568 , 529 , 571 , 529 , 575 , 529 , 578 ,
-  530 , 581 , 530 , 584 , 530 , 575 , 529 , 564 , 530 , 567 , 530 , 571 ,
-  529 , 575 , 529 , 578 , 529 , 582 , 530 , 584 , 530 , 574 , 530 , 1714 ,
-  530 , 567 , 529 , 1721 , 529 , 575 , 529 , 578 , 529 , 1732 , 529 , 585 ,
-  529 , 575 , 529 , 1714 , 529 , 1718 , 529 , 1721 , 529 , 1725 , 528 , 578 ,
-  529 , 1733 , 528 , 586 , 529 , 575 , 529 , 564 , 529 , 1718 , 529 , 1722 ,
-  528 , 575 , 529 , 578 , 529 , 582 , 529 , 586 , 529 , 575 , 529 , 565 ,
-  528 , 568 , 529 , 1722 , 529 , 575 , 528 , 579 , 529 , 582 , 529 , 585 ,
-  529 , 576 , 529 , 565 , 528 , 569 , 528 , 572 , 529 , 575 , 529 , 579 ,
-  528 , 583 , 528 , 586 , 528 , 577 , 528 , 565 , 528 , 1719 , 528 , 1723 ,
-  527 , 576 , 528 , 580 , 527 , 584 , 527 , 587 , 528 , 577 , 527 , 566 ,
-  528 , 569 , 528 , 573 , 527 , 577 , 527 , 580 , 527 , 584 , 527 , 588 ,
-  527 , 577 , 527 , 566 , 528 , 570 , 527 , 573 , 527 , 601 , 503 , 581 ,
-  526 , 584 , 527 , 612 , 503 , 577 , 527 , 1740 , 503 , 1744 , 503 , 597 ,
-  503 , 1750 , 503 , 1731 , 526 , 1758 , 502 , 1738 , 526 , 587 , 816 ,
 CREATE BAD  23 ALLOT
 
-: SAME-BYTES? ( a1 a2 u -- f )
-  0 ?DO  OVER I + C@  OVER I + C@ <> IF 2DROP UNLOOP FALSE EXIT THEN  LOOP  2DROP TRUE ;
-: FRAME= ( a -- f )   AC-FRAME SWAP 23 SAME-BYTES? ;
+: FRAME= ( a -- f )   23 AC-FRAME 23 STR= ;
 : ALL-OK? ( a1 .. an n -- f )   TRUE SWAP 0 ?DO  SWAP AC-OK? AND  LOOP ;
 : BYTE@ ( i -- c )   FRAME + C@ ;
 
@@ -99,7 +72,7 @@ T{ B19 13 AC-CHECK?  B19 AC-OK?  B19 12 AC-CHECK? -> TRUE FALSE FALSE }T   \ the
 T{ A1 BAD 23 MOVE  BAD 22 + DUP C@ 1 XOR SWAP C!  BAD AC-OK? -> FALSE }T
 
 \ ---- the times of a real frame back into bytes
-T{ RAW 371 AC-DECODE  SWAP R1 23 SAME-BYTES? -> 184 TRUE }T
+T{ RAW 371 AC-DECODE  SWAP 23 R1 23 STR= -> 184 TRUE }T
 
 \ ---- a frame of the remote control becomes the state, and goes out as it came
 T{ AC-RESET  B2 AC-TAKE  B2 FRAME= -> TRUE }T
@@ -116,10 +89,20 @@ T{ AC-RESET  B2 AC-TAKE  7 AC-FLAP!  16 BYTE@  19 BYTE@ -> 7 $07 }T             
 T{ 0 AC-FLAP!  16 BYTE@  0 AC-FAN!  17 BYTE@  19 BYTE@ -> 0 0 $08 }T               \ as B12, B13
 T{ AC-RESET  B8 AC-TAKE  DRY-GRADE FIELD@  COOL AC-MODE!  DRY-GRADE FIELD@ -> 2 0 }T
 
+\ ---- the state read back; the names of the modes and the clock as text (AC-BASE)
+T{ AC-RESET  TRUE AC-POWER!  HEAT AC-MODE!  21 AC-TEMP!  3 AC-FAN!  5 AC-FLAP!
+   AC-POWER@ AC-MODE@ AC-TEMP@ AC-FAN@ AC-FLAP@ -> TRUE 0 21 3 5 }T
+T{ DRY AC-MODE!  AC-TEMP@  6 BYTE@  FALSE AC-POWER!  AC-POWER@ -> 21 $46 FALSE }T   \ the frame has 23 C
+T{ HEAT MODE-NAME S" heat" STR=  FAN MODE-NAME S" fan" STR=  5 MODE-NAME S" ?" STR= -> TRUE TRUE TRUE }T
+T{ 0 HM>S S" 00:00" STR=  845 HM>S S" 14:05" STR=  1439 HM>S S" 23:59" STR= -> TRUE TRUE TRUE }T
+
 \ ---- times: out and back
 T{ AC-RESET  TRUE AC-POWER!  AC-TIMINGS  NIP -> 371 }T
 T{ AC-TIMINGS  1- CELLS + @  TIMES @  TIMES CELL+ @ -> 800 9000 4500 }T   \ the last light, the header
-T{ AC-TIMINGS AC-DECODE  SWAP AC-FRAME 23 SAME-BYTES? -> 184 TRUE }T
+T{ AC-TIMINGS AC-DECODE  SWAP 23 AC-FRAME 23 STR= -> 184 TRUE }T
+T{ B2 23 AC>TIMES  AC-DECODE  SWAP 23 B2 23 STR= -> 184 TRUE }T     \ any bytes, as AC-TIMINGS
+T{ B19 13 AC>TIMES  NIP -> 211 }T                                   \ the short frame
+T{ B19 13 AC>TIMES  AC-DECODE  SWAP 13 B19 13 STR= -> 104 TRUE }T
 
 \ ---- errors
 T{ 31 ' AC-TEMP! CATCH NIP -> -2 }T

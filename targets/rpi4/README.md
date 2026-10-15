@@ -24,7 +24,7 @@ In the folder `ucf`, with a bootstrap VM with 32-bit cells:
 The output ends with:
 
       saved: ucf.hex
-      code: 9124 bytes, image: 84440 bytes
+      code: 9124 bytes, image: 85204 bytes
       written: build/kernel8.img (271268 bytes)
 
 1. `targets/freeze.fs` runs `FREEZE`: the running system is the image,
@@ -154,7 +154,7 @@ serial line of QEMU is the pair of FIFOs `build/ser.in` and
       ./build/ucf-linux-a64 < targets/rpi4/test.fs > build/test.log; echo "status $?"
       tail -c 80 build/test.log; kill $!; rm build/ser.in build/ser.out'
 
-Expected, after about 1 s: `all: 1055 tests, 0 errors` (t0 and hayes).
+Expected, after about 1 s: `all: 1058 tests, 0 errors` (t0 and hayes).
 
 ## Memory
 

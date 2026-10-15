@@ -7,10 +7,10 @@
 \ - MOCK-MAC: @ ! C@ C! MOVE FILL BIS! BIC! take the addresses of the board. The 8 KB
 \   of the MAC and 16 KB of SRAM1 from $3FFE4000 are buffers here; the
 \   other registers of the chip are one cell. The registers do what they
-\   did on the board (orga/002_Plan.md, section 8.3, N3b-2 and N3b-3): the
-\   reset of the MAC sets RX-NEXT to RX-END; a reload is done at once, and
-\   it starts the DMA at RX-BASE only when RX-NEXT is RX-END; the bits
-\   written to INT-CLEAR go from INT-STATUS.
+\   did on the board (orga/Archiv/002_Plan_bis_Fassung_115.md, section
+\   8.3, N3b-2 and N3b-3): the reset of the MAC sets RX-NEXT to RX-END; a
+\   reload is done at once, and it starts the DMA at RX-BASE only when
+\   RX-NEXT is RX-END; the bits written to INT-CLEAR go from INT-STATUS.
 \ - ESP32-PHY and INTR: the words that radio.fs uses; they only note the
 \   channel and the handler of source 0.
 \
@@ -154,8 +154,8 @@ PUBLIC
 VARIABLE INT0-XT             \ the handler of source 0 (the MAC)
 VARIABLE INT0-ON             \ source 0 goes to its handler
 : INT! ( xt i -- )   0= IF INT0-XT ! ELSE DROP THEN ;
-: INT-ON ( i -- )   0= IF TRUE INT0-ON ! THEN ;
-: INT-OFF ( i -- )   0= IF FALSE INT0-ON ! THEN ;
+: INT-ON ( i -- )   0= IF INT0-ON ON! THEN ;
+: INT-OFF ( i -- )   0= IF INT0-ON OFF! THEN ;
 : +INT ( -- ) ;
 END-PACKAGE
 

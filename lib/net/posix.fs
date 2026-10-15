@@ -81,7 +81,8 @@ VARIABLE PEEKED          \ the byte of PEEK
   NIP  POLLERR POLLHUP OR AND IF NET-CLOSED ELSE 1 THEN ;
 
 PUBLIC
-: (TCP-CONNECT) ( ip port -- h ior )   \ the connection begins; (TCP-STATE) tells when it stands
+: (TCP-CONNECT) ( a u ip port -- h ior )   \ the connection begins; (TCP-STATE) tells when it stands
+  2SWAP 2DROP                                                      \ the system has its own buffers
   SOCK-STREAM NEW-SOCKET ?DUP IF  >R DROP 2DROP 0 R> EXIT  THEN    ( ip port fd )
   >R SA!  R@ SA 16 SYS-CONNECT                                     ( r )  ( R: fd )
   DUP 0< 0=  OVER EINPROGRESS NEGATE =  OR IF  DROP R> 0 EXIT  THEN
@@ -90,8 +91,8 @@ PUBLIC
   DUP POLLIN POLLOUT OR POLL-NOW                    ( h revents )
   OVER CONNECTED? IF  OPEN-STATE  EXIT  THEN
   IF  FAILED  ELSE  DROP 0  THEN ;
-: (TCP-LISTEN) ( port -- h ior )   \ a server at port
-  SOCK-STREAM BOUND ?DUP IF EXIT THEN
+: (TCP-LISTEN) ( a u port -- h ior )   \ a server at port
+  NIP NIP  SOCK-STREAM BOUND ?DUP IF EXIT THEN
   DUP 8 SYS-LISTEN DROP  0 ;
 : (TCP-ACCEPT) ( h -- h2 true | false )   \ a new connection to the server h
   SA-ROOM SYS-ACCEPT  DUP 0< IF DROP FALSE EXIT THEN
@@ -103,8 +104,8 @@ PUBLIC
 : (AVAILABLE) ( h -- n )   FIONREAD N-READY SYS-IOCTL 0< IF 0 ELSE N-READY @ THEN ;
 : (CLOSE) ( h -- ior )   SYS-CLOSE >IOR ;
 
-: (UDP-OPEN) ( port -- h ior )   \ port 0: any port; it may send to 255.255.255.255
-  SOCK-DGRAM BOUND ?DUP IF EXIT THEN
+: (UDP-OPEN) ( a u port -- h ior )   \ port 0: any port; it may send to 255.255.255.255
+  NIP NIP  SOCK-DGRAM BOUND ?DUP IF EXIT THEN          \ the system has its own buffer
   DUP SO-BROADCAST SET-OPTION  0 ;
 : (SENDTO) ( a u ip port h -- ior )   \ one datagram
   >R SA!  R> ROT ROT  MSG-NOSIGNAL SA 16 SYS-SENDTO >IOR ;

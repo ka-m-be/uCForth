@@ -44,7 +44,8 @@ The words for the search order:
 | `DEFINITIONS` | new words go into the first vocabulary |
 
 A package has two vocabularies: `name` for its words, and `name.I`
-for its helpers (lib/README.md):
+for its helpers, `PROTECTED` and `PRIVATE` (lib/README.md; with
+`TEMP-HEADS ON!` the `PRIVATE` words keep no names):
 
     ok> VOCS
     TEXT.I TEXT PACKAGES.I FILES.I FILES INTERNALS FORTH
@@ -125,7 +126,7 @@ without `board` is the prompt of the host. The board itself sends
 | `#reset` | restart the board over RTS; a line that still runs (`FREEZE`) ends first, and the next line waits for the prompt after the start (each at most 10 s) |
 | `#help` | the commands |
 | `#bye` | end term |
-| Ctrl-C | stop the word that runs on the board (and a file that loads) |
+| Ctrl-C | stop the word that runs on the board (and a file that loads); also while `#reset` waits for the prompt, so it reaches the second of `autostart in 1 s` |
 
 A file name after `#include` in a file is relative to that file. Files
 load files up to 8 deep.

@@ -36,6 +36,7 @@ VARIABLE ID            \ the number of the last question
 VARIABLE HOST-N
 VARIABLE CNAME         \ the place of the name of a CNAME record in MSG; 0: none
 VARIABLE USOCK         \ the UDP socket of the question
+520 CONSTANT ROOM-SIZE   ROOM-SIZE BUFFER: ROOM   \ its buffer: one answer of at most 512 bytes, 8 bytes before it
 
 \ ---- the question
 : B, ( c -- )   P @ C!  1 P +! ;
@@ -112,7 +113,7 @@ VARIABLE USOCK         \ the UDP socket of the question
 PUBLIC
 : DNS-QUERY ( a u -- ip ior )   \ the address of the name a u, from the server DNS-IP
   250 MIN  DUP HOST-N !  HOST SWAP MOVE
-  0 UDP-OPEN ?DUP IF EXIT THEN  USOCK !
+  ROOM ROOM-SIZE 0 UDP-OPEN ?DUP IF EXIT THEN  USOCK !
   ['] LOOKUP CATCH  USOCK @ SOCK-CLOSE DROP  THROW ;
 
 ' DNS-QUERY IS (RESOLVE)

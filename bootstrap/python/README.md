@@ -13,7 +13,7 @@ explains each part. This file tells only what is special in Python.
 In the folder `ucf`:
 
     $ python3 bootstrap/python/ucf.py
-    uCForth - Python bootstrap VM - 16 bit - 163 words in FORTH - built in 0.8 s
+    uCForth - Python bootstrap VM - 16 bit - 165 words in FORTH - built in 0.8 s
     ok> 3 4 + .
     7
     ok> BYE
@@ -23,7 +23,7 @@ The options are the same as for the other bootstrap VMs (`-32`, `-pure`,
 `bootstrap/c/README.md`. Files load before the keyboard:
 
     $ python3 bootstrap/python/ucf.py host/files.fs
-    uCForth - Python bootstrap VM - 16 bit - 163 words in FORTH - built in 0.8 s
+    uCForth - Python bootstrap VM - 16 bit - 165 words in FORTH - built in 0.8 s
     ok> INCLUDE examples/hello.fs
     Hello from uCForth
 

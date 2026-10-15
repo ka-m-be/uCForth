@@ -139,7 +139,15 @@ WL-INTERNALS CURRENT !
 : THROW  ( n -- )
   ?DUP IF  HANDLER @ RP!  R> HANDLER !  R> SWAP >R  SP! DROP  R>  THEN ;
 : ABORT  ( -- )  -1 THROW ;
-: UNUSED ( -- u )    DICT-END HERE - ;   \ the free bytes of the dictionary
+\ The temp store: the headers of the PRIVATE words of a package, from
+\ DICT-END down, while the package loads (lib/package.fs, doc/vm.md 6).
+>INTERNALS
+PARSE-NAME TEMP-START HEADER  2 ,  VP @ ,  CELL VP +!  REVEAL   \ its lowest byte; DICT-END: empty
+DICT-END TEMP-START !
+: TEMP?  ( a -- f )   TEMP-START @ DICT-END WITHIN ;   \ a lies in the temp store
+: LIMIT  ( -- a )     TEMP-START @ ;   \ the end of the free dictionary
+>FORTH
+: UNUSED ( -- u )    LIMIT HERE - ;   \ the free bytes of the dictionary
 : ALLOT  ( n -- )    \ -8 THROW if the dictionary is full
   DUP 0< 0= IF  DUP UNUSED U> IF -8 THROW THEN  THEN  DP +! ;
 
@@ -166,7 +174,7 @@ WL-INTERNALS CURRENT !
   REPEAT  DROP 2DROP 0 ;
 : ALIGNED       ( a -- a' )   CELL 1- +  CELL NEGATE AND ;
 : ALIGN         ( -- )        BEGIN HERE CELL 1- AND WHILE 0 C, REPEAT ;
-: NAME>XT       ( nt -- xt )  CELL+ COUNT 31 AND + ALIGNED ;
+: NAME>XT       ( nt -- xt )  CELL+ COUNT 31 AND + ALIGNED  DUP TEMP? IF @ THEN ;
 : IMMEDIATE?    ( nt -- f )   CELL+ C@ 128 AND 0<> ;
 : COMPILE-ONLY? ( nt -- f )   CELL+ C@ 64 AND 0<> ;
 : NAME-THROW    ( a u n -- )  >R  ERRMSG CELL+ !  ERRMSG !  R> THROW ;
@@ -221,15 +229,27 @@ PARSE-NAME TX! FIND-NAME NAME>XT  'EMIT !
 
 \ ==== 10  Headers ======================================================
 \ A header is: link, count byte with flags, name, filler to the next
-\ cell. The code field follows (doc/vm.md, section 6).
+\ cell. The code field follows (doc/vm.md, section 6). A temp header
+\ (a PRIVATE word of a package) lies in the temp store and has the xt
+\ in the cell after the name instead; END-PACKAGE gives it back.
 
 >INTERNALS
 : REVEALED? ( -- f )   \ true if LATEST heads a wordlist
   LATEST @  VOC-LINK @  BEGIN DUP WHILE
     2DUP @ = IF 2DROP -1 EXIT THEN  CELL+ @
   REPEAT  2DROP 0 ;
+: TEMP-SIZE ( u -- n )   1+ ALIGNED 2 CELLS + ;   \ a temp header: link, count byte, name, xt
 : FORGET-UNFINISHED ( -- )   \ give back the space of a header that is not visible
-  REVEALED? 0=  LATEST @ FROZEN-END @ U< 0= AND IF  LATEST @ DP !  CURRENT @ @ LATEST !  THEN ;
+  REVEALED? 0=  LATEST @ FROZEN-END @ U< 0= AND IF
+    LATEST @ TEMP? IF  LATEST @ NAME>XT DP !  LATEST @ DUP CELL+ C@ 31 AND TEMP-SIZE + TEMP-START !
+    ELSE  LATEST @ DP !  THEN
+    CURRENT @ @ LATEST !
+  THEN ;
+: TEMP-HEADER ( a u -- )   \ the header in the temp store; the code follows at HERE
+  DUP TEMP-SIZE  DUP HERE + 32 + TEMP-START @ U> IF -8 THROW THEN
+  TEMP-START @ SWAP -  DUP TEMP-START !  DUP LATEST !      ( a u nt )
+  CURRENT @ @ OVER !  2DUP CELL+ C!                        \ the link, the count byte
+  CELL+ 1+ SWAP  2DUP + ALIGNED HERE SWAP !  MOVE ;        \ the xt, the name
 : HEADER ( a u -- )   \ a new header in CURRENT, not yet visible
   DUP 0= IF -16 THROW THEN  DUP 31 > IF -19 THROW THEN
   FORGET-UNFINISHED
@@ -238,7 +258,8 @@ PARSE-NAME TX! FIND-NAME NAME>XT  'EMIT !
       OUT @ IF CR THEN  ."   redefined " 2DUP TYPE CR
     THEN
   THEN
-  ALIGN  DUP HERE + 32 + DICT-END U> IF -8 THROW THEN
+  ALIGN  CURRENT @ TEMP? IF TEMP-HEADER EXIT THEN   \ a wordlist in the temp store: PRIVATE
+  DUP HERE + 32 + LIMIT U> IF -8 THROW THEN
   HERE >R  CURRENT @ @ ,  DUP C,  HERE SWAP DUP ALLOT MOVE  ALIGN  R> LATEST ! ;
 : REVEAL ( -- )   \ make the header LATEST visible
   LATEST @ ?DUP IF CURRENT @ ! THEN ;
@@ -392,7 +413,8 @@ CREATE MESSAGES   \ THROW code and counted string; 0 ends the table
 \ From here on Forth builds the definitions. Genesis removes the ':'
 \ and ';' of section 1 when this file is complete.
 
-: ;  ( -- )  LIT EXIT ,  DISCARD @ IF 0 DISCARD ! ELSE REVEAL THEN  0 STATE ! ;  IMMEDIATE COMPILE-ONLY
+: ;  ( -- )  LIT EXIT ,  HERE LIMIT U> IF -8 THROW THEN   \ the code ran into the temp store or past DICT-END
+  DISCARD @ IF 0 DISCARD ! ELSE REVEAL THEN  0 STATE ! ;  IMMEDIATE COMPILE-ONLY
 : :  ( "name" -- )  PARSE-NAME HEADER  0 ,  ] ;
 >INTERNALS
 : ?: ( "name" -- )   \ like ':', but ';' drops the word if name is known

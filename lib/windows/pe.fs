@@ -90,7 +90,7 @@ CREATE DOS-CODE  $0E C, $1F C, $BA C, $0E C, $00 C, $B4 C, $09 C, $CD C, $21 C,
 
 PUBLIC
 : PE-START ( entry -- )
-  PE-HDR PE-HDR-SIZE 0 FILL  0 #SECTIONS !  FALSE WIDE !
+  PE-HDR PE-HDR-SIZE 0 FILL  0 #SECTIONS !  WIDE OFF!
   S" This program needs Windows." DOS-PART
   $00004550 PE-OFF 4 H!             \ "PE" 0 0
   $14C $84 2 H!                     \ machine: i386
@@ -109,7 +109,7 @@ PUBLIC
   16 OPT 92 + 4 H! ;                \ 16 data directories
 
 : EFI-START ( entry -- )   \ PE32+: the optional header has 240 bytes, some fields 64 bits
-  PE-HDR PE-HDR-SIZE 0 FILL  0 #SECTIONS !  TRUE WIDE !
+  PE-HDR PE-HDR-SIZE 0 FILL  0 #SECTIONS !  WIDE ON!
   S" This program needs UEFI." DOS-PART
   $00004550 PE-OFF 4 H!             \ "PE" 0 0
   $8664 $84 2 H!                    \ machine: x86-64

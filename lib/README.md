@@ -11,13 +11,14 @@ have at most 8 characters and `.fs`, folder names at most 8 characters
 | --- | --- |
 | `ihex.fs` | package IHEX: write Intel HEX records (`IHEX-START`, `IHEX-DATA`, `IHEX-END`), each line to the vector `IHEX-LINE`; read one record with `IHEX>` |
 | `vm.fs` | package VM: the virtual machine of doc/vm.md in Forth. It runs a second uCForth (the target) in a window of the dictionary; the target has the cell size of the host. `TRUN` runs a target word, `OP` adds a primitive. |
-| `package.fs` | `PACKAGE PUBLIC PRIVATE END-PACKAGE`: the frame of a package (in FORTH; FILES loads it) |
+| `package.fs` | `PACKAGE PUBLIC PROTECTED PRIVATE END-PACKAGE`, the switch `TEMP-HEADS`: the frame of a package (in FORTH; FILES loads it) |
 | `sha256.fs` | package SHA256: the hash function SHA-256 (`SHA-START`, `SHA-ADD`, `SHA-END`, `SHA-DIGEST`); 32-bit cells |
 | `sha1.fs` | package SHA1: streaming SHA-1 and saved contexts; 32-bit cells, for protocol compatibility |
 | `kdf1.fs` | package KDF1: HMAC-SHA1, bounded PBKDF2 and SHA1-PRF; needs SHA1 |
 | `aes128.fs` | package AES128: AES-128 blocks and RFC 3394 key unwrap |
 | `ccm.fs` | package CCM: authenticated encryption, 13-byte nonce and 8-byte tag; needs AES128 and 32-bit cells |
-| `text.fs` | package TEXT: `2SWAP /STRING S= -LEADING -TRAILING SPLIT PLACE +PLACE N>S FAIL` |
+| `text.fs` | package TEXT: `2SWAP /STRING 1/STRING BOUNDS S= STR= SCAN -LEADING -TRAILING SPLIT PLACE +PLACE N>S FAIL`; `STR=` compares bytes exactly, `S=` as names (`CASE-SENSE`) |
+| `json.fs` | package JSON: an object into a buffer (`JSON-INTO`, `JSON-NUMBER`, `JSON-TEXT`, `JSON-FLAG`, `JSON-NUMBERS`, `JSON-HEX`, `JSON-OBJECT`, `JSON-END`, `JSON-DONE`) and single fields of a text, without a tree (`JSON-CHECK`, `JSON-FIELD`, `JSON>NUMBER`, `JSON>FLAG`, `JSON>TEXT`, `JSON>NUMBERS`, `JSON>HEX`); needs TEXT (section "JSON") |
 | `idle.fs` | package IDLE: words that run while the console waits (`IDLE+`, `IDLE-`, `IDLE-RUN`, `.IDLE`; KEY runs them), `.STOPPED`, and `-BREAK` `+BREAK` `NO-BREAK`: Ctrl-C waits between them (on a board). In the image of the ESP32 boards |
 | `slip.fs` | package SLIP: byte frames after RFC 1055 (for the ROM bootloader of the ESP32) |
 | `md5.fs` | package MD5: the digest MD5 (RFC 1321); 32-bit cells |
@@ -30,10 +31,10 @@ have at most 8 characters and `.fs`, folder names at most 8 characters
 | `dos/` | MS-DOS: the package DOS, the HAL words of `targets/dos` (`SYSCALL`, `REGS`, `DOS`, the ports `PC@ PC! PW@ PW!`); its test runs on DOS only |
 | `pc/` | a PC without an operating system: the package BIOS, the HAL words of `targets/pc-bios` (`SYSCALL`, `REGS`, `BIOS`, the ports `PC@ PC! PW@ PW!`); it is in the image of the PC, and its test runs there only. Also `asm.fs`, the package ASM: `CODE` words on a PC, with DOS or without (`CODE`, `END-CODE`, `NEXT,`, `>CODE`; needs TEXT and I8086); its test runs on DOS and on the PC |
 | `esp32/` | the ESP32 chips (ESP32-S3, ESP32): the common drivers for the board, the layer and the drivers of each chip in its own folder (`esp32s3/`, `esp32/`), the ROM bootloader and its image format for the host (`lib/esp32/README.md`) |
-| `irremote/` | IR remote controls, on every system: IRCODE, the pulse distance code, bytes to times in us and back (`SHAPE`, `>TIMINGS`, `TIMINGS>`); KELON168, the frame of Hisense air conditioners (21 bytes; DG11R2-01, RCH-R0Y3: `AC-POWER!` ... `AC-TIMINGS`, `AC-DECODE`, `.AC`); RTY3, the frame of the remote control RCH-RTY3-0 (23 bytes, measured; the same words and `AC-FLAP!`, `AC-CHECK?`; `apps/aircon/` uses it). Their tests are in `test/` of this folder (`lib/test/`) |
+| `irremote/` | IR remote controls, on every system; each package that reads frames back has a file of its own: IRCODE, the pulse distance code, bytes to times in us (`SHAPE`, `>TIMINGS`), and IRCODE-READ, times back into bytes (`TIMINGS>`); AC-BASE, what the frames of air conditioners share (the modes, bit fields, the clock); RTY3, the frame of the remote control RCH-RTY3-0 (23 bytes, measured: `AC-POWER!` ... `AC-TIMINGS`, `AC>TIMES`), and RTY3-READ (`AC-DECODE`, `AC-CHECK?`, `AC-TAKE`, `.AC`; `apps/aircon/` uses both, the schema `rty3` of `apps/irbridge/` uses RTY3); KELON168 and KELON168-READ, the frame of other Hisense remote controls (21 bytes; DG11R2-01, RCH-R0Y3); IR-SYMBOLS, any frame as a table of durations and a hex digit for each time (`>SYMBOLS`, `SYMBOLS>`). The map of all IR files: `irremote/README.md`. Their tests are in `test/` of this folder (`lib/test/`) |
 | `linux/` | Linux: the program file (ELF), in the 64-bit form (aarch64) and in the 32-bit form (i386); the calls of the kernel with `SYSCALL` for each processor (LINUX-A64, LINUX-X64, LINUX-I386: the layer SYSTEM of `net/`); a TAP device as the LINK of our TCP/IP (TAP) |
 | `macos/` | macOS: the program file (Mach-O) with its signature; the calls of the kernel with `SYSCALL` (MACOS: the layer SYSTEM of `net/`) |
-| `net/` | the network: TCP, UDP and DNS with the same words on each system (NET, INET, DNS); under them a layer for the system: POSIX-NET for macOS and Linux (`host.fs` loads all), or our own TCP/IP in Forth (ARP, IPV4, UDP, TCP, DHCP, LINK-NET) over Ethernet frames (the contract LINK: NO-LINK, TAP); `tcpip.fs` loads it (`lib/net/README.md`) |
+| `net/` | the network: TCP, UDP and DNS with the same words on each system (NET, INET, DNS); under them a layer for the system: POSIX-NET for macOS and Linux (`host.fs` loads all), or our own TCP/IP in Forth (ARP, IPV4, UDP, TCP, DHCP, LINK-NET) over Ethernet frames (the contract LINK: NO-LINK, TAP); `tcpip.fs` loads it; a client of MQTT over NET (MQTT), a small server of HTTP/1.0 (HTTP) (`lib/net/README.md`) |
 | `windows/` | Windows: PE, the program file (PE32, the format of each program of Windows) with its imports, for the build on the host; also the 64-bit form PE32+ for UEFI (`EFI-START`, `targets/uefi-x64`); WINDOWS, the functions of the DLLs of Windows for an application (`LIBRARY`, `WINAPI:`, `Z"`, `>CHIP`, `FIND-FUNCTION`, `SYSCALL`; `targets/win32/README.md`); its test runs on Windows only |
 | `rpi/` | the Raspberry Pi: the chip BCM2711 (mailbox, framebuffer) |
 
@@ -49,50 +50,109 @@ vocabularies (host/README.md).
 
 ## Packages: exported words and helpers
 
-A package has two vocabularies. `p` holds the words the package gives
-to its users (the *exported* words). `p.I` holds its helpers (I:
-internals). After the load, only `p` is in the search order. So a
+A package has three parts, as a class of C++. `p` holds the words the
+package gives to its users (the *exported* words, `PUBLIC`). `p.I`
+holds the words that other packages and tests may take on purpose
+(`PROTECTED`, with `ALSO p.I`). The `PRIVATE` words are for the
+package only. After the load, only `p` is in the search order. So a
 helper does not hide an older word with the same name, and a user sees
 only the words of the interface.
 
 The frame of a package file (`lib/package.fs`; the package FILES
 loads it):
 
-    PACKAGE IHEX  ALSO FILES     \ IHEX, IHEX.I; FILES is used
-    \ helpers
+    PACKAGE IHEX  ALSO FILES     \ IHEX; FILES is used
+    \ helpers (PRIVATE)
     PUBLIC
     \ exported words
+    PROTECTED
+    \ words for ALSO IHEX.I
     PRIVATE
     \ more helpers
     ...
     END-PACKAGE
 
-- `PACKAGE name` makes the vocabularies `name` and `name.I` and puts
-  `INTERNALS name name.I` into the search order. New words go to
-  `name.I`.
+- `PACKAGE name` makes the vocabulary `name` and puts `INTERNALS name`
+  and the private words into the search order. New words are
+  `PRIVATE`.
 - The name of a package has at most 29 characters: a name has at most
   31, and `.I` takes two of them.
-- `PUBLIC` and `PRIVATE` change where the next words go. A file
-  changes between the two as often as it must.
+- `PUBLIC`, `PROTECTED` and `PRIVATE` change where the next words go. A
+  file changes between them as often as it must. The first `PROTECTED`
+  makes `name.I`.
+- The variable `TEMP-HEADS` (in FORTH) decides what `PRIVATE` does.
+  Off (`TEMP-HEADS OFF!`, the start), it does what `PROTECTED` does: the headers go to `name.I`,
+  and each test reaches them there (`ALSO IHEX.I`). On (`TEMP-HEADS ON!`), the headers of
+  the `PRIVATE` words go to the temp store at the top of the dictionary,
+  and `END-PACKAGE` gives it back (doc/vm.md, sections 3 and 6). The code
+  stays and the package still calls it, but no search finds the names:
+  an image has room for more (`apps/irbridge/app.fs` switches it on),
+  and `SEE` shows `?` and the address for such a word.
+- A package that takes words of another one with `ALSO p.I` gets only
+  the `PROTECTED` words of it when `TEMP-HEADS` is on: a `PRIVATE`
+  word stops the load (error -13). `lib/test/heads.fs` loads the
+  packages of the host so. Today WLAN, WIFI, RMT, IR-CAPTURE, ESP32-PHY
+  and IR give `PROTECTED` words to other packages, IR-QUEUE and INTR
+  to the board tests.
 - `ALSO` after `PACKAGE` adds the packages that this one uses. They
   come before the own words in the search order: a name there hides a
-  helper with the same name.
+  helper with the same name. `tools/shadows.fs` shows such names.
 - `END-PACKAGE` puts the search order and the vocabulary for new words
   back as they were before `PACKAGE`, and adds the package.
-- A package file can load another package file: 4 inside each other.
-- A test of a helper adds it again: `ALSO IHEX.I`.
+- A package file can load another package file: 4 inside each other,
+  but not in the `PRIVATE` part of one with `TEMP-HEADS` on (its names
+  would go with the temp store).
+- `FREEZE` waits for `END-PACKAGE` while the temp store is in use, and
+  `MARKER` is not among the `PRIVATE` words then.
 - No exported word has the name of the package: it would hide the
   vocabulary, and `ALSO FONT8` would run the word.
 - The search order has 16 places.
 
 `HIDE name` (base) takes one word out of its wordlist after its use,
 as `PRIVATIZE` in pForth or `HIDE` in SwiftForth. For a package, the
-two vocabularies are the better way.
+parts of the frame are the better way.
 
 Each package uses this frame; only `host/files.fs` and `lib/package.fs` have it by hand, because they come first.
 
 Coming later from archive/m0-m3/forth: the chip `atmega328p.fs` and the
 board `uno.fs` (Arduino Uno), in a folder such as `lib/avr/`.
+
+## JSON
+
+For the messages of the IR bridge and other small programs that talk
+JSON over MQTT or HTTP (`json.fs`, package JSON). The writer puts one
+object into a buffer of the caller, field after field. The reader finds
+the value of a name in an object and turns it into a number, a flag, a
+text, cells or bytes; it needs no tree and keeps nothing between two
+calls. As in MQTT, the name of a field is on top of the stack, its value
+below it:
+
+    ALSO FILES  S" lib/text.fs" INCLUDED  S" lib/json.fs" INCLUDED
+    ONLY FORTH ALSO JSON
+    CREATE OUT 100 ALLOT
+    OUT 100 JSON-INTO  7 S" id" JSON-NUMBER  0 S" code" JSON-NUMBER
+    JSON-DONE . TYPE                    \ 0 {"id":7,"code":0}
+
+The same object, read back (`JSON-DONE DROP` leaves its text):
+
+    OUT 100 JSON-INTO  7 S" id" JSON-NUMBER  JSON-DONE DROP
+    S" id" JSON-FIELD . JSON>NUMBER . .   \ -1 0 7
+
+The limits: a text of at most 4096 bytes, at most 8 objects and arrays
+inside each other, whole numbers of a cell. Numbers with a fraction are
+valid JSON, but `JSON>NUMBER` refuses them; texts go through as they are
+(UTF-8), and `JSON>TEXT` knows `\uXXXX` up to `$7F`. Between the parts of a
+text each character below 33 counts as white space, as for `-LEADING`. The codes are -470
+(the buffer is full), -471 (no valid JSON), -472 (a value of another
+kind), -473 (outside the limits); the head of `json.fs` has the details.
+
+**Memory:** 6 840 bytes of dictionary and 104 bytes of RAM data with
+32-bit cells; 3 786 and 52 bytes with 16-bit cells.
+
+**Tests:** `lib/test/json.fs`, 58 tests with 16- and 32-bit cells (in
+`tools/test.fs`):
+
+    build/ucf-c host/files.fs lib/test/json.fs </dev/null
 
 ## Protocol arithmetic (N3d)
 

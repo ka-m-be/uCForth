@@ -47,7 +47,7 @@ PUBLIC
 : CLOSE-PORT ( -- )  PORT @ ?DUP IF CLOSE-FILE DROP  0 PORT ! THEN ;
 : OPEN-PORT ( a u -- )   \ close the port that is open, open a u
   CLOSE-PORT  PORT-NAME PLACE  0 RX-N !  0 RX-I !
-  TRUE DTR !  TRUE RTS !            \ the host sets both lines when it opens the port
+  DTR ON!  RTS ON!                  \ the host sets both lines when it opens the port
   (OPEN) IF  0 PORT !  S" cannot open " PORT$ FAIL  THEN ;
 
 : SEND ( a u -- )

@@ -596,11 +596,11 @@ VARIABLE EXTRA                       \ the number of a register without a name, 
     .wur OF  8 8 FIELD 2 URS +SPECIAL  ENDOF
   ENDCASE ;
 VARIABLE FIRST
-: +SEP ( -- )   FIRST @ IF  S"  " +T  FALSE FIRST !  ELSE  S" , " +T  THEN ;
+: +SEP ( -- )   FIRST @ IF  S"  " +T  FIRST OFF!  ELSE  S" , " +T  THEN ;
 : +INSN ( e -- )
   DUP NAME +T  -1 EXTRA !
   6 0 DO  DUP I KIND  DUP SUFFIX? IF +SUFFIX ELSE DROP THEN  LOOP
-  TRUE FIRST !
+  FIRST ON!
   6 0 DO  DUP I KIND  ?DUP IF  DUP SUFFIX? IF DROP ELSE  +SEP +OPERAND  THEN  THEN  LOOP  DROP
   EXTRA @ 0< 0= IF  +SEP  EXTRA @ +NUM  THEN ;
 : UNKNOWN ( -- )   \ .byte and the bytes of the instruction
@@ -620,8 +620,8 @@ VARIABLE FIRST
   PC @ ILEN @ + ;
 
 PUBLIC
-: XT-ESP32 ( -- )     FALSE S3? !  ['] XT-DECODE IS DECODE  ['] (.BYTES) IS .CODE  8 ADDR-DIGITS ! ;
-: XT-ESP32S3 ( -- )   TRUE S3? !   ['] XT-DECODE IS DECODE  ['] (.BYTES) IS .CODE  8 ADDR-DIGITS ! ;
+: XT-ESP32 ( -- )     S3? OFF!  ['] XT-DECODE IS DECODE  ['] (.BYTES) IS .CODE  8 ADDR-DIGITS ! ;
+: XT-ESP32S3 ( -- )   S3? ON!   ['] XT-DECODE IS DECODE  ['] (.BYTES) IS .CODE  8 ADDR-DIGITS ! ;
 
 END-PACKAGE
 XT-ESP32

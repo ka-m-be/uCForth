@@ -1,4 +1,4 @@
-\ kelon168.fs - tests of the package KELON168 (lib/irremote/kelon168.fs)
+\ kelon168.fs - tests of the packages KELON168 and KELON168-READ (lib/irremote/kelon168.fs, kelonrd.fs)
 \
 \ Load (in the folder ucf), after the package FILES and the tester:
 \   ... host/files.fs forth/test/tester.fs lib/test/kelon168.fs
@@ -9,14 +9,17 @@
 \ cells (MILLIS).
 
 ONLY FORTH DEFINITIONS  ALSO FILES
+S" lib/irremote/acbase.fs" INCLUDED
 S" lib/irremote/ircode.fs" INCLUDED
+S" lib/irremote/irread.fs" INCLUDED
 S" lib/irremote/kelon168.fs" INCLUDED
-ONLY FORTH DEFINITIONS  ALSO INTERNALS  ALSO KELON168  ALSO KELON168.I
+S" lib/irremote/kelonrd.fs" INCLUDED
+S" lib/text.fs" INCLUDED
+ONLY FORTH DEFINITIONS  ALSO INTERNALS  ALSO TEXT  ALSO AC-BASE  ALSO AC-BASE.I
+ALSO KELON168  ALSO KELON168.I  ALSO KELON168-READ  ALSO KELON168-READ.I
 DECIMAL
 
-: SAME-BYTES? ( a1 a2 u -- f )
-  0 ?DO  OVER I + C@  OVER I + C@ <> IF 2DROP UNLOOP FALSE EXIT THEN  LOOP  2DROP TRUE ;
-: FRAME= ( a -- f )   AC-FRAME SWAP 21 SAME-BYTES? ;
+: FRAME= ( a -- f )   21 AC-FRAME 21 STR= ;
 
 CREATE F0  $83 C, $06 C, $04 C, $82 C, $00 C, $00 C, $80 C, $00 C, $00 C, $00 C, $00 C, $00 C, $00 C, $06 C, $00 C, $01 C, $00 C, $00 C, $28 C, $00 C, $29 C,
 CREATE F1  $83 C, $06 C, $04 C, $82 C, $00 C, $00 C, $80 C, $00 C, $00 C, $00 C, $00 C, $00 C, $00 C, $06 C, $00 C, $01 C, $00 C, $00 C, $38 C, $00 C, $39 C,
@@ -89,9 +92,13 @@ T{ D1 BAD 21 MOVE  $84 BAD C!  BAD AC-OK? -> FALSE }T
 T{ AC-RESET  F27 AC-TAKE  GRADE  DRY-EXTRA FIELD@ -> -1 2 }T   \ DRY, grade -1
 T{ COOL AC-MODE!  GRADE  DRY-EXTRA FIELD@  SET-TEMP @  TEMP-BITS FIELD@ -> 0 0 24 8 }T
 
+\ ---- the state read back
+T{ AC-RESET  TRUE AC-POWER!  COOL AC-MODE!  22 AC-TEMP!  4 AC-FAN!  AC-POWER@ AC-MODE@ AC-TEMP@ AC-FAN@ -> TRUE 2 22 4 }T
+
 \ ---- times: out and back
 T{ AC-RESET  TRUE AC-POWER!  3 AC-FAN!  AC-TIMINGS  NIP -> 343 }T
-T{ AC-TIMINGS AC-DECODE  SWAP AC-FRAME 21 SAME-BYTES? -> 168 TRUE }T
+T{ AC-TIMINGS AC-DECODE  SWAP 21 AC-FRAME 21 STR= -> 168 TRUE }T
+T{ AC-FRAME 21 AC>TIMES  NIP -> 343 }T                              \ any bytes, as AC-TIMINGS
 
 \ ---- errors
 T{ 31 ' AC-TEMP! CATCH NIP -> -2 }T

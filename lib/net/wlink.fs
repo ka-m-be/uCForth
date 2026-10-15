@@ -11,7 +11,9 @@
 \ one step of the CCMP in software; LINK-NET runs it in each step of the
 \ network (NET-STEP, a timer). LINK-CONTROL gives the EAPOL frames of a new
 \ group key to WLAN; that work waits for the radio, so it runs only in the
-\ foreground (NET-CONTROL, in the chain of IDLE).
+\ foreground (NET-CONTROL, in the chain of IDLE). The answer of WLAN goes
+\ back protected, as a frame of the queue: with the key of the pair in use,
+\ the AP takes no EAPOL frame without CCMP.
 \
 \   a WLINK-POOL! ( -- )       the packet RAM: WLINK-POOL-SIZE bytes at a
 \   WLINK-START ( -- )         start, after the join (WIFI-STATUS 6)
@@ -163,15 +165,15 @@ DEFER SOFT-STOP    ' NOOP IS SOFT-STOP       \ ( -- ) end and clear
     DUP C@ 12 AND 8 = IF
       DUP C@ DUP 8 = SWAP $88 = OR 0= IF  DROP DROP-RAW EXIT  THEN           \ data without data
     THEN
-    DUP 1+ C@ $40 AND 0= IF                                                   \ not protected: EAPOL
-      DROP RAW-R @ RAW-LENS AT-LEN @ SAVE-CONTROL DROP-RAW EXIT
+    DUP 1+ C@ $40 AND 0= IF                                     \ not protected: EAPOL, a management frame
+      RAW-R @ RAW-LENS AT-LEN @ SAVE-CONTROL DROP-RAW EXIT                     \ the frame a and its length
     THEN DROP
     J-DECRYPT JOB ! BEGIN-RX
   ELSE
     TX-W @ TX-R @ <> IF J-ENCRYPT JOB ! BEGIN-TX THEN
   THEN ;
 : JOB-ERROR ( n -- )   \ the frame of the job goes; a lost radio stops the link
-  DUP -433 = OVER -438 = OR IF FALSE RUNNING ! THEN
+  DUP -433 = OVER -438 = OR IF RUNNING OFF! THEN
   DUP -440 = IF DROP 1 OLD +! ELSE NOTE THEN
   SOFT-STOP  JOB @ DUP J-DECRYPT = SWAP J-RECEIVED = OR IF DROP-RAW ELSE JOB @ IF DROP-TX THEN THEN
   J-IDLE JOB ! ;
@@ -193,6 +195,14 @@ DEFER SOFT-STOP    ' NOOP IS SOFT-STOP       \ ( -- ) end and clear
     ENDOF
     J-RECEIVED OF KEY-NOW JOB-GEN @ <> IF -440 THROW THEN RX-DONE ENDOF
   ENDCASE ;
+: SEND-EAPOL ( a n -- f )   \ an EAPOL frame of WLAN (802.11, LLC) to the queue; false: the link is down
+  UP? 0= IF 2DROP FALSE EXIT THEN
+  TX-W @ TX-R @ - 2 < 0= IF -1 TX-W +! -441 NOTE THEN     \ full: it takes the place of the newest frame
+  TX-W @ TX-BUF >R
+  OVER 16 + R@ 6 MOVE  OVER 10 + R@ 6 + 6 MOVE  OVER 30 + R@ 12 + 2 MOVE   \ to, from, type
+  32 - DUP 14 + TX-W @ TX-LENS AT-LEN !
+  SWAP 32 + R> 14 + ROT MOVE  1 TX-W +! TRUE ;
+' SEND-EAPOL IS STA-LINK-SEND
 
 PUBLIC
 AT-CONTROL 512 + CONSTANT WLINK-POOL-SIZE
@@ -230,9 +240,9 @@ AT-CONTROL 512 + CONSTANT WLINK-POOL-SIZE
   RX-PNS 5 17 * 6 * 0 FILL GENERATIONS 5 CELLS 0 FILL
   0 RAW-W ! 0 RAW-R ! 0 TX-W ! 0 TX-R ! 0 ETH-W ! 0 ETH-R !
   0 CONTROL-N ! J-IDLE JOB ! 0 ERROR ! MILLIS SEEN !
-  TRUE RUNNING ! ;
+  RUNNING ON! ;
 : WLINK-STOP ( -- )
-  FALSE RUNNING ! RADIO-TX-END SOFT-STOP J-IDLE JOB ! 0 CONTROL-N !
+  RUNNING OFF! RADIO-TX-END SOFT-STOP J-IDLE JOB ! 0 CONTROL-N !
   POOL @ ?DUP IF WLINK-POOL-SIZE 0 FILL THEN ;
 : .WLINK ( -- )
   ." WLINK up/rx/tx/drop/old/code: " UP? . RX-GOOD @ . TX-GOOD @ . DROPPED @ . OLD @ . ERROR @ . CR ;

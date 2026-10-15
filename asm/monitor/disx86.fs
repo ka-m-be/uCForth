@@ -66,7 +66,7 @@ VARIABLE RIP-LO   VARIABLE RIP-HI    \ its displacement, a double
 : MODF ( -- n )   MRM @ 6 RSHIFT ;
 : REGF ( -- n )   MRM @ 3 RSHIFT 7 AND ;
 : RMF ( -- n )    MRM @ 7 AND ;
-: MODRM ( -- )   HAVE-MRM @ IF EXIT THEN  BYTE+ MRM !  TRUE HAVE-MRM ! ;
+: MODRM ( -- )   HAVE-MRM @ IF EXIT THEN  BYTE+ MRM !  HAVE-MRM ON! ;
 : REX? ( bit -- f )   REX @ AND 0<> ;
 : +R ( n -- n' )   4 REX? IF 8 + THEN ;     \ REX.R extends the field reg
 : +X ( n -- n' )   2 REX? IF 8 + THEN ;     \ REX.X the index of SIB
@@ -370,7 +370,7 @@ CREATE BASES16   \ the registers of ModR/M with 16-bit addresses, for r/m 0 to 7
   RMF 4 = IF  +SIB EXIT  THEN
   MODF 0= RMF 5 = AND IF
     X64? IF  ASIZE @ 64 = IF S" rip" ELSE S" eip" THEN +T
-      SDWORD+  2DUP RIP-HI ! RIP-LO !  TRUE RIP?  !  +DISP EXIT  THEN
+      SDWORD+  2DUP RIP-HI ! RIP-LO !  RIP? ON!  +DISP EXIT  THEN
     DWORD+ +HEX EXIT
   THEN
   RMF +B ASIZE @ +REG
@@ -455,9 +455,9 @@ CREATE BASES16   \ the registers of ModR/M with 16-bit addresses, for r/m 0 to 7
     $26 OF  1 SEG !  TRUE  ENDOF     $2E OF  2 SEG !  TRUE  ENDOF
     $36 OF  3 SEG !  TRUE  ENDOF     $3E OF  4 SEG !  TRUE  ENDOF
     $64 OF  5 SEG !  TRUE  ENDOF     $65 OF  6 SEG !  TRUE  ENDOF
-    $66 OF  TRUE O16 !  TRUE  ENDOF
-    $67 OF  TRUE A16 !  TRUE  ENDOF
-    $F0 OF  TRUE LOCKX !  TRUE  ENDOF
+    $66 OF  O16 ON!  TRUE  ENDOF
+    $67 OF  A16 ON!  TRUE  ENDOF
+    $F0 OF  LOCKX ON!  TRUE  ENDOF
     $F2 OF  $F2 REPX !  TRUE  ENDOF  $F3 OF  $F3 REPX !  TRUE  ENDOF
     FALSE SWAP
   ENDCASE
@@ -568,8 +568,8 @@ VARIABLE START-A
   S"  # " +T  DA @ 0  RIP-LO @ RIP-HI @ D+  +HEX ;
 : X86-DECODE ( a -- a' )
   DUP START-A !  DA !  TXT-START
-  FALSE O16 !  FALSE A16 !  0 REX !  0 SEG !  0 REPX !  FALSE LOCKX !
-  FALSE HAVE-MRM !  FALSE RIP? !
+  O16 OFF!  A16 OFF!  0 REX !  0 SEG !  0 REPX !  LOCKX OFF!
+  HAVE-MRM OFF!  RIP? OFF!
   PREFIXES DUP OPC !  SIZES
   $0F = IF  OP2 TABLE !  BYTE+ OPC !  ELSE  OP1 TABLE !  THEN
   X64? OP1? AND IF  OPC @ INV64 BIT@ IF  INVALID  DA @ EXIT  THEN  THEN

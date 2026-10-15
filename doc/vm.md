@@ -88,7 +88,7 @@ tells how much for its image. With base and the package FILES:
 
 | Area | 16 bit | 32 bit | When it is full |
 | --- | --- | --- | --- |
-| dictionary: words, `ALLOT`, `,` | 58 KB, of it 48 KB free | 189 KB, of it 171 KB free | error −8 (dictionary overflow) |
+| dictionary: words, `ALLOT`, `,` | 58 KB, of it 47 KB free | 189 KB, of it 169 KB free | error −8 (dictionary overflow) |
 | RAM data: `VARIABLE`, `VALUE`, `BUFFER:`, `DEFER`, vocabularies | 3.5 KB, of it 2.1 KB free | 63 KB, of it 61 KB free | error −8 |
 | data stack | 256 cells | 256 cells | no check: more cells overwrite the return stack; too few give −4 after the word |
 | return stack | 256 cells | 256 cells | no check: deeper calls overwrite PAD and the input line |
@@ -156,6 +156,18 @@ extension, `VALLOT` (and so `VARIABLE`, `VALUE`, `BUFFER:`, `DEFER` and
 new vocabularies) takes memory there; `DATA-ALLOT` always takes memory
 in DATA. `MARKER` saves and restores `XVP` too. A kernel then must read
 a wordlist record through the same rule as `@` (`FIND-NAME`).
+
+**The temp store.** While a package loads with `TEMP-HEADS` on
+(`lib/package.fs`), the headers of its `PRIVATE` words lie at the top of
+the dictionary, from `DICT-END` down (section 6). The variable
+`TEMP-START` of `core.fs` (in `INTERNALS`) holds its lowest byte,
+`DICT-END` when it is empty. `HERE` grows up to it: `UNUSED`, `HEADER`,
+`ALLOT` and `;` take it (`LIMIT`) as the end of the dictionary. An
+address belongs to the store only from `TEMP-START` up to `DICT-END`:
+the addresses of an extension of the RAM data are higher (below).
+`END-PACKAGE` gives the store back. No image holds it: `FREEZE` stops
+with an error while a package uses it, and `MARKER` saves and restores
+`TEMP-START`. With `TEMP-HEADS` off (the start) the store stays empty.
 
 ## 4 System variables
 
@@ -239,6 +251,25 @@ xt:  code field    a primitive number
 
 The xt is the address of the code field: `xt = nt + CELL + 1 + length`,
 rounded up to the next cell boundary.
+
+A **temp header** is the header of a `PRIVATE` word of a package with
+`TEMP-HEADS` on (`lib/package.fs`). It lies in the temp store (section
+3), and its wordlist record lies there too. Up to the name it is a
+header as above; the cell after the name holds the xt, and the code
+field lies at `HERE` in the dictionary as for each word:
+
+```text
+temp store:  link  count byte  name  xt ---+
+                                           |
+dictionary:              ...  code field  parameter field ...
+```
+
+`NAME>XT` knows it by its address (`TEMP?`: from `TEMP-START` up to
+`DICT-END`): a header in the temp store gives the xt from that cell. Only `NAME>XT` reads that cell; `FIND-NAME` (also the
+primitive of a VM or kernel) reads link, count byte and name as always.
+`END-PACKAGE` gives the temp store back: the code stays and the other
+words of the package still call it, but no search finds the name any
+more. An image has no temp header.
 
 | Code field | Name | The word … |
 | --- | --- | --- |

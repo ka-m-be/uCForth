@@ -51,6 +51,7 @@
 \ lib/esp32/test/phyhost.fs.
 
 PACKAGE ESP32-PHY  ALSO ROM   \ lib/package.fs
+PROTECTED   \ PHY-C (below) links the code of C with these words: CLINK finds them in ESP32-PHY.I
 
 \ ==== The data of the code of C ========================================
 \ CLINK (lib/esp32/clink.fs) has these four words too. ESP32-PHY has them

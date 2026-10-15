@@ -27,7 +27,7 @@ In the command window, in the folder `ucf`:
 
     C:\>cd \ucf
     C:\ucf>cscript //nologo bootstrap\windows\ucf-wsh.js
-    uCForth - JScript bootstrap VM - 16 bit - 163 words in FORTH - built in 656 ms
+    uCForth - JScript bootstrap VM - 16 bit - 165 words in FORTH - built in 656 ms
     ok> 3 4 + .
     7
     ok> bye
@@ -52,7 +52,7 @@ the keyboard. A name can have `\` or `/`: Windows takes both. Inside
 uCForth, the names are as in the sources, with `/`:
 
     C:\ucf>cscript //nologo bootstrap\windows\ucf-wsh.js host\files.fs
-    uCForth - JScript bootstrap VM - 16 bit - 163 words in FORTH - built in 641 ms
+    uCForth - JScript bootstrap VM - 16 bit - 165 words in FORTH - built in 641 ms
     ok> INCLUDE examples/hello.fs
     Hello from uCForth
 
@@ -62,7 +62,7 @@ starts it again. The images are the same as the images of the other
 bootstrap VMs, so each of them starts the images of the others:
 
     C:\ucf>cscript //nologo bootstrap\windows\ucf-wsh.js
-    uCForth - JScript bootstrap VM - 16 bit - 163 words in FORTH - built in 641 ms
+    uCForth - JScript bootstrap VM - 16 bit - 165 words in FORTH - built in 641 ms
     ok> : HELLO  ." Hello" CR ;
     ok> FREEZE
       saved: ucf.hex
@@ -87,18 +87,18 @@ In the folder `ucf`:
       check core32: the same as seed/core32.hex
       check base32: the same as seed/base32.hex
     C:\ucf>cscript //nologo bootstrap\windows\ucf-wsh.js host\files.fs tools\test.fs
-    uCForth - JScript bootstrap VM - 16 bit - 163 words in FORTH - built in 641 ms
+    uCForth - JScript bootstrap VM - 16 bit - 165 words in FORTH - built in 641 ms
 
     t0: 183 tests, 0 errors
       redefined HD-A
-    hayes: 872 tests, 0 errors
+    hayes: 875 tests, 0 errors
     ...
     8086: 249 tests, 0 errors
-    all: 2742 tests, 0 errors
+    all: 2882 tests, 0 errors
     C:\ucf>echo %ERRORLEVEL%
     0
 
-With `-32` before `host\files.fs`: `all: 10979 tests, 0 errors`. The
+With `-32` before `host\files.fs`: `all: 12186 tests, 0 errors`. The
 whole output is the same as for the C bootstrap VM, line for line
 (`bootstrap/c/README.md`, section "Tests"); only the first line
 differs.

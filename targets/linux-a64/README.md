@@ -16,8 +16,8 @@ In the folder `ucf`, with a bootstrap VM with 32-bit cells:
 The output ends with:
 
       saved: ucf.hex
-      code: 7948 bytes, image: 86824 bytes
-      written: build/ucf-linux-a64 (152360 bytes)
+      code: 7948 bytes, image: 88700 bytes
+      written: build/ucf-linux-a64 (154236 bytes)
 
 `build.fs` does three things:
 
@@ -51,7 +51,7 @@ when `QUIT` waits for the next line:
 
     $ echo "ALSO FILES  INCLUDE tools/test.fs" | build/ucf-linux-a64
     ...
-    all: 10979 tests, 0 errors
+    all: 12186 tests, 0 errors
 
 The terminal works in its normal line mode: it shows what you type and
 sends the line with the return key. Backspace and Ctrl-U correct the
@@ -98,7 +98,7 @@ and DNS, with the same words as on each other system.
     0 172.66.157.237
 
 The test of the network: `echo "ALSO FILES  INCLUDE lib/net/test/net.fs"
-| build/ucf-linux-a64` gives `net: 89 tests, 0 errors` (in Docker: the command in section "Test" with this line). lib/net/README.md
+| build/ucf-linux-a64` gives `net: 93 tests, 0 errors` (in Docker: the command in section "Test" with this line). lib/net/README.md
 explains the words, `SYSCALL` with VM addresses, and the limits.
 
 ## An application
@@ -154,7 +154,7 @@ In Docker on a Mac (Apple silicon), in the folder `ucf`:
       sh -c 'cp -r /ucf /tmp/u && cd /tmp/u && chmod +x build/ucf-linux-a64 &&
              echo "ALSO FILES  INCLUDE tools/test.fs" | build/ucf-linux-a64'
 
-Expected: `all: 10979 tests, 0 errors`; the tests take about 0.3 s. The tool
+Expected: `all: 12186 tests, 0 errors`; the tests take about 0.3 s. The tool
 `tools/genesis.fs` (the reference images, 32 bit) takes 0.5 s.
 
 **Tested (2026):** in Docker (Debian 12, arm64): all tests; `ARG`; the
@@ -181,7 +181,7 @@ After the start, with the image of `build.fs` (base and FILES):
 
 | Area | Size | Free |
 | --- | --- | --- |
-| dictionary: words, `ALLOT`, `,` | 189 KB | 171 KB |
+| dictionary: words, `ALLOT`, `,` | 189 KB | 169 KB |
 | RAM data: `VARIABLE`, `VALUE`, `BUFFER:`, vocabularies | 63 KB | 61 KB |
 | data stack, return stack | 256 cells each | |
 | the input line | 256 characters | |

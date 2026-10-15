@@ -49,7 +49,7 @@ LINK-MTU 14 + BUFFER: RX   \ the frame that came
   LINK-TICK
   RX LINK-RECEIVE ?DUP IF RX SWAP FRAME-IN THEN
   IP-STEP ARP-TICK TCP-TICK DHCP-TICK ;
-: FINISH ( -- )   IP-FLUSH  WANTED @ IF  FALSE WANTED !  WORK  THEN ;
+: FINISH ( -- )   IP-FLUSH  WANTED @ IF  WANTED OFF!  WORK  THEN ;
 : LOCKED ( i*x xt -- j*x )   \ run xt, a word of UDP or TCP, while a step and Ctrl-C wait
   -BREAK  1 BUSY +!  CATCH
   BUSY @ 1 = IF  ['] FINISH CATCH  -28 = IF DROP -28 THEN  THEN   \ only Ctrl-C at once counts
@@ -60,19 +60,19 @@ DEFER NET-SERVICE
 ' NOOP IS NET-SERVICE
 : NET-CONTROL ( -- ) ['] LINK-CONTROL LOCKED NET-SERVICE ;
 : NET-STEP ( -- )   \ a step of the network, but not while a word of NETIF runs
-  BUSY @ IF  TRUE WANTED !  EXIT  THEN
-  -BREAK  1 BUSY !  ['] WORK CATCH  0 BUSY !  FALSE WANTED !  +BREAK
+  BUSY @ IF  WANTED ON!  EXIT  THEN
+  -BREAK  1 BUSY !  ['] WORK CATCH  0 BUSY !  WANTED OFF!  +BREAK
   DUP -28 = IF THROW THEN  DROP ;
-: (TCP-CONNECT) ( ip port -- h ior )   ['] (TCP-CONNECT) LOCKED ;
+: (TCP-CONNECT) ( a u ip port -- h ior )   ['] (TCP-CONNECT) LOCKED ;
 : (TCP-STATE) ( h -- n )               ['] (TCP-STATE) LOCKED ;
-: (TCP-LISTEN) ( port -- h ior )       ['] (TCP-LISTEN) LOCKED ;
+: (TCP-LISTEN) ( a u port -- h ior )   ['] (TCP-LISTEN) LOCKED ;
 : (TCP-ACCEPT) ( h -- h2 true | false )   ['] (TCP-ACCEPT) LOCKED ;
 : (SEND) ( a u h -- u2 ior )           ['] (SEND) LOCKED ;
 : (RECV) ( a u h -- u2 ior )           ['] (RECV) LOCKED ;
 : (AVAILABLE) ( h -- n )               ['] (AVAILABLE) LOCKED ;
 : (CLOSE) ( h -- ior )
   DUP UDP-HANDLE? IF ['] (UDP-CLOSE) ELSE ['] (TCP-CLOSE) THEN  LOCKED ;
-: (UDP-OPEN) ( port -- h ior )         ['] (UDP-OPEN) LOCKED ;
+: (UDP-OPEN) ( a u port -- h ior )     ['] (UDP-OPEN) LOCKED ;
 : (SENDTO) ( a u ip port h -- ior )    ['] (SENDTO) LOCKED ;
 : (RECVFROM) ( a u h -- u2 ip port true | false )   ['] (RECVFROM) LOCKED ;
 : (JOIN) ( ip h -- ior )               ['] (JOIN) LOCKED ;
@@ -87,8 +87,8 @@ DEFER NET-SERVICE
 : (DNS-SERVER) ( -- ip )    IP-DNS @ ;
 : (NET-POLL) ( ms -- )   NET-CONTROL NET-STEP MS ;
 PRIVATE
-: FIXED ( ip mask gateway dns -- )   DHCP-STOP  IP-CONFIG  TRUE STATIC ! ;
-: NO-ADDRESS ( -- )   DHCP-STOP  0 0 0 0 IP-CONFIG  FALSE STATIC ! ;
+: FIXED ( ip mask gateway dns -- )   DHCP-STOP  IP-CONFIG  STATIC ON! ;
+: NO-ADDRESS ( -- )   DHCP-STOP  0 0 0 0 IP-CONFIG  STATIC OFF! ;
 : DOWN ( -- ) NO-ADDRESS ARP-FORGET IP-FORGET UDP-FORGET TCP-DOWN ;
 PUBLIC
 : NET-STATIC ( ip mask gateway dns -- )   ['] FIXED LOCKED ;

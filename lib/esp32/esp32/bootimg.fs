@@ -106,7 +106,7 @@ VARIABLE FA   VARIABLE FU           \ the part of the flash that HASH or DICT>FL
 
 : BLANK? ( a u -- f )   \ VM addresses a to a + u in the flash: all bytes $FF?
   OVER + SWAP ?DO  I DROM @ -1 <> IF FALSE UNLOOP EXIT THEN  4 +LOOP  TRUE ;
-: SAME? ( a u -- f )   \ VM addresses a to a + u: the same bytes in the flash and in the RAM?
+: FLASHED? ( a u -- f )   \ VM addresses a to a + u: the same bytes in the flash and in the RAM?
   OVER + SWAP ?DO  I DROM @  I RAM-BASE + @  <> IF FALSE UNLOOP EXIT THEN  4 +LOOP  TRUE ;
 : OLD-FROZEN? ( -- f )   \ the boot image in the flash has a frozen part there (its slot 120 is not S0)
   FBASE 512 + BUF 4 FLASH-READ THROW  BUF @ S0 <> ;   \ header 24, segment 8, then the table
@@ -120,7 +120,7 @@ VARIABLE FA   VARIABLE FU           \ the part of the flash that HASH or DICT>FL
   FA @ FU @ BLANK? 0= ABORT" FREEZE: the flash after the frozen part is not erased"
   FA @ RAM-BASE +  FU @  DICT-FLASH FA @ +  FLASH-WRITE THROW
   DICT-FLASH FA @ +  BUF 4 FLASH-READ THROW   \ the cache once more, for QEMU (see above)
-  FA @ FU @ SAME? 0= ABORT" FREEZE: the flash has other bytes than the RAM"
+  FA @ FU @ FLASHED? 0= ABORT" FREEZE: the flash has other bytes than the RAM"
   FA @ FU @ + FLASH-END! ;
 
 \ ---- 2. the RAM data behind the frozen part ------------------------------

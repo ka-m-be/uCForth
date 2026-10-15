@@ -11,7 +11,7 @@
 \ any time, also while the flash is busy. A frame longer than the RAM is not
 \ cut: the handler drops it, and also the rest of it up to its end (the
 \ tail), and counts it (long). With all 4 slots in use it drops the new
-\ frame and counts it (full). IR-QUEUE (lib/esp32/irqueue.fs) decodes the
+\ frame and counts it (full). IR-QUEUE (lib/esp32/esp32/irqueue.fs) decodes the
 \ slots.
 \
 \   IR-CAP-ON ( -- )           the handler on; channel 4 receives
@@ -35,6 +35,7 @@
 \ The test on the board: lib/esp32/esp32/test/irqueue.fs.
 
 PACKAGE IR-CAPTURE ALSO CHIP ALSO GPIO ALSO INTR ALSO RMT ALSO RMT.I
+PROTECTED                             \ IRC-BUILD below and the board tests use them
 4 CONSTANT CAP-SLOTS                  \ the handler takes write mod 4: keep it 4
 256 CONSTANT CAP-WORDS                \ the RAM of channel 4: 4 blocks of 64 pulse words
 CAP-WORDS CELLS 8 + CONSTANT CAP-SIZE \ a slot: the count, the end in us, the pulse words
@@ -72,11 +73,11 @@ PUBLIC
   CAP-STATE 36 0 FILL CAP-RAW CAP-SLOTS CAP-SIZE * 0 FILL
   MICROS CAP-STATE C-END-US + !
   ['] CAPTURE RMT-SOURCE INT! 4 TRUE RMT-RX-INT
-  RMT-SOURCE INT-ON +INT 4 RMT-RX-ON TRUE ENABLED ! ;
+  RMT-SOURCE INT-ON +INT 4 RMT-RX-ON ENABLED ON! ;
 : IR-CAP-OFF ( -- )
   ENABLED @ IF
     4 FALSE RMT-RX-INT RMT-SOURCE INT-OFF 4 RMT-RX-OFF
-    0 RMT-SOURCE INT! FALSE ENABLED !
+    0 RMT-SOURCE INT! ENABLED OFF!
   THEN
   CAP-RAW CAP-SLOTS CAP-SIZE * 0 FILL  0 CAP-STATE C-WRITE + !  0 CAP-STATE C-READ + ! ;
 : IR-CAP-PENDING? ( -- f ) C-WRITE CAP@ C-READ CAP@ <> ;

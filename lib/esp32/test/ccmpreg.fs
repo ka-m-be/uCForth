@@ -34,4 +34,30 @@ T{ RADIO-KEYS-CLEAR RADIO-CCMP? KEY-ENABLE @ KEYS-EMPTY? -> FALSE 0 TRUE }T
 T{ SYNTH-KEY PEER 0 FALSE RADIO-CCMP-KEY! OTHERS-EMPTY? -> TRUE }T   \ a key changes only its slot
 RADIO-KEYS-CLEAR
 T{ SYNTH-KEY PEER 0 FALSE RADIO-CCMP-KEY! RADIO-STOP KEY-ENABLE @ KEYS-EMPTY? -> 0 TRUE }T
+\ The other aborts of RADIO-CCMP-KEY!: a key of the pair with an ID other than 0, software
+\ CCMP on, no station mode. No slot changes.
+: PAIR-KEY ( -- ) SYNTH-KEY PEER 0 FALSE RADIO-CCMP-KEY! ;
+: PAIR-ID-1 ( -- ) SYNTH-KEY PEER 1 FALSE RADIO-CCMP-KEY! ;
+START-STA
+T{ ' PAIR-ID-1 CATCH KEY-ENABLE @ -> -2 0 }T
+RADIO-SOFT-CCMP
+T{ ' PAIR-KEY CATCH KEY-ENABLE @ RADIO-CCMP? -> -2 0 FALSE }T
+RADIO-BEACONS
+T{ ' PAIR-KEY CATCH KEY-ENABLE @ -> -2 0 }T
+\ With a key in the MAC a protected frame may go out (hardware CCMP); without a key it may not.
+128 BUFFER: P-FRAME
+: PROTECTED-TX ( -- )
+  P-FRAME 128 0 FILL $08 P-FRAME C! $41 P-FRAME 1+ C!
+  PEER P-FRAME 4 + 6 MOVE STA-OWN P-FRAME 10 + 6 MOVE PEER P-FRAME 16 + 6 MOVE
+  P-FRAME 48 TRUE RADIO-TX-START ;
+RADIO-STOP START-STA
+T{ ' PROTECTED-TX CATCH TX-ACTIVE? -> -2 FALSE }T
+PAIR-KEY
+T{ ' PROTECTED-TX CATCH TX-ACTIVE? -> 0 TRUE }T
+\ A frame too short for its header is never one that the MAC decrypted, whatever its
+\ buffer still holds from before.
+T{ 0 0 FRAME OVER 3 + $10 SWAP C! ARRIVE RECEIVED RADIO-DECRYPTED? -> 0 0 FALSE }T
+\ With the radio off, RADIO-KEYS-CLEAR writes nothing.
+RADIO-STOP
+T{ 0 #WRITES ! RADIO-KEYS-CLEAR #WRITES @ RADIO-CCMP? RADIO-DECRYPTED? -> 0 FALSE FALSE }T
 S" ccmpreg" .RESULTS

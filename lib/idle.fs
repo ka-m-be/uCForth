@@ -1,6 +1,6 @@
 \ idle.fs - package IDLE: words that run while the console waits
 \
-\ The chain: at most 8 words ( -- ). KEY runs each of them once, again
+\ The chain: at most 12 words ( -- ). KEY runs each of them once, again
 \ and again, while it waits for a key: at the prompt, and between the
 \ bytes of a line. So a word of the chain never runs in the middle of
 \ another word. On a board the services of an application run here: the
@@ -44,7 +44,7 @@
 
 PACKAGE IDLE   \ lib/package.fs
 
-8 CONSTANT #CHAIN
+12 CONSTANT #CHAIN
 #CHAIN CELLS BUFFER: CHAIN        \ the xts of the chain; 0: a free place
 CHAIN #CHAIN CELLS 0 FILL         \ BUFFER: does not clear
 VARIABLE RUNNING                  \ RP@ of the IDLE-RUN that runs; 0: none
@@ -92,7 +92,7 @@ PUBLIC
 : IDLE+ ( xt -- )
   'KEY? @ ['] IDLE-KEY? <> IF  'KEY? @ OLD-KEY? !  ['] IDLE-KEY? 'KEY? !  THEN
   DUP PLACE-OF IF DROP EXIT THEN
-  0 PLACE-OF  DUP 0= ABORT" IDLE: 8 words in the chain already"  ! ;
+  0 PLACE-OF  DUP 0= ABORT" IDLE: 12 words in the chain already"  ! ;
 : IDLE- ( xt -- )   ?DUP IF  PLACE-OF ?DUP IF 0 SWAP ! THEN  THEN ;
 : .IDLE ( -- )   #CHAIN 0 DO  I CELLS CHAIN + @ ?DUP IF .NAME SPACE THEN  LOOP  CR ;
 

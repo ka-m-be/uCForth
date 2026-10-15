@@ -102,7 +102,7 @@ container:
 
 The output ends with:
 
-    ok> ALL-RESULTS all: 1055 tests, 0 errors
+    ok> ALL-RESULTS all: 1058 tests, 0 errors
 
 `build/ucf-linux-a64` runs in the container without an emulator: the
 container and the program are both for 64-bit ARM.
@@ -150,9 +150,9 @@ bits, on its kernel with 64 bits (start QEMU without `readonly=on`: the
 tests write files):
 
     localhost:/mnt# echo "ALSO FILES  INCLUDE tools/test.fs" | ./build/ucf-linux-i386 | tail -1
-    all: 10979 tests, 0 errors
+    all: 12186 tests, 0 errors
     localhost:/mnt# echo "ALSO FILES  INCLUDE tools/test.fs" | ./build/ucf-linux-x64 | tail -1
-    all: 10979 tests, 0 errors
+    all: 12186 tests, 0 errors
 
 So a real Linux kernel checks the signals and the calls of the system,
 which QEMU in Docker only emulates.
@@ -394,7 +394,7 @@ a pseudo terminal, and the tool for Linux (`build/ucf-a64`,
 
 Then the tests, as on the board: `#include forth/test/tester.fs`,
 `#include forth/test/t0.fs`, `#include forth/test/hayes.fs`, `#include
-forth/test/all.fs` give `all: 1055 tests, 0 errors` after about 10 s.
+forth/test/all.fs` give `all: 1058 tests, 0 errors` after about 10 s.
 `FREEZE` writes into `build/flash-s3.bin`: the next start has the new
 words. `#bye` ends `term`; QEMU ends with the container.
 
@@ -427,7 +427,7 @@ Its ROM runs in QEMU (`ets Jul 29 2019`), then `ok>` comes. There the
 CPU clock follows the registers, as on the chip: `ALSO CLOCK  CPU-MHZ
 .` gives 240. With `-serial pty` and `build/ucf-a64` as above (with
 `-machine esp32` and this flash file), t0, hayes and `all.fs` give
-`all: 1055 tests, 0 errors` in 3 s; `FREEZE` writes the flash file, and
+`all: 1058 tests, 0 errors` in 3 s; `FREEZE` writes the flash file, and
 the next start has the new words. No PSRAM (the module WROOM-32 has
 none).
 

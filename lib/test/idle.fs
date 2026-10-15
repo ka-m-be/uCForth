@@ -45,13 +45,15 @@ T{ ' ID-DEEP IDLE+  0 RUNS-A !  IDLE-RUN  RUNS-A @  ' ID-DEEP IDLE- -> 1 }T
 : NO-KEY ( -- c true | false )   FALSE ;
 T{ ' NO-KEY OLD-KEY? !  ' ID-A IDLE+  0 RUNS-A !  KEY? KEY?  RUNS-A @  ' ID-A IDLE- -> <FALSE> <FALSE> 2 }T
 
-\ ---- 8 words at most
+\ ---- 12 words at most
 : NOTHING ( "name" -- )   CREATE  DOES> DROP ;
-NOTHING W1  NOTHING W2  NOTHING W3  NOTHING W4  NOTHING W5  NOTHING W6  NOTHING W7  NOTHING W8  NOTHING W9
-: ALL+ ( -- )   ['] W1 IDLE+  ['] W2 IDLE+  ['] W3 IDLE+  ['] W4 IDLE+  ['] W5 IDLE+  ['] W6 IDLE+  ['] W7 IDLE+  ['] W8 IDLE+ ;
-: ALL- ( -- )   ['] W1 IDLE-  ['] W2 IDLE-  ['] W3 IDLE-  ['] W4 IDLE-  ['] W5 IDLE-  ['] W6 IDLE-  ['] W7 IDLE-  ['] W8 IDLE- ;
-T{ ALL+  ' W9 ' IDLE+ CATCH NIP  ALL- -> -2 }T
-T{ ' W9 IDLE+  ' W9 IDLE- -> }T
+NOTHING W1  NOTHING W2  NOTHING W3  NOTHING W4  NOTHING W5  NOTHING W6  NOTHING W7
+NOTHING W8  NOTHING W9  NOTHING W10  NOTHING W11  NOTHING W12  NOTHING W13
+CREATE WS  ' W1 , ' W2 , ' W3 , ' W4 , ' W5 , ' W6 , ' W7 , ' W8 , ' W9 , ' W10 , ' W11 , ' W12 ,
+: ALL+ ( -- )   12 0 DO  I CELLS WS + @ IDLE+  LOOP ;
+: ALL- ( -- )   12 0 DO  I CELLS WS + @ IDLE-  LOOP ;
+T{ ALL+  ' W13 ' IDLE+ CATCH NIP  ALL- -> -2 }T
+T{ ' W13 IDLE+  ' W13 IDLE- -> }T
 
 \ ---- -BREAK and +BREAK count, never below 0; the chain runs inside them
 T{ 0 NO-BREAK !  -BREAK -BREAK NO-BREAK @  +BREAK NO-BREAK @  +BREAK +BREAK NO-BREAK @ -> 2 1 0 }T

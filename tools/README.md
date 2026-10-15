@@ -10,6 +10,7 @@ after the package FILES.
 | `ucf.fs` | the tool `ucf`: `info`, `flash`, `reset`, `term`, `run` for an ESP32-S3 or an ESP32; a program for the Mac, Windows or Linux (section "ucf.fs") |
 | `genesis.fs` | uCForth builds its reference images itself and compares them with `seed/`; the exit status is 0 if they are the same |
 | `pick.fs` | package PICK: copies from a quarry of code of C (`blob/esp32`) only the functions and the data that an application needs; a pick list says which (section "pick.fs") |
+| `shadows.fs` | at the end of each package that loads after it: the words of the package that a package of its PACKAGE line hides (section "shadows.fs") |
 
     LC_ALL=C awk -f bootstrap/awk/ucf.awk -- host/files.fs tools/test.fs
     LC_ALL=C awk -f bootstrap/awk/ucf.awk -- host/files.fs tools/genesis.fs
@@ -229,3 +230,30 @@ the radio uses the copies, and how to pick again. A pick list for
 another application works in the same way: its entries, the names
 outside that it gives itself, and a file that loads the copies with
 CLINK, as `phy.fs` does.
+
+## shadows.fs
+
+Inside a package, the packages of its PACKAGE line come first in the
+search order (`lib/README.md`, "Packages"). A word of the package with
+the name of a word of such a package is found by the later words of
+the package only as that other word, without a message. `shadows.fs`
+puts a check before `END-PACKAGE`: at the end of each package that
+loads after it, one line for each such name: of the `PRIVATE`, the
+`PROTECTED` and the `PUBLIC` words. It changes nothing else;
+`.SHADOWS` gives the number of the lines. Load it first, then the
+files, for example all tests:
+
+    $ printf 'ALSO FILES INCLUDE tools/shadows.fs\nALSO FILES INCLUDE tools/test.fs\n' | build/ucf-c -32 host/files.fs
+    ...
+      LINK-NET: (TCP-CONNECT) is also in TCP
+    ...
+      RADIO-LINK: LINK-MAC is also in AP-LINK
+    ...
+    all: 12186 tests, 0 errors
+
+These two show on purpose: LINK-NET wraps the words of UDP and TCP in
+words with the same name (`: (TCP-CONNECT) ['] (TCP-CONNECT) LOCKED ;`),
+and RADIO-LINK hands its words on to the LINK of the same name; no
+later word of the two packages needs its own word under that name.
+With 16-bit cells there is no line. The test: `tools/test/shadows.fs`.
+

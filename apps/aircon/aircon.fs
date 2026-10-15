@@ -1,18 +1,18 @@
 \ aircon.fs - package AIRCON: the words of the application aircon
 \
 \ The start script apps/aircon/app.fs loads this file and the
-\ packages that it needs (RMT, IR, IRCODE, RTY3); its README has the
-\ words and the wiring. The pins: IR-OUT and IR-IN below.
+\ packages that it needs (RMT, IR, AC-BASE, IRCODE, IRCODE-READ, RTY3,
+\ RTY3-READ); its README has the words and the wiring. The pins: IR-OUT
+\ and IR-IN below.
 
 ONLY FORTH DEFINITIONS
-PACKAGE AIRCON  ALSO RTY3  ALSO IR   \ lib/package.fs
+PACKAGE AIRCON  ALSO AC-BASE  ALSO RTY3  ALSO RTY3-READ  ALSO IR   \ lib/package.fs
 
 4 CONSTANT IR-OUT                   \ GPIO 4: IRout of the transceiver (green wire)
 14 CONSTANT IR-IN                   \ GPIO 14: IRin (white wire)
 
 : TAKE ( a n -- )   \ a frame of the remote control becomes the state
   AC-DECODE 184 = IF  DUP AC-OK? IF AC-TAKE EXIT THEN  THEN  DROP ;
-: .BYTES ( a n -- )   0 ?DO  I IF SPACE THEN  DUP I + C@ .H2  LOOP  DROP CR ;
 64 BUFFER: LAST                     \ the last frame that LISTEN showed
 VARIABLE LAST-U                     \ its length in bytes
 : .CHANGES ( a u -- )   \ the bytes that differ from the last frame of the same length

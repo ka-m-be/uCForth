@@ -21,8 +21,8 @@ default; the build makes a 16-bit image):
 1 s, Python 10 s.) The output ends with:
 
       saved: ucf.hex
-      code: 6194 bytes at $100, image: 12310 bytes
-      written: build/ucf.com (18504 bytes), build/kernel.com (6194 bytes),
+      code: 6194 bytes at $100, image: 13414 bytes
+      written: build/ucf.com (19608 bytes), build/kernel.com (6194 bytes),
       build/ucf.scr (402 lines), build/ucf.lst (1033 lines of source)
 
 `build.fs` does three things:
@@ -212,7 +212,7 @@ terminal of the Mac.
        C:\UCF.COM < C:\TEST.TXT > COM1
        C:\DEBUG < C:\EXIT.SCR
 
-   The output ends with `all: 2742 tests, 0 errors`, 5 s with the start
+   The output ends with `all: 2882 tests, 0 errors`, 5 s with the start
    of FreeDOS.
 
 2. The bootstrap VM from the reference seed: its base image must be the
@@ -289,7 +289,7 @@ with the image of `build.fs` (base and FILES):
 
 | Area | Size | Free |
 | --- | --- | --- |
-| dictionary: words, `ALLOT`, `,` | 58 KB | 48 KB |
+| dictionary: words, `ALLOT`, `,` | 58 KB | 47 KB |
 | RAM data: `VARIABLE`, `VALUE`, `BUFFER:`, vocabularies | 3.5 KB | 2.1 KB |
 | data stack, return stack | 256 cells each | |
 | the input line | 250 characters from the keyboard, 256 from a file | |

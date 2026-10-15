@@ -159,8 +159,8 @@ CODE (WSR) ( -- )   WSR-TABLE,  END-CODE
 
 PUBLIC
 : CALL-AT ( a -- )
-  DUP IMG !  IMG >CHIP  2  [ ' (CALL) >CODE ] LITERAL  SYSCALL DROP  FALSE FROM-FAULT ! ;
-: LAST-FAULT ( -- )   FAULT-REGS IMG 108 MOVE  TRUE FROM-FAULT ! ;
+  DUP IMG !  IMG >CHIP  2  [ ' (CALL) >CODE ] LITERAL  SYSCALL DROP  FROM-FAULT OFF! ;
+: LAST-FAULT ( -- )   FAULT-REGS IMG 108 MOVE  FROM-FAULT ON! ;
 CODE SR@ ( n -- x )
   A2 TOS@,  A2 A2 0 8 EXTUI,
   A3 A2 2 SLLI,  A3 A3 A2 ADD.N,                     \ 5 n
@@ -277,7 +277,7 @@ VARIABLE REASON   VARIABLE STARTED   VARIABLE SKIP
   67 DSAVE@ IMG !  66 DSAVE@ IMG 4 + !  68 DSAVE@ IMG 8 + !  64 IMG 12 + !
   69 DSAVE@ IMG 84 + !  70 DSAVE@ IMG 88 + !  71 DSAVE@ IMG 92 + !
   64 DSAVE@ IMG 96 + !  65 DSAVE@ IMG 100 + !  72 DSAVE@ IMG 104 + !
-  FALSE FROM-FAULT ! ;
+  FROM-FAULT OFF! ;
 : IMG>DSAVE ( -- )   \ a0 to a15 and PC from the image: SET-REG works while it waits
   16 0 DO  IMG 20 + I CELLS + @  I DSAVE!  LOOP  IMG @ 67 DSAVE! ;
 : ?STARTED ( -- )   STARTED @ 0= ABORT" MON-ESP32: no function waits (DEBUG-AT)" ;
@@ -285,16 +285,16 @@ ALSO XTENSA
 : DISARM ( -- )   0 DEBUG-HOOK !  0 ICOUNTLEVEL SR!  0 IBREAKENABLE SR! ;
 PREVIOUS
 : (RUN) ( count breaks -- )
-  ARM-BREAKS !  ARM-COUNT !  FALSE ENDING !
+  ARM-BREAKS !  ARM-COUNT !  ENDING OFF!
   [ ' (HOOK) >CODE ] LITERAL DEBUG-HOOK !
   0 [ ' (DCALL) >CODE ] LITERAL SYSCALL DROP
   0 DEBUG-HOOK ! ;
 : RUN ( count breaks -- )   \ the function goes on: one step, or up to a stop
   REASON @ IF  SKIP @ IMG +!  0 SKIP !  IMG>DSAVE  THEN   \ after a BREAK: the instruction after it
-  ['] (RUN) CATCH ?DUP IF  DISARM  FALSE STARTED !  THROW  THEN
+  ['] (RUN) CATCH ?DUP IF  DISARM  STARTED OFF!  THROW  THEN
   ENDING @ IF
     6 0 DO  10 I + DSAVE@  IMG 28 + I CELLS + !  LOOP   \ a2 to a7: as the function left them
-    0 REASON !  FALSE STARTED !  EXIT
+    0 REASON !  STARTED OFF!  EXIT
   THEN
   DSAVE>IMG
   72 DSAVE@  DUP 1 AND IF 1 ELSE 3 THEN REASON !      \ ICOUNT: a step
@@ -311,7 +311,7 @@ PUBLIC
   DUP 32 + >CHIP OVER 12 - !  >CHIP 1 DSAVE!
   [ ' (TRAMP-END) >CODE $3FFFFFFF AND $80000000 OR ] LITERAL 8 DSAVE!   \ a8: the return, CALLX8
   6 0 DO  IMG 28 + I CELLS + @  10 I + DSAVE!  LOOP   \ a10 to a15: a2 to a7 of the image
-  0 REASON !  0 SKIP !  TRUE STARTED ! ;
+  0 REASON !  0 SKIP !  STARTED ON! ;
 : STEP ( -- )   ?STARTED  STEP-COUNT 0 RUN ;
 : GO ( -- )
   ?STARTED

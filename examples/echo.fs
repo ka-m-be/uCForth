@@ -12,6 +12,7 @@ ALSO FILES  INCLUDE lib/net/host.fs
 ONLY FORTH DEFINITIONS  ALSO INET  ALSO NET
 
 CREATE ECHO-BUF 256 ALLOT
+CREATE ECHO-ROOM 4096 ALLOT   \ the buffer of the server: our TCP/IP uses it, a system has its own
 : ECHO-ONCE ( sock -- )   \ the bytes that wait go back
   >R  ECHO-BUF 256 R@ SOCK-READ THROW  ECHO-BUF SWAP R> SOCK-WRITE THROW ;
 : SERVE ( sock -- )   \ until the client closes, or a key
@@ -19,7 +20,7 @@ CREATE ECHO-BUF 256 ALLOT
     DUP SOCK-AVAILABLE IF  DUP ECHO-ONCE  ELSE  NET-POLL  THEN
   REPEAT  SOCK-CLOSE DROP ;
 : ECHO-SERVER ( port -- )   \ the clients one after the other, until a key
-  TCP-LISTEN THROW
+  ECHO-ROOM 4096 ROT TCP-LISTEN THROW
   BEGIN  KEY? 0=  WHILE
     DUP TCP-ACCEPT IF  ." a client" CR  SERVE  ." closed" CR  ELSE  NET-POLL  THEN
   REPEAT  SOCK-CLOSE DROP  KEY DROP ;

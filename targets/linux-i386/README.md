@@ -20,8 +20,8 @@ In the folder `ucf`, with a bootstrap VM with 32-bit cells:
 The output ends with:
 
       saved: ucf.hex
-      code: 8816 bytes, image: 86824 bytes
-      written: build/ucf-linux-i386 (152360 bytes)
+      code: 8816 bytes, image: 88700 bytes
+      written: build/ucf-linux-i386 (154236 bytes)
 
 Each bootstrap VM builds the same file, byte for byte. `build.fs` does
 three things:
@@ -92,7 +92,7 @@ and DNS, with the same words as on each other system.
     0 172.66.157.237
 
 The test of the network: `echo "ALSO FILES  INCLUDE lib/net/test/net.fs"
-| build/ucf-linux-i386` gives `net: 89 tests, 0 errors` (in Docker: the command in section "Test" with this line). lib/net/README.md
+| build/ucf-linux-i386` gives `net: 93 tests, 0 errors` (in Docker: the command in section "Test" with this line). lib/net/README.md
 explains the words, `SYSCALL` with VM addresses, and the limits.
 
 ## An application, and the tool ucf
@@ -121,7 +121,7 @@ in QEMU):
     docker run --rm --platform linux/386 -v "$PWD":/u -w /u debian:bookworm-slim \
       sh -c 'echo "ALSO FILES  INCLUDE tools/test.fs" | ./build/ucf-linux-i386'
 
-The output ends with `all: 10979 tests, 0 errors`, after about 2 s.
+The output ends with `all: 12186 tests, 0 errors`, after about 2 s.
 
 **Tested (2026):** in Docker (Debian 12, i386, QEMU on the Mac): all
 tests; `ARG`; the exit status; the end of the input; `MS`; Ctrl-C at a
@@ -151,7 +151,7 @@ After the start, with the image of `build.fs` (base and FILES):
 
 | Area | Size | Free |
 | --- | --- | --- |
-| dictionary: words, `ALLOT`, `,` | 189 KB | 171 KB |
+| dictionary: words, `ALLOT`, `,` | 189 KB | 169 KB |
 | RAM data: `VARIABLE`, `VALUE`, `BUFFER:`, vocabularies | 63 KB | 61 KB |
 | data stack, return stack | 256 cells each | |
 | the input line | 256 characters | |

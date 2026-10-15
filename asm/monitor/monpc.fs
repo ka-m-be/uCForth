@@ -184,7 +184,7 @@ CREATE OLD-VECTORS  8 ALLOT           \ the vectors 1 and 3 before the run
 : RUN ( trap -- )   \ the code runs: one step ($100), or up to a stop (0)
   TRAP !  VECTORS!  (RESUME)  VECTORS-BACK
   REASON @ 1 =  ENDED? AND IF  0 REASON !  THEN
-  REASON @ 0= IF  FALSE STARTED !  THEN ;
+  REASON @ 0= IF  STARTED OFF!  THEN ;
 : ?STARTED ( -- )   STARTED @ 0= ABORT" MON-PC: no code waits (DEBUG-AT)" ;
 
 8 CONSTANT #BREAKS
@@ -205,7 +205,7 @@ PUBLIC
   IMG 20 + !  IMG 22 + !
   DEBUG-STACK 512 + 4 -  DUP IMG 24 + !  VM-SEG IMG 26 + !
   ['] (ENDED) >CODE OVER !  VM-SEG SWAP 2 + !      \ the way back for RETF: IP, then CS
-  $0202 IMG 18 + !  0 REASON !  TRUE STARTED ! ;
+  $0202 IMG 18 + !  0 REASON !  STARTED ON! ;
 : STEP ( -- )   ?STARTED  $100 RUN ;
 : GO ( -- )
   ?STARTED

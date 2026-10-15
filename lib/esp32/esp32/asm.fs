@@ -41,7 +41,7 @@ PACKAGE ASM  ALSO XTENSA  ALSO ROM  ALSO BOOTIMG   \ lib/package.fs
 \ The frozen part of the dictionary can lie in the flash (FLASH-DICT?):
 \ NEXT, and >CHIP, read its end from the table of the primitives.
 0 >CHIP  $10000 >CHIP $10000 -  -  DATA-OFF !
-TRUE FLASH-DICT? !
+FLASH-DICT? ON!
 
 66 CONSTANT DOCODE                  \ the code field of a CODE word
 $400A0000 CONSTANT SRAM0-END        \ the end of SRAM0 on the instruction bus

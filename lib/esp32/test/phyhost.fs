@@ -15,7 +15,7 @@ ONLY FORTH DEFINITIONS  ALSO FILES
 INCLUDE forth/test/tester.fs
 ONLY FORTH DEFINITIONS  ALSO FILES
 S" lib/text.fs" INCLUDED  S" asm/xtensa.fs" INCLUDED
-S" lib/esp32/test/mock.fs" INCLUDED  TRUE QUIET !
+S" lib/esp32/test/mock.fs" INCLUDED  QUIET ON!
 S" lib/esp32/clink.fs" INCLUDED
 ALSO INTERNALS  ' HOST! IS CODE!  PREVIOUS
 ONLY FORTH DEFINITIONS  ALSO FILES  ALSO TEXT  ALSO XTENSA  ALSO ROM  ALSO ASM  ALSO CLINK  ALSO INTERNALS
@@ -26,13 +26,11 @@ CREATE PHY-PATH  128 ALLOT
   PHY-FOLDER COUNT PHY-PATH PLACE  PARSE-NAME PHY-PATH +PLACE  PHY-PATH COUNT INCLUDED ;
 : #require ( "word" "file" -- )   \ the file, if the word is not there
   PARSE-NAME FIND-NAME IF  PARSE-NAME 2DROP EXIT  THEN  #include ;
-: SAME-BYTES? ( a1 a2 u -- f )   \ the u bytes at a1 and a2 are the same
-  0 ?DO  OVER I + C@  OVER I + C@ <> IF  2DROP FALSE UNLOOP EXIT  THEN  LOOP  2DROP TRUE ;
 : IN-SRAM0? ( a -- f )   $40080000 $400A0000 WITHIN ;
 
 VP @ CONSTANT VP0  HERE CONSTANT H0  CODE-SIZE CONSTANT CODE0
 INCLUDE lib/esp32/esp32/phy.fs
-ALSO INTERNALS  ALSO ESP32-PHY.I  ALSO ASM  ALSO CLINK
+ALSO INTERNALS  ALSO ESP32-PHY.I  ALSO ASM  ALSO CLINK  ALSO TEXT
 
 \ The link: no name waits; the names of the code, PHY-C and the marker
 \ are gone; the data and the words of ESP32-PHY stay.
@@ -66,7 +64,7 @@ T{ ana:rodata C@  ana:rodata 8 + C@  ana:rodata 11 + C@ -> 0 $30 $71 }T
 T{ INIT-DATA C@  INIT-DATA 44 + C@  INIT-DATA 57 + C@  INIT-DATA 127 + C@ -> 3 78 5 0 }T
 
 \ The start values: SAVE-START at the link; RESET-DATA puts them back.
-T{ START-VALUES C-DATA #C-DATA SAME-BYTES? -> TRUE }T
+T{ START-VALUES #C-DATA C-DATA #C-DATA STR= -> TRUE }T
 T{ C-DATA C@  $5A C-DATA C!  RESET-DATA  C-DATA C@ = -> TRUE }T
 T{ phy_init_flag C@  1 phy_init_flag C!  RESET-DATA  phy_init_flag C@ = -> TRUE }T
 

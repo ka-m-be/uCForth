@@ -25,10 +25,11 @@ DECIMAL
 10 0 77 2 IP CONSTANT OUR-IP      \ our TCP/IP
 255 255 255 0 IP CONSTANT MASK
 CREATE BUF 2000 ALLOT
+1536 BUFFER: ROOM   100 BUFFER: G-ROOM   \ the buffers of our UDP sockets
 
 \ ---- the side of the kernel: POSIX-NET, and a socket for ping
 ALSO POSIX-NET
-: K-UDP ( port -- h )   (UDP-OPEN) THROW ;
+: K-UDP ( port -- h )   0 0 ROT (UDP-OPEN) THROW ;   \ the kernel has its own buffer
 : K-SEND ( a u ip port h -- ior )   (SENDTO) ;
 : K-RECV ( a u h -- u2 ip port true | false )   (RECVFROM) ;
 : K-CLOSE ( h -- )   (CLOSE) DROP ;
@@ -52,7 +53,7 @@ VARIABLE U-OUR   VARIABLE U-KERNEL
   3000 0 DO  BUF 2000 U-OUR @ UDP-RECEIVE IF TRUE UNLOOP EXIT THEN  NET-POLL  LOOP  FALSE ;
 : KERNELS ( -- u ip port true | false )   \ a datagram for the kernel, in at most 3 s
   3000 0 DO  BUF 2000 U-KERNEL @ K-RECV IF TRUE UNLOOP EXIT THEN  NET-POLL  LOOP  FALSE ;
-T{ 47021 UDP-OPEN SWAP U-OUR ! -> 0 }T
+T{ ROOM 1536 47021 UDP-OPEN SWAP U-OUR ! -> 0 }T
 T{ 47022 K-UDP U-KERNEL ! -> }T
 T{ S" from linux" OUR-IP 47021 U-KERNEL @ K-SEND -> 0 }T
 T{ OURS -> 10 K-IP 47022 TRUE }T
@@ -84,7 +85,7 @@ T{ OURS -> 4 OUR-IP 47021 TRUE }T
 
 \ ---- a group (multicast): only after UDP-JOIN
 VARIABLE U-GROUP
-T{ 47023 UDP-OPEN SWAP U-GROUP ! -> 0 }T
+T{ G-ROOM 100 47023 UDP-OPEN SWAP U-GROUP ! -> 0 }T
 T{ U-KERNEL @ VIA-TAP  S" group" 224 0 0 251 IP 47023 U-KERNEL @ K-SEND -> 0 }T
 T{ 100 POLLS  BUF 100 U-GROUP @ UDP-RECEIVE -> FALSE }T
 T{ 224 0 0 251 IP U-GROUP @ UDP-JOIN -> 0 }T
@@ -119,9 +120,9 @@ U-KERNEL @ K-CLOSE  P-SOCK @ K-CLOSE
 
 \ ---- TCP: the side of the kernel
 ALSO POSIX-NET
-: K-LISTEN ( port -- h )   (TCP-LISTEN) THROW ;
+: K-LISTEN ( port -- h )   0 0 ROT (TCP-LISTEN) THROW ;   \ the kernel has its own buffers
 : K-ACCEPT ( h -- h2 true | false )   (TCP-ACCEPT) ;
-: K-CONNECT ( ip port -- h )   (TCP-CONNECT) THROW ;
+: K-CONNECT ( ip port -- h )   0 0 2SWAP (TCP-CONNECT) THROW ;
 : K-STATE ( h -- n )   (TCP-STATE) ;
 : K-WRITE ( a u h -- u2 ior )   (SEND) ;
 : K-READ ( a u h -- u2 ior )   (RECV) ;
@@ -165,11 +166,13 @@ VARIABLE OUR-S   VARIABLE K-S                \ the two ends of a test
   REPEAT
   GOT @ TOTAL @ =  WRONG @ 0= AND ;
 
-\ ---- TCP: we open, the kernel listens
+\ ---- TCP: we open, the kernel listens; our buffers: 2 KB each way
 3000 NET-TIMEOUT !
 VARIABLE K-SRV   VARIABLE K-C   VARIABLE OUR-C
+4096 BUFFER: C-ROOM   4096 BUFFER: S-ROOM
+: OUR-OPEN ( a u port -- sock ior )   >R >R >R  C-ROOM 4096  R> R> R> TCP-OPEN ;
 T{ 47031 K-LISTEN K-SRV ! -> }T
-T{ S" 10.0.77.1" 47031 TCP-OPEN SWAP OUR-C ! -> 0 }T
+T{ S" 10.0.77.1" 47031 OUR-OPEN SWAP OUR-C ! -> 0 }T
 T{ K-SRV @ K-ACCEPTED SWAP K-C ! -> TRUE }T
 T{ OUR-C @ SOCK-OPEN?  K-C @ K-OPEN? -> TRUE 1 }T
 T{ S" hello" OUR-C @ SOCK-WRITE -> 0 }T
@@ -184,7 +187,7 @@ T{ K-C @ K-OPEN? -> NET-CLOSED }T
 K-C @ K-CLOSE
 
 \ the kernel closes: we read the end
-T{ S" 10.0.77.1" 47031 TCP-OPEN SWAP OUR-C ! -> 0 }T
+T{ S" 10.0.77.1" 47031 OUR-OPEN SWAP OUR-C ! -> 0 }T
 T{ K-SRV @ K-ACCEPTED SWAP K-C ! -> TRUE }T
 T{ S" bye" K-C @ K-WRITE -> 3 0 }T
 K-C @ K-CLOSE
@@ -193,22 +196,22 @@ T{ BUF 100 OUR-C @ SOCK-READ  OUR-C @ SOCK-OPEN? -> 0 0 FALSE }T
 T{ OUR-C @ SOCK-CLOSE -> 0 }T
 
 \ the kernel resets the connection: our next write fails
-T{ S" 10.0.77.1" 47031 TCP-OPEN SWAP OUR-C ! -> 0 }T
+T{ S" 10.0.77.1" 47031 OUR-OPEN SWAP OUR-C ! -> 0 }T
 T{ K-SRV @ K-ACCEPTED SWAP K-C ! -> TRUE }T
 K-C @ K-RESET
 T{ 100 POLLS  OUR-C @ SOCK-OPEN?  S" x" OUR-C @ SOCK-WRITE -> FALSE NET-CLOSED }T
 T{ OUR-C @ SOCK-CLOSE -> 0 }T
 
 \ no server at the port; nobody at the address
-T{ S" 10.0.77.1" 47039 TCP-OPEN -> 0 NET-REFUSED }T
+T{ S" 10.0.77.1" 47039 OUR-OPEN -> 0 NET-REFUSED }T
 1000 NET-TIMEOUT !
-: TIMED-OPEN ( -- sock ior ms )   MILLIS >R  S" 10.0.77.3" 47031 TCP-OPEN  MILLIS R> - ;
+: TIMED-OPEN ( -- sock ior ms )   MILLIS >R  S" 10.0.77.3" 47031 OUR-OPEN  MILLIS R> - ;
 T{ TIMED-OPEN 900 1500 WITHIN -> 0 NET-TIMED-OUT TRUE }T
 3000 NET-TIMEOUT !
 
 \ ---- TCP: we listen, the kernel opens
 VARIABLE SRV
-T{ 47032 TCP-LISTEN SWAP SRV ! -> 0 }T
+T{ S-ROOM 4096 47032 TCP-LISTEN SWAP SRV ! -> 0 }T
 T{ OUR-IP 47032 K-CONNECT K-C ! -> }T
 : ACCEPTED ( server -- sock true | false )   \ a connection, in at most 3 s
   3000 0 DO  DUP TCP-ACCEPT IF  NIP TRUE UNLOOP EXIT  THEN  NET-POLL  LOOP  DROP FALSE ;

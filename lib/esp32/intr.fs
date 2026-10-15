@@ -72,7 +72,9 @@ INTR-STATUS CONSTANT STATUS     \ registers: the sources that ask, 32 in each
 6 CONSTANT NOWHERE              \ a CPU interrupt that no source reaches (as ESP-IDF)
 66 CONSTANT DOCODE               \ the code field of a CODE word (doc/vm.md, section 7)
 #SOURCES CELLS BUFFER: HANDLERS
+PROTECTED                       \ for the board test lib/esp32/esp32/test/irqueue.fs
 #SOURCES BUFFER: CPU            \ a byte for each source: its CPU interrupt, 1 or 19 to 21
+PRIVATE
 CPU #SOURCES CPU-INT FILL
 #SOURCES BUFFER: LIST           \ the sources for Forth handlers that are on, a byte each
 VARIABLE #ON                    \ their number
@@ -154,12 +156,12 @@ VARIABLE BROKE                  \ a handler stopped with -28: Ctrl-C did not wai
 : SERVE ( i -- )   \ the handler of source i; an error other than -28 switches source i off
   DUP CELLS HANDLERS + @  ?DUP 0= IF DROP EXIT THEN          ( i xt )
   DUP CATCH  ?DUP 0= IF 2DROP EXIT THEN                      ( i xt n )
-  DUP -28 = IF  TRUE BROKE !  DROP 2DROP EXIT  THEN
+  DUP -28 = IF  BROKE ON!  DROP 2DROP EXIT  THEN
   ROT  NOWHERE SWAP CELLS MAP + !                            \ one store: the list stays
   INT-STOPPED ;
 PUBLIC
 : (ISR) ( -- )   \ the kernel runs it after CPU interrupt 1: the handlers of the sources that ask
-  ERRMSG @  ERRMSG CELL+ @  FALSE BROKE !                    \ ERRMSG of the word that ran
+  ERRMSG @  ERRMSG CELL+ @  BROKE OFF!                       \ ERRMSG of the word that ran
   #ON @ 0 ?DO
     I LIST + C@  DUP ASKS?  OVER ON? AND IF SERVE ELSE DROP THEN
     BROKE @ IF LEAVE THEN

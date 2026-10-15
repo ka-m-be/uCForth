@@ -6,7 +6,7 @@ the ROM bootloader of the chip. The tool `ucf` (`tools/ucf.fs`) runs it
 in the RAM, writes it to the flash, and is the console with `#include`.
 
 **Status:** tested on the board (diymore ESP32-S3 N16R8): `ucf info`,
-`run` and `flash`; t0 and hayes over `#include`: 1055 tests, 0 errors;
+`run` and `flash`; t0 and hayes over `#include`: 1058 tests, 0 errors;
 the board starts uCForth from the flash, with the CPU at 240 MHz and
 the 8 MB PSRAM on; `FREEZE` on the board writes the running system to
 the flash; Ctrl-C stops the word that runs, an error of the CPU gives
@@ -56,12 +56,12 @@ The output ends with:
 
       saved: ucf.hex
       code: 8106 bytes at $40378000, start at $4037917C
-      image: $100-$00001D10 and $00010A00-$00019948, at $3FC90000 + VM address
+      image: $100-$00001D48 and $00010A00-$0001A094, at $3FC90000 + VM address
       start word: ON-BOOT
       FREEZE on the board: yes
       interrupts: yes
       Ctrl-C waits for NO-BREAK: yes
-      written: build/esp32s3.bin (60176 bytes)
+      written: build/esp32s3.bin (62096 bytes)
 
 1. `lib/package.fs` comes first: the packages for the board
    (`PACKAGE` ... `END-PACKAGE`) need it on the board too. Then
@@ -488,7 +488,7 @@ The package IDLE (`lib/idle.fs`, in the image; `ALSO IDLE`):
 
 | Word | Effect |
 | --- | --- |
-| `xt IDLE+` | xt ( -- ) runs from now on while the console waits (8 words at most) |
+| `xt IDLE+` | xt ( -- ) runs from now on while the console waits (12 words at most) |
 | `xt IDLE-` | not any more |
 | `IDLE-RUN` | each word of the chain once (`KEY` does it; a program with a loop of its own calls it) |
 | `.IDLE` | the words of the chain |
@@ -661,7 +661,7 @@ On the board, in `ucf term`:
     board ok> #include lib/esp32/esp32s3/test/asm.fs
     board ok> #include lib/net/test/board.fs
 
-Expected: `all: 1055 tests, 0 errors` (8 s at 240 MHz), then `intr: 18
+Expected: `all: 1058 tests, 0 errors` (8 s at 240 MHz), then `intr: 18
 tests, 0 errors` (the package INTR: errors of the CPU, handlers, an
 error in a handler, a timer while `MS` waits), `gpio: 20 tests, 0
 errors`, `timers: 7 tests, 0 errors`, `rmt: 31 tests, 0 errors` (the
@@ -701,13 +701,13 @@ ROM:
     cat forth/test/tester.fs forth/test/t0.fs forth/test/hayes.fs forth/test/all.fs |
       python3 ../archive/m0-m3/tests/xtensa_emu.py build/esp32s3.bin | tail -2
 
-Expected, after about 40 s: `all: 1055 tests, 0 errors`. The emulator
+Expected, after about 40 s: `all: 1058 tests, 0 errors`. The emulator
 has no interrupts: `?RX` takes the bytes from UART0 itself.
 
 In QEMU, the emulator of Espressif with the real ROM of the chip
 (doc/qemu.md, section "The ESP32 in QEMU"): the image as it is, from a
 flash file of 16 MB. There, `ucf term` runs all of t0, hayes and
-`all.fs` over a pseudo terminal: `all: 1055 tests, 0 errors` in 10 s;
+`all.fs` over a pseudo terminal: `all: 1058 tests, 0 errors` in 10 s;
 `FREEZE` writes the flash file, and the next start has the new words.
 QEMU has no GPIO and no RMT, so the tests of `lib/esp32/esp32s3/test/`
 do not run there; the CPU stays at 80 MHz.
@@ -732,7 +732,7 @@ eleven files for the board):
 
 | Area | Size | Free |
 | --- | --- | --- |
-| dictionary: words, `ALLOT`, `,`; inside the chip | 189 KB | 154 KB |
+| dictionary: words, `ALLOT`, `,`; inside the chip | 189 KB | 152 KB |
 | RAM data: `VARIABLE`, `VALUE`, `BUFFER:`, vocabularies; in the PSRAM after `PSRAM-ON` | 8 MB | 8 MB |
 | RAM data inside the chip: the image, `SRAM-BUFFER:` | 63 KB | 57 KB |
 | data stack, return stack | 256 cells each | |

@@ -24,7 +24,7 @@ A *bootstrap VM* runs uCForth on a computer that has no uCForth yet
 awk:
 
     $ LC_ALL=C awk -f bootstrap/awk/ucf.awk
-    uCForth - awk bootstrap VM - 16 bit - 163 words in FORTH - built in 1 s
+    uCForth - awk bootstrap VM - 16 bit - 165 words in FORTH - built in 1 s
     ok> 3 4 + .
     7
     ok> : SQUARE ( n -- n*n )  DUP * ;
@@ -45,7 +45,7 @@ of this manual:
 
     $ cc -O2 -o build/ucf-c bootstrap/c/ucf.c
     $ build/ucf-c
-    uCForth - C bootstrap VM - 16 bit - 163 words in FORTH - built in 4 ms
+    uCForth - C bootstrap VM - 16 bit - 165 words in FORTH - built in 4 ms
     ok>
 
 There are bootstrap VMs for Python and for JavaScript too; the
@@ -60,7 +60,7 @@ Files on the command line load before the keyboard. They come after
 (`host/files.fs`) gives uCForth files and `INCLUDE`:
 
     $ LC_ALL=C awk -f bootstrap/awk/ucf.awk -- host/files.fs
-    uCForth - awk bootstrap VM - 16 bit - 163 words in FORTH - built in 1 s
+    uCForth - awk bootstrap VM - 16 bit - 165 words in FORTH - built in 1 s
     ok> INCLUDE examples/hello.fs
     Hello from uCForth
 
@@ -94,12 +94,12 @@ words of a package.
 
     $ LC_ALL=C awk -f bootstrap/awk/ucf.awk -- host/files.fs tools/test.fs </dev/null
     ...
-    all: 2742 tests, 0 errors
+    all: 2882 tests, 0 errors
 
 This takes about 20 s. `</dev/null` gives the bootstrap VM an empty
 keyboard: without it, the bootstrap VM waits for keys after the last
 file. With `-32` (32-bit cells, before `host/files.fs`), more packages
-run their tests: `all: 10979 tests, 0 errors`.
+run their tests: `all: 12186 tests, 0 errors`.
 
 ## 4 A program for your computer
 
@@ -110,7 +110,7 @@ minute):
 
     $ LC_ALL=C awk -f bootstrap/awk/ucf.awk -- -32 host/files.fs targets/macos-a64/build.fs </dev/null
     ...
-      code: 7900 bytes, image: 86824 bytes
+      code: 7900 bytes, image: 88700 bytes
       written: build/ucf-macos-a64 (115696 bytes)
     $ chmod +x build/ucf-macos-a64
     $ build/ucf-macos-a64
@@ -144,7 +144,7 @@ The program runs all tests in about 0.4 s:
 
     $ echo "ALSO FILES  INCLUDE tools/test.fs" | build/ucf-macos-a64
     ...
-    all: 10979 tests, 0 errors
+    all: 12186 tests, 0 errors
 
 On macOS and Linux, the program also has the network: TCP, UDP and
 names over DNS (lib/net/README.md). Our own TCP/IP in Forth, for a
@@ -163,7 +163,7 @@ image. A double click opens it, and the prompt comes at once
 
     $ LC_ALL=C awk -f bootstrap/awk/ucf.awk -- -32 host/files.fs targets/browser/build.fs </dev/null
     ...
-      written: build/ucf-web.html (122514 bytes, 32-bit cells)
+      written: build/ucf-web.html (128140 bytes, 32-bit cells)
 
 ## 5 The tool ucf (macOS)
 
@@ -174,7 +174,7 @@ packages (`tools/ucf.fs`). The bootstrap VM builds it as in step 4
 
     $ LC_ALL=C awk -f bootstrap/awk/ucf.awk -- -32 host/files.fs tools/ucf.fs targets/macos-a64/build.fs </dev/null
     ...
-      written: build/ucf (132208 bytes)
+      written: build/ucf (148720 bytes)
     $ chmod +x build/ucf
 
 Its commands are in tools/README.md. With `targets/win32/build.fs`
@@ -283,7 +283,7 @@ here the port is `/dev/cu.usbserial-110`:
     ...
     $ build/ucf flash /dev/cu.usbserial-110 build/esp32.bin 0x1000
     ...
-    47 KB in 5.2 s
+    48 KB in 5.4 s
     The board waits in the bootloader; reset starts it.
     $ build/ucf reset /dev/cu.usbserial-110
     $ build/ucf term /dev/cu.usbserial-110
@@ -291,21 +291,23 @@ here the port is `/dev/cu.usbserial-110`:
 The words are the same as on the ESP32-S3, and so is the line for an
 application: `apps/aircon/app.fs` runs on both boards.
 
-**The IR bridge on the WROOM** (in work: the WLAN with a saved
-network, a setup network, sockets, IR in the background): after the
-steps above, one line loads it and freezes it into the flash (about 2
-minutes):
+**The IR bridge on the WROOM**: after the steps above, one line loads
+it and freezes it into the flash (about 3 minutes):
 
     $ build/ucf term /dev/cu.usbserial-110 apps/irbridge/app.fs
     ...
-    irbridge: ready; WBACK-START joins the saved WLAN, 4 14 IR-Q-START starts IR
-    board ok> WBACK-START
-    WLAN back: link and DHCP ready
+    irbridge: ready; WBACK-START joins the saved WLAN, then BRIDGE-LOAD and 4 14 BRIDGE-START
+    board ok> #reset
+    board ok> ALSO BRIDGE-BOOT  BRIDGE-BOOT-ON  FREEZE
 
-Then the words of NET work as on a host. `WBACK-START` needs the
-profile of the network in the flash, and the passphrase is typed only
-at the board: apps/irbridge/README.md has these steps, the setup
-network, IR, and what to do when it does not work.
+From then on the board starts the bridge by itself after each reset.
+Hold its button BOOT for 3 s: it opens the setup network `IRBRIDGE-`
+and 6 hex digits, and a phone gives it the WLAN and the broker at
+`http://192.168.77.1/`. Then the bridge reports the IR frames that it
+hears to the broker and sends those that it gets; its web page shows
+the state, and its LED shows whether the WLAN and the broker are
+connected. apps/irbridge/README.md has the steps, the topics, the web
+page, the LED, and what to do when it does not work.
 
 ## 7 Where next
 
@@ -316,7 +318,7 @@ network, IR, and what to do when it does not work.
 | the virtual machine and its rules | doc/vm.md |
 | how a bootstrap VM works | bootstrap/c/README.md (the reference), bootstrap/awk/README.md, bootstrap/bash/README.md, doc/genesis.md |
 | packages | lib/README.md |
-| the network: TCP, UDP, DNS on macOS and Linux; our own TCP/IP in Forth for a board; the layers | lib/net/README.md |
+| the network: TCP, UDP, DNS on macOS and Linux; our own TCP/IP in Forth for a board; the layers; MQTT | lib/net/README.md |
 | the host: files, serial lines, term | host/README.md |
 | the ESP32-S3: `FREEZE`, clock, PSRAM, interrupts, GPIO, timers, the RMT, `CODE` words | targets/esp32s3/README.md |
 | the ESP32: the board, its memory, `CODE` words in SRAM0, what is different; which of the two chips | targets/esp32/README.md, lib/esp32/README.md ("Which board") |
@@ -356,9 +358,13 @@ checks run on the bootstrap VM or on a program.
 | `build/ucf-a64`, `build/ucf-x64`, `build/ucf-i386` (the tool for Linux) | `LC_ALL=C awk -f bootstrap/awk/ucf.awk -- -32 host/files.fs tools/ucf.fs targets/linux-a64/build.fs </dev/null`, the same with `targets/linux-x64/build.fs` or `targets/linux-i386/build.fs` | 20 s each |
 | `build/ucf-intel` (the tool for a Mac with Intel) | `LC_ALL=C awk -f bootstrap/awk/ucf.awk -- -32 host/files.fs tools/ucf.fs targets/macos-x64/build.fs </dev/null` | 80 s |
 | `build/ucf-web.html` (a web browser) | `LC_ALL=C awk -f bootstrap/awk/ucf.awk -- -32 host/files.fs targets/browser/build.fs </dev/null` | 2 s |
-| all tests on the Mac | `echo "ALSO FILES  INCLUDE tools/test.fs" \| build/ucf-macos-a64` | 0.1 s |
+| all tests on the Mac | `echo "ALSO FILES  INCLUDE tools/test.fs" \| build/ucf-macos-a64` | 2.9 s |
 | the tests of the network (macOS, Linux) | `echo "ALSO FILES  INCLUDE lib/net/test/net.fs" \| build/ucf-macos-a64` | 1.3 s |
-| the same tests over our TCP/IP, without a network | `echo "ALSO FILES  INCLUDE lib/net/test/loop.fs" \| build/ucf-macos-a64` | 1.1 s |
+| the same tests over our TCP/IP, without a network, and the tests of the buffers | `echo "ALSO FILES  INCLUDE lib/net/test/loop.fs" \| build/ucf-macos-a64` | 1.1 s |
+| the tests of JSON | `echo "ALSO FILES  INCLUDE lib/test/json.fs" \| build/ucf-macos-a64` | 0.1 s |
+| the tests of MQTT, with a broker in Forth | `echo "ALSO FILES  INCLUDE lib/net/test/mqtt.fs" \| build/ucf-macos-a64` | 0.3 s |
+| the tests of MQTT against a broker on the Mac (port 1883, no password) | `echo "ALSO FILES  INCLUDE lib/net/test/mqttnet.fs" \| build/ucf-macos-a64` | 5 s |
+| the tests of the IR bridge, with mocks | `echo "ALSO FILES  INCLUDE apps/irbridge/test/bridge.fs" \| build/ucf-macos-a64` | 0.1 s |
 
 With the C bootstrap VM (`build/ucf-c` instead of `LC_ALL=C awk -f
 bootstrap/awk/ucf.awk --`), each command takes less than half a second,

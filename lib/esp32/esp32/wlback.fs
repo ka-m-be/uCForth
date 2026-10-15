@@ -17,6 +17,9 @@
 \                           keys in the RAM go, the saved profile stays
 \   WBACK-READY? ( -- f )   joined, the link is up, the address came from DHCP
 \   WBACK-RUNNING? ( -- f ) between WBACK-START and WBACK-STOP
+\   WBACK-GAVE-UP? ( -- f ) a step failed, and even its stop: the recovery
+\                           ended by itself (an application may start the
+\                           chip again); false again after WBACK-START
 \   .WBACK ( -- )           the state, the attempts, the joins, the code of the
 \                           last failure (0 after a join)
 \   WLAN-BOOT-ON ( -- )     after each start of the board: WBACK-START, then
@@ -48,6 +51,7 @@ VARIABLE DELAY-MS                \ the pause before the next attempt
 VARIABLE LAST-ERROR              \ the code of the last failure; 0 after a join
 VARIABLE ATTEMPTS
 VARIABLE JOINS
+VARIABLE GAVE-UP                 \ a step failed, and even its stop
 
 : OFFLINE ( -- )   \ all off: network, link, scan, station, radio; the addresses go
   NET-STOP WLINK-STOP WIFI-SCAN-CANCEL WIFI-LEAVE RADIO-STOP NET-DOWN ;
@@ -90,7 +94,7 @@ VARIABLE JOINS
   ENABLED @ 0= IF EXIT THEN
   ['] STEP CATCH  ?DUP 0= IF EXIT THEN
   DUP -28 = IF THROW THEN                                 \ Ctrl-C as at the console
-  ['] FAILED CATCH ?DUP IF  NIP  FALSE ENABLED !  THROW  THEN ;   \ not even the stop works
+  ['] FAILED CATCH ?DUP IF  NIP  ENABLED OFF!  GAVE-UP ON!  THROW  THEN ;      \ not even the stop works
 
 PUBLIC
 : WBACK-STEP ( -- )   WORK ;
@@ -98,15 +102,16 @@ PUBLIC
   ENABLED @ ABORT" WLAN-BACK: already started"
   LINK-AP? ABORT" WLAN-BACK: stop the setup AP first"
   WLAN-SAVED? 0= IF -431 THROW THEN
-  OFFLINE LINK-STATION  S-WAIT BACK-STATE !  0 LAST-ERROR ! 0 ATTEMPTS ! 0 JOINS !
-  1000 DELAY-MS !  MILLIS DUE !  TRUE ENABLED !  ['] WBACK-STEP IDLE+ ;
+  OFFLINE LINK-STATION  S-WAIT BACK-STATE !  0 LAST-ERROR ! 0 ATTEMPTS ! 0 JOINS !  GAVE-UP OFF!
+  1000 DELAY-MS !  MILLIS DUE !  ENABLED ON!  ['] WBACK-STEP IDLE+ ;
 : WBACK-STOP ( -- )
   LINK-AP? ABORT" WLAN-BACK: the setup AP runs; SETUP-STOP ends it"
-  FALSE ENABLED !  ['] WBACK-STEP IDLE-  OFFLINE  S-WAIT BACK-STATE ! ;
+  ENABLED OFF!  ['] WBACK-STEP IDLE-  OFFLINE  S-WAIT BACK-STATE ! ;
 : WBACK-READY? ( -- f )   BACK-STATE @ S-READY = ;
 : WBACK-RUNNING? ( -- f )   ENABLED @ ;
+: WBACK-GAVE-UP? ( -- f )   GAVE-UP @ ;
 : .WBACK ( -- )
   ." WLAN back state/attempts/joins/code: " BACK-STATE @ . ATTEMPTS @ . JOINS @ . LAST-ERROR @ . CR ;
 : WLAN-BOOT-ON ( -- )   ['] WBACK-START 'SETUP !  ['] QUIT 'LOOP !  TURNKEY ;
-: WLAN-BOOT-OFF ( -- )   FALSE AUTORUN !  ['] NOOP 'SETUP !  ['] NOOP 'LOOP ! ;
+: WLAN-BOOT-OFF ( -- )   AUTORUN OFF!  ['] NOOP 'SETUP !  ['] NOOP 'LOOP ! ;
 END-PACKAGE

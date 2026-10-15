@@ -33,14 +33,14 @@ on the command line load before the keyboard:
 Files and `INCLUDE` come with the package FILES:
 
     $ bash bootstrap/bash/ucf.sh host/files.fs
-    uCForth - bash bootstrap VM - 16 bit - 163 words in FORTH - built in 20 s
+    uCForth - bash bootstrap VM - 16 bit - 165 words in FORTH - built in 20 s
     ok> INCLUDE examples/hello.fs
     Hello from uCForth
 
 `FREEZE` saves the image to `ucf.hex` (or to the file in `$UCF_IMAGE`):
 
     $ bash bootstrap/bash/ucf.sh
-    uCForth - bash bootstrap VM - 16 bit - 163 words in FORTH - built in 20 s
+    uCForth - bash bootstrap VM - 16 bit - 165 words in FORTH - built in 20 s
     ok> : HELLO  ." Hello" CR ;
     ok> FREEZE
       saved: ucf.hex
@@ -178,7 +178,7 @@ Then all tests of the words, with 16 and 32 bit (`-32`):
 Expected, and the exit status 0:
 
     t0: 183 tests, 0 errors
-    hayes: 872 tests, 0 errors
+    hayes: 875 tests, 0 errors
     files: 26 tests, 0 errors
     ihex: 11 tests, 0 errors
     vm: 9 tests, 0 errors
@@ -186,7 +186,7 @@ Expected, and the exit status 0:
     text: 10 tests, 0 errors
     package: 8 tests, 0 errors
     slip: 6 tests, 0 errors
-    all: 2742 tests, 0 errors
+    all: 2882 tests, 0 errors
 
 Between these lines, some tests show messages such as `redefined HD-A`
 or `cannot open host/test/none.tmp`: the tests cause them on purpose.

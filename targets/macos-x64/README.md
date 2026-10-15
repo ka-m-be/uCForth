@@ -20,7 +20,7 @@ In the folder `ucf`, with a bootstrap VM with 32-bit cells:
 The output ends with:
 
       saved: ucf.hex
-      code: 8576 bytes, image: 86824 bytes
+      code: 8576 bytes, image: 88700 bytes
       written: build/ucf-macos-x64 (115696 bytes)
 
 Each bootstrap VM builds the same file, byte for byte. `build.fs` does
@@ -71,9 +71,9 @@ outside the program (for example `$7FFFFFF0 @`) is the error -9
 
     $ echo "ALSO FILES  INCLUDE tools/test.fs" | build/ucf-macos-x64
     ...
-    all: 10979 tests, 0 errors
+    all: 12186 tests, 0 errors
 
-With Rosetta on a Mac with Apple silicon this takes 0.6 s
+With Rosetta on a Mac with Apple silicon this takes 4.2 s
 (`arch -x86_64` in front).
 
 **Tested (2026):** on macOS 26 with Rosetta (a Mac with M4): all tests;
@@ -113,7 +113,7 @@ or build them on this Mac with a bootstrap VM (section "Build").
 
        $ echo "ALSO FILES  INCLUDE tools/test.fs" | build/ucf-macos-x64
        ...
-       all: 10979 tests, 0 errors
+       all: 12186 tests, 0 errors
 
 4. With an ESP32-S3 board at a USB port (`ls /dev/cu.*` shows its name;
    `lsof` on it shows no other program):
@@ -153,7 +153,7 @@ and DNS, with the same words as on each other system.
     0 172.66.157.237
 
 The test of the network: `echo "ALSO FILES  INCLUDE lib/net/test/net.fs"
-| build/ucf-macos-x64` gives `net: 89 tests, 0 errors` (also with Rosetta on Apple silicon). lib/net/README.md
+| build/ucf-macos-x64` gives `net: 93 tests, 0 errors` (also with Rosetta on Apple silicon). lib/net/README.md
 explains the words, `SYSCALL` with VM addresses, and the limits.
 
 ## An application, and the tool ucf
@@ -222,7 +222,7 @@ After the start, with the image of `build.fs` (base and FILES):
 
 | Area | Size | Free |
 | --- | --- | --- |
-| dictionary: words, `ALLOT`, `,` | 189 KB | 171 KB |
+| dictionary: words, `ALLOT`, `,` | 189 KB | 169 KB |
 | RAM data: `VARIABLE`, `VALUE`, `BUFFER:`, vocabularies | 63 KB | 61 KB |
 | data stack, return stack | 256 cells each | |
 | the input line | 256 characters | |

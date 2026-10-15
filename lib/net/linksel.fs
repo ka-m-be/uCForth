@@ -35,8 +35,8 @@ PUBLIC
   WLINK-POOL-SIZE AP-POOL-SIZE MAX < ABORT" LINK: the packet RAM is too small"
   DUP WLINK-POOL! AP-POOL! ;
 : LINK-AP? ( -- f ) AP-MODE @ ;
-: LINK-STATION ( -- ) ?OFF FALSE AP-MODE ! ;
-: LINK-ACCESS ( -- ) ?OFF TRUE AP-MODE ! ;
+: LINK-STATION ( -- ) ?OFF AP-MODE OFF! ;
+: LINK-ACCESS ( -- ) ?OFF AP-MODE ON! ;
 : LINK-MAC ( -- a ) 0 CALL ;
 : LINK-MTU ( -- n ) 1500 ;
 : LINK-UP? ( -- f ) 1 CALL ;

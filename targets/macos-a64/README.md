@@ -15,7 +15,7 @@ In the folder `ucf`, with a bootstrap VM with 32-bit cells:
 The output ends with:
 
       saved: ucf.hex
-      code: 7900 bytes, image: 86824 bytes
+      code: 7900 bytes, image: 88700 bytes
       written: build/ucf-macos-a64 (115696 bytes)
 
 The build takes about 30 s: SHA-256 for the signature in Forth on the
@@ -64,9 +64,9 @@ not look at them. The tool `build/ucf` is such an application
 
     $ echo "ALSO FILES  INCLUDE tools/test.fs" | build/ucf-macos-a64
     ...
-    all: 10979 tests, 0 errors
+    all: 12186 tests, 0 errors
 
-This takes about 0.4 s. `tools/genesis.fs` (the reference images,
+This takes about 2.8 s. `tools/genesis.fs` (the reference images,
 32 bit) takes 0.4 s.
 
 ## Serial lines
@@ -94,7 +94,7 @@ and DNS, with the same words as on each other system.
     0 172.66.157.237
 
 The test of the network: `echo "ALSO FILES  INCLUDE lib/net/test/net.fs"
-| build/ucf-macos-a64` gives `net: 89 tests, 0 errors`. lib/net/README.md
+| build/ucf-macos-a64` gives `net: 93 tests, 0 errors`. lib/net/README.md
 explains the words, `SYSCALL` with VM addresses, and the limits.
 
 ## How it works
@@ -132,7 +132,7 @@ After the start, with the image of `build.fs` (base and FILES):
 
 | Area | Size | Free |
 | --- | --- | --- |
-| dictionary: words, `ALLOT`, `,` | 189 KB | 171 KB |
+| dictionary: words, `ALLOT`, `,` | 189 KB | 169 KB |
 | RAM data: `VARIABLE`, `VALUE`, `BUFFER:`, vocabularies | 63 KB | 61 KB |
 | data stack, return stack | 256 cells each | |
 | the input line | 256 characters | |

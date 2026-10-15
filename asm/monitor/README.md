@@ -734,7 +734,7 @@ On Windows (32-bit cells), measured in Wine:
 | WINDOWS | 0.9 KB |
 | MONITOR, DISX86 | 26.0 KB |
 | MON-WIN32 | 33.2 KB: 32 KB of it are the memory of the assembler X86 for the code (`TARGET`), which your code uses too |
-| free afterwards | 96.6 KB of 171 KB |
+| free afterwards | 94.7 KB of 169 KB |
 
 With 32-bit cells, measured on the ESP32 (board WROOM-32):
 
@@ -744,16 +744,16 @@ With 32-bit cells, measured on the ESP32 (board WROOM-32):
 | XTENSA, ASM (CODE words) | 14.3 KB | 20 bytes |
 | MONITOR, DISXT | 20.5 KB (MONITOR 2.9 KB, DISXT 17.6 KB) | |
 | MON-ESP32 | 10.3 KB: 4 KB of it the stack for `DEBUG-AT`, 0.6 KB the register files | 4.4 KB |
-| free afterwards | 112.2 KB of 189 KB (measured with the old map of 192 KB: 48.2 KB of 125 KB) | 115 KB |
+| free afterwards | 110.3 KB of 189 KB (measured with the old map of 192 KB: 48.2 KB of 125 KB) | 115 KB |
 
 DISXT has 302 instructions in its table (8 KB) and the names of 67
 special registers. On the ESP32-S3 the code of the CODE words is in the
 dictionary: there XTENSA and ASM take 14.0 KB, MON-ESP32 14.6 KB with
-its code, the others as above; of the 154 KB that are free after the
-start, 104 KB stay free.
+its code, the others as above; of the 152 KB that are free after the
+start, 102 KB stay free.
 
 AArch64, measured with `build/ucf-macos-a64`: MONITOR and DISA64 take
-47.3 KB (DISA64 44.3 KB), of the 171 KB that are free after the start.
+47.3 KB (DISA64 44.3 KB), of the 169 KB that are free after the start.
 The table of DISA64 has 482 lines (11.3 KB), the names of 469 system
 registers take 7.0 KB, those of 236 operations of SYS 3.8 KB.
 

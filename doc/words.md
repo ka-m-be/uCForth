@@ -1,7 +1,7 @@
 # Words: the vocabularies FORTH and INTERNALS
 
-This is the reference for the base of uCForth: the 163 words of the
-vocabulary FORTH and the 122 words of the vocabulary INTERNALS, as
+This is the reference for the base of uCForth: the 165 words of the
+vocabulary FORTH and the 128 words of the vocabulary INTERNALS, as
 `forth/core.fs` and `forth/base.fs` make them. `doc/forth.md` explains
 the words of FORTH in groups, with examples.
 
@@ -101,7 +101,7 @@ The letters in the stack effects:
 | `.H2` | colon | I base 5 | `( c -- )` | show a byte as two hex digits |
 | `.HEX` | colon | I base 5 | `( u -- )` | show a cell in hex with all its digits: 4 or 8 |
 | `.ID` | colon | I base 4 | `( nt -- )` | show the name of a header |
-| `.NAME` | colon | I base 5 | `( xt -- )` | show the name of a word; `?` if no header has this xt |
+| `.NAME` | colon | I base 5 | `( xt -- )` | show the name of a word; if no header has this xt: `?` and the xt in hex |
 | `.R` | colon | F core 13 | `( n w -- )` | show n at the right side of a field of w characters |
 | `.S` | colon | F base 5 | `( -- )` | show the data stack; it does not change |
 | `.WL` | colon | I base 4 | `( wl -- )` | show the name of a wordlist and a space; `?` if it has no name |
@@ -117,7 +117,7 @@ The letters in the stack effects:
 | `2DROP` | opt 53 | F core 2 | `( x1 x2 -- )` | take the two top items away |
 | `2DUP` | opt 52 | F core 2 | `( x1 x2 -- x1 x2 x1 x2 )` | copy the two top items |
 | `:` | colon | F core 16 | `( "name" -- )` | start the definition of name |
-| `;` | colon IC | F core 16 | `( -- )` | end the definition; the word is visible now |
+| `;` | colon IC | F core 16 | `( -- )` | end the definition; the word is visible now. Error -8 if the code ran into the temp store or past `DICT-END` |
 | `<` | opt 44 | F core 5 | `( n1 n2 -- f )` | true if n1 is less than n2 |
 | `<#` | colon | F core 13 | `( -- )` | start a number text |
 | `<>` | colon | F core 5 | `( x1 x2 -- f )` | true if x1 is not equal to x2 |
@@ -211,12 +211,12 @@ The letters in the stack effects:
 | `FILL` | opt 56 | F core 5 | `( a u c -- )` | fill u bytes from a on with the byte c |
 | `FIND-NAME` | opt 58 | I core 7 | `( a u -- nt \| 0 )` | search the name a u in the search order |
 | `FLAG!` | colon | I core 3 | `( mask -- )` | set the bits of mask in the count byte of the newest header |
-| `FORGET-UNFINISHED` | colon | I core 10 | `( -- )` | give back the space of a header that is not visible |
+| `FORGET-UNFINISHED` | colon | I core 10 | `( -- )` | give back the space of a header that is not visible; of a temp header also its place in the temp store |
 | `FORTH` | voc | F base 4 | `( -- )` | put the vocabulary FORTH first in the search order, in place of the one that is there |
-| `FREEZE` | colon | F base 6 | `( -- )` | save the system as it is now; the dictionary below `HERE` is read-only from then on |
+| `FREEZE` | colon | F base 6 | `( -- )` | save the system as it is now; the dictionary below `HERE` is read-only from then on. Not while a package uses the temp store |
 | `FROZEN-END` | sysvar | I vm 4 | `( -- a )` | the end of the frozen part: below it the dictionary is read-only |
 | `HANDLER` | sysvar | I vm 4 | `( -- a )` | the return stack pointer of the newest `CATCH`; 0: none |
-| `HEADER` | colon | I core 10 | `( a u -- )` | make a new header with the name a u in `CURRENT`; it is not visible yet |
+| `HEADER` | colon | I core 10 | `( a u -- )` | make a new header with the name a u in `CURRENT`; it is not visible yet. A temp header if the record of `CURRENT` lies in the temp store |
 | `HERE` | colon | F core 2 | `( -- a )` | the next free address of the dictionary |
 | `HEX` | colon | F core 13 | `( -- )` | the number base is 16 |
 | `HIDE` | colon | F base 6 | `( "name" -- )` | the search does not find name any more |
@@ -238,12 +238,13 @@ The letters in the stack effects:
 | `LAST-CR` | var | I core 12 | `( -- a )` | true: the last line ended with CR, so `ACCEPT` skips a LF that follows |
 | `LATEST` | sysvar | I vm 4 | `( -- a )` | the nt of the newest header, also before it is visible |
 | `LEAVE` | colon CU | F base 2 | `( -- )` | leave the loop at once |
+| `LIMIT` | colon | I core 6 | `( -- a )` | the end of the free dictionary: `TEMP-START` (`DICT-END` while the temp store is empty) |
 | `LIT` | prim 5 C | I vm 7 | `( -- x )` | push the next cell of the body |
 | `LITERAL` | colon IC | F core 11 | `( x -- )` | compile x as a number into the definition |
 | `LOOP` | colon IC | F base 2 | `( -- )` | add 1 to the index; go back to `DO` until the index is the limit. Compile: `( a1 a2 -- )` |
 | `LSHIFT` | opt 40 | F core 5 | `( x u -- x' )` | shift x left by u bits |
 | `M*` | colon | I base 3 | `( n1 n2 -- d )` | multiply; the product has two cells |
-| `MARKER` | colon | F base 6 | `( "name" -- )` | name forgets itself and each newer word, with their data and vocabularies |
+| `MARKER` | colon | F base 6 | `( "name" -- )` | name forgets itself and each newer word, with their data and vocabularies; not among the temp headers of a package |
 | `MAX` | colon | F core 5 | `( n1 n2 -- n )` | the greater number |
 | `MESSAGE` | colon | I core 15 | `( n -- a u )` | the text for the `THROW` number n; u is 0 if there is none |
 | `MESSAGES` | table | I core 15 | `( -- a )` | the table of the messages: a `THROW` number and a counted string each, 0 at the end |
@@ -253,13 +254,15 @@ The letters in the stack effects:
 | `MOVE` | opt 55 | F core 5 | `( a1 a2 u -- )` | copy u bytes from a1 to a2; the areas can overlap |
 | `MS` | hal 81 | F vm 8 | `( u -- )` | wait u milliseconds |
 | `NAME-THROW` | colon | I core 7 | `( a u n -- )` | put the text a u into `ERRMSG`, then `THROW` with n |
-| `NAME>XT` | colon | I core 7 | `( nt -- xt )` | the xt of a header |
+| `NAME>XT` | colon | I core 7 | `( nt -- xt )` | the xt of a header; of a temp header from the cell after the name |
 | `NAMED` | colon | I base 6 | `( "name" -- nt )` | the header of name; `THROW` with -13 if the search order does not have it |
 | `NEGATE` | opt 36 | F core 2 | `( n -- -n )` | change the sign |
 | `NIP` | opt 50 | F core 2 | `( x1 x2 -- x2 )` | take the second item away |
 | `NOOP` | colon | I core 2 | `( -- )` | do nothing: the start value of a vector |
 | `NUMBER?` | colon | I core 14 | `( a u -- n true \| false )` | convert the text a u to a number: `BASE`, the signs `$ # %`, `'c'`, a minus; `THROW` with -24 if it does not fit a cell |
 | `OF` | colon IC | F base 2 | `( x1 x2 -- \| x1 )` | if the two are equal, take both and do the part up to `ENDOF`; else keep x1. Compile: `( -- a )` |
+| `OFF!` | colon | F base 1 | `( a -- )` | write `FALSE` into the cell at a: the flag is clear |
+| `ON!` | colon | F base 1 | `( a -- )` | write `TRUE` into the cell at a: the flag is set |
 | `ONLY` | colon | F base 4 | `( -- )` | only FORTH stays in the search order |
 | `OR` | prim 25 | F vm 7 | `( x1 x2 -- x3 )` | a bit is 1 if it is 1 in x1 or in x2 |
 | `ORDER` | colon | F base 4 | `( -- )` | show the search order, and the vocabulary for new words |
@@ -304,6 +307,10 @@ The letters in the stack effects:
 | `SPACES` | colon | F core 8 | `( n -- )` | show n spaces |
 | `STATE` | sysvar | I vm 4 | `( -- a )` | 0: interpret; true: compile |
 | `SWAP` | prim 15 | F vm 7 | `( x1 x2 -- x2 x1 )` | exchange the two top items |
+| `TEMP-HEADER` | colon | I core 10 | `( a u -- )` | the header a u in the temp store: link, count byte, name, the xt (`HERE`) |
+| `TEMP-SIZE` | colon | I core 10 | `( u -- n )` | the bytes of a temp header with a name of u characters |
+| `TEMP-START` | var | I core 6 | `( -- a )` | the lowest byte of the temp store (doc/vm.md, section 3); `DICT-END`: empty |
+| `TEMP?` | colon | I core 6 | `( a -- f )` | true if a lies in the temp store: from `TEMP-START` up to `DICT-END` |
 | `THEN` | colon IC | F core 4 | `( -- )` | the end of `IF`. Compile: `( a -- )` |
 | `THROW` | colon | F core 6 | `( n -- )` | if n is not 0: go back to the newest `CATCH`, with n |
 | `TIB` | const | I vm 3 | `( -- a )` | the input line, 256 bytes |
@@ -326,7 +333,7 @@ The letters in the stack effects:
 | `UNLINK` | colon | I base 6 | `( nt c -- f )` | take the header nt out of the chain that starts in the cell c; true if it was there |
 | `UNLOOP` | opt 65 C | F base 2 | `( -- )` | take the loop values from the return stack: before an `EXIT` in a loop |
 | `UNTIL` | colon IC | F core 4 | `( f -- )` | if f is false, go back to `BEGIN`. Compile: `( a -- )` |
-| `UNUSED` | colon | F core 6 | `( -- u )` | the free bytes of the dictionary: from `HERE` to `DICT-END` |
+| `UNUSED` | colon | F core 6 | `( -- u )` | the free bytes of the dictionary: from `HERE` to `LIMIT` |
 | `UPC` | colon | I core 7 | `( c -- c' )` | change a to z into A to Z |
 | `US` | hal 82 | F vm 8 | `( u -- )` | wait u microseconds |
 | `VALLOT` | colon | I core 11 | `( n -- a )` | take n bytes for data: in the extension of the RAM data, if there is one, else in the RAM data |
@@ -341,6 +348,7 @@ The letters in the stack effects:
 | `WITHIN` | colon | F core 5 | `( n lo hi -- f )` | true if n is lo or more, and less than hi |
 | `WL-FIND` | colon | I core 7 | `( a u wl -- a u nt \| a u 0 )` | search the name a u in one wordlist |
 | `WL-FORTH` | const | I vm 3 | `( -- wl )` | the wordlist record of FORTH |
+| `WL-INIT` | colon | I base 4 | `( a -- wl )` | an empty wordlist record at a, without a name, the newest of `VOC-LINK` |
 | `WL-INTERNALS` | const | I vm 3 | `( -- wl )` | the wordlist record of INTERNALS |
 | `WORDLIST` | colon | I base 4 | `( -- wl )` | make a new, empty wordlist record, without a name |
 | `WORDS` | colon | F base 4 | `( -- )` | show the words of the first vocabulary of the search order |

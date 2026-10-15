@@ -3,7 +3,7 @@
 \ One #require loads what the WLAN of the WROOM needs, in this order:
 \ ESP32-PHY (the calibration; it links C code into SRAM0), BYTES, ESP32-MAC,
 \ ESP32-RADIO, WIFI (the scan), SHA1, KDF1, AES128, WPAKEY, WLAN (the WPA2
-\ station), WLSAVE (the profile in the flash), TEXT, INET, CCMP, WIFI-LINK
+\ station), FLASH-PAIR and WLSAVE (the profile in the flash), TEXT, INET, CCMP, WIFI-LINK
 \ and AP-LINK (the two LINKs) and RADIO-LINK (it selects one of them). At the
 \ end both LINKs get their packet RAM: RADIO-POOL LINK-POOL! The radio has
 \ hardware CCMP, so the CCMP in software (lib/net/wlsoft.fs, package CCM) is
@@ -35,6 +35,8 @@ ONLY FORTH
 #require WPAKEY ../../net/wpakey.fs
 ONLY FORTH
 #require WLAN ../../net/wpasta.fs
+ONLY FORTH
+#require FLASH-PAIR ../flpair.fs
 ONLY FORTH
 #require WLSAVE wlsave.fs
 ONLY FORTH

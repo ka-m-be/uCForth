@@ -1,22 +1,30 @@
 \ ir.fs - tests of IR with the frames of KELON168 on the ESP32, on the board (lib/esp32/ir.fs)
 \
-\ On the board, in ucf term, after the tester:
+\ On the board, with the base image in the flash (build/esp32.bin), in ucf
+\ term, after the tester:
 \   #include forth/test/tester.fs
 \   #include lib/esp32/esp32/test/ir.fs
-\ No wires, no transceiver: the sending channel drives GPIO 25 without
-\ the carrier (the ESP32 has no demodulator; a transceiver has its own),
-\ and GPIO 25 goes back into the receiving channel, not inverted. So a
-\ frame of the air conditioner goes out and comes back inside the chip.
+\ Not on the image of the bridge: there the private words of IR have no
+\ headers (TEMP-HEADS ON!, lib/package.fs). No wires, no transceiver: the
+\ sending channel drives GPIO 25 without the carrier (the ESP32 has no
+\ demodulator; a transceiver has its own), and GPIO 25 goes back into the
+\ receiving channel, not inverted. So a frame of the air conditioner goes
+\ out and comes back inside the chip.
 
+ONLY FORTH                          \ the order of the tests before it is not needed here
 #require RMT ../../rmt.fs
 #require IR ../../ir.fs
+#require AC-BASE ../../../irremote/acbase.fs
 #require IRCODE ../../../irremote/ircode.fs
+#require IRCODE-READ ../../../irremote/irread.fs
 #require KELON168 ../../../irremote/kelon168.fs
-ONLY FORTH DEFINITIONS  ALSO INTERNALS  ALSO GPIO  ALSO RMT  ALSO IR  ALSO IR.I  ALSO KELON168  DECIMAL
+#require KELON168-READ ../../../irremote/kelonrd.fs
+ONLY FORTH DEFINITIONS  ALSO INTERNALS  ALSO GPIO  ALSO RMT  ALSO IR  ALSO IR.I
+ALSO AC-BASE  ALSO KELON168  ALSO KELON168-READ  DECIMAL
 
 : LOOPBACK ( -- )   \ out and in at GPIO 25, without the carrier; the receiver starts after
   \ 20 ms of rest: the switching of the pin begins a frame (lib/esp32/esp32/rmt.fs, RMT-RX-ON)
-  25 25 IR-PINS  TX 25 RMT-OUT  25 RX RMT-IN  0 0 IR-CARRIER  TRUE IR-ECHO !  20 MS  RX RMT-RX-ON ;
+  25 25 IR-PINS  TX 25 RMT-OUT  25 RX RMT-IN  0 0 IR-CARRIER  IR-ECHO ON!  20 MS  RX RMT-RX-ON ;
 : SAME-BYTES? ( a1 a2 u -- f )
   0 ?DO  OVER I + C@  OVER I + C@ <> IF 2DROP UNLOOP FALSE EXIT THEN  LOOP  2DROP TRUE ;
 : WAIT-FRAME ( -- a n true | false )   \ a frame, or false after 500 ms
@@ -54,7 +62,7 @@ T{ 0 HEARD-N !  ' HEARD-IT IR-LISTEN  AC-TIMINGS IR-SEND  50 MS  HEARD-N @ -> 34
 T{ 0 IR-LISTEN  0 HEARD-N !  AC-TIMINGS IR-SEND  50 MS  HEARD-N @  WAIT-FRAME NIP NIP -> 0 TRUE }T
 
 \ ---- IR-ECHO false: the receiver does not listen while the board sends
-T{ FALSE IR-ECHO !  AC-TIMINGS IR-SEND  WAIT-FRAME -> FALSE }T
+T{ IR-ECHO OFF!  AC-TIMINGS IR-SEND  WAIT-FRAME -> FALSE }T
 25 INPUT
 
 S" ir" .RESULTS

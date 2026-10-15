@@ -156,8 +156,8 @@ VARIABLE REST-A  VARIABLE REST-U   \ the part of LINE that is not read yet
 : OPEN ( s -- )   \ open the package file of the source s
   DUP IN-SOURCE !  0 LINE# !
   S-FILE COUNT R/O OPEN-FILE IF  DROP S" cannot open the file" S" " STOP  THEN
-  IN-FID !  TRUE OPEN? ! ;
-: CLOSE ( -- )   OPEN? @ IF  IN-FID @ CLOSE-FILE DROP  FALSE OPEN? !  THEN ;
+  IN-FID !  OPEN? ON! ;
+: CLOSE ( -- )   OPEN? @ IF  IN-FID @ CLOSE-FILE DROP  OPEN? OFF!  THEN ;
 : READ ( -- f )   \ the next line into LINE; false at the end of the file
   LINE 256 IN-FID @ READ-LINE THROW
   OVER 256 = IF  S" the line is too long" S" " STOP  THEN
@@ -247,13 +247,13 @@ VARIABLE ALIGNED?    \ the line before was "8 DATA-ALIGN"
   ALIGNED? @ IF  S" no DATA: after 8 DATA-ALIGN" S" " STOP  THEN ;
 
 : NEW-FUNCTION ( -- )   \ CODE name
-  NO-ALIGN  TOKEN 2DUP NAMED?  FUNCTION NEW-OBJECT IN-CODE !  FALSE ORG? !
+  NO-ALIGN  TOKEN 2DUP NAMED?  FUNCTION NEW-OBJECT IN-CODE !  ORG? OFF!
   1 0 TALLY  PUBLIC? @ IF 1 1 TALLY THEN ;
 : CODE-LINE ( -- )   \ a line of the function IN-CODE
   1 IN-CODE @ R-LINES +!
   FIRST  S" CODE" IS? IF  S" CODE inside a function" S" " STOP  THEN
   ORG? @ 0= IF   \ the line after CODE: $off n LITERALS or $off ORIGIN
-    TRUE ORG? !
+    ORG? ON!
     NUMBER  TOKEN S" ORIGIN" IS? IF  2DROP ORG !  EXIT  THEN
     NUMBER DROP  TOKEN S" LITERALS" IS? NIP NIP 0= IF
       S" LITERALS or ORIGIN expected" S" " STOP  THEN
@@ -268,7 +268,7 @@ VARIABLE ALIGNED?    \ the line before was "8 DATA-ALIGN"
 : NEW-DATA ( n -- )   \ n DATA: name
   TOKEN 2DUP NAMED?  RAM-DATA NEW-OBJECT
   ALIGNED? @ IF  1 OVER R-LINES +!  THEN   \ the line 8 DATA-ALIGN
-  2DUP R-SIZE !  IN-DATA !  4 TALLY  1 2 TALLY  FALSE ALIGNED? ! ;
+  2DUP R-SIZE !  IN-DATA !  4 TALLY  1 2 TALLY  ALIGNED? OFF! ;
 : NEW-TABLE ( -- )   \ CREATE name   \ .section, n bytes
   NO-ALIGN  TOKEN 2DUP NAMED?  DICT-DATA NEW-OBJECT
   RAW S" \" IS? NIP NIP  RAW 2DROP  RAW NUMBER  RAW S" bytes" IS? NIP NIP
@@ -298,7 +298,7 @@ VARIABLE ALIGNED?    \ the line before was "8 DATA-ALIGN"
 : NUMBER-LINE ( -- )   \ n DATA: name, 8 DATA-ALIGN, or a line with SYMBOL!
   FIRST NUMBER  TOKEN
   S" DATA:" IS? IF  2DROP NEW-DATA  EXIT  THEN
-  S" DATA-ALIGN" IS? IF  2DROP DROP  NO-ALIGN  TRUE ALIGNED? !  EXIT  THEN
+  S" DATA-ALIGN" IS? IF  2DROP DROP  NO-ALIGN  ALIGNED? ON!  EXIT  THEN
   NO-ALIGN  ROT DROP  POINTER ;
 
 : OBJECT-LINE ( -- )   \ line 1, "\ x.fs - package P: x.o of lib.a (ESP32)": the text after ": "
@@ -319,10 +319,10 @@ VARIABLE HEAD-DATA?   \ the head gives the number of data objects on a later lin
     NUMBER  IN-SOURCE @ S-HEAD !
     RAW 1 /STRING NUMBER  IN-SOURCE @ S-HEAD CELL+ !       \ (74
     RAW S" global)," IS? NIP NIP IF  RAW NUMBER  IN-SOURCE @ S-HEAD 2 CELLS + !
-    ELSE  TRUE HEAD-DATA? !  THEN  EXIT
+    ELSE  HEAD-DATA? ON!  THEN  EXIT
   THEN
   2SWAP S" section)," S=  HEAD-DATA? @ AND IF
-    NUMBER  IN-SOURCE @ S-HEAD 2 CELLS + !  FALSE HEAD-DATA? !
+    NUMBER  IN-SOURCE @ S-HEAD 2 CELLS + !  HEAD-DATA? OFF!
   ELSE  2DROP  THEN ;
 
 : TOP-LINE ( -- )   \ a line outside a function
@@ -332,8 +332,8 @@ VARIABLE HEAD-DATA?   \ the head gives the number of data objects on a later lin
   S" CREATE" IS? IF  2DROP NEW-TABLE  EXIT  THEN
   NUMBER? IF  DROP NUMBER-LINE  EXIT  THEN
   FIRST NO-ALIGN
-  S" PUBLIC" IS? >R  S" EXPORTS" IS? R> OR IF  2DROP TRUE PUBLIC? !  EXIT  THEN
-  S" PRIVATE" IS? IF  2DROP FALSE PUBLIC? !  EXIT  THEN
+  S" PUBLIC" IS? >R  S" EXPORTS" IS? R> OR IF  2DROP PUBLIC? ON!  EXIT  THEN
+  S" PRIVATE" IS? IF  2DROP PUBLIC? OFF!  EXIT  THEN
   S" PACKAGE" IS? IF  2DROP TOKEN 2DUP NAMED?
     DUP 29 > IF  S" the name of a package has at most 29 characters: " 2SWAP STOP  THEN
     IN-SOURCE @ S-PACKAGE PLACE  EXIT  THEN
@@ -341,7 +341,7 @@ VARIABLE HEAD-DATA?   \ the head gives the number of data objects on a later lin
   S" a line that PICK does not know: " 2SWAP STOP ;
 
 : READ-SOURCE ( s -- )   \ read the objects of the package file of s
-  OPEN  FALSE PUBLIC? !  0 IN-CODE !  0 IN-DATA !  FALSE ALIGNED? !  FALSE HEAD-DATA? !
+  OPEN  PUBLIC? OFF!  0 IN-CODE !  0 IN-DATA !  ALIGNED? OFF!  HEAD-DATA? OFF!
   BEGIN READ WHILE
     LINE# @ 1 = IF  OBJECT-LINE  THEN
     IN-CODE @ IF  CODE-LINE  ELSE
@@ -521,8 +521,8 @@ VARIABLE #RENAMED
 : NO-OUT ( rec -- )   0 SWAP R-OUT ! ;
 : RENAMES ( -- )   \ the objects of the hull with the same name get new names
   WORDLIST KEPT-NAMES !  WORDLIST CLASHES !  0 #RENAMED !
-  FALSE CASE-SENSE !  ['] SAME-NAME EACH-KEPT  ['] NEW-NAME? EACH-KEPT
-  TRUE CASE-SENSE !  ['] OLD-NAME EACH-KEPT  ['] NO-OUT EACH-KEPT ;
+  CASE-SENSE OFF!  ['] SAME-NAME EACH-KEPT  ['] NEW-NAME? EACH-KEPT
+  CASE-SENSE ON!  ['] OLD-NAME EACH-KEPT  ['] NO-OUT EACH-KEPT ;
 
 \ ==== Writing ==========================================================
 
@@ -542,8 +542,8 @@ VARIABLE COPIED      \ LINE is in OUTBUF up to this address
 : OUT-TEXT ( a u -- )   +OUT OUT-LINE ;
 : OUT-OPEN ( a u -- )   \ make the file a u for a copy
   2DUP W/O CREATE-FILE IF  DROP S" cannot make the file " 2SWAP FAIL  THEN
-  NIP NIP OUT-FID !  TRUE OUT-OPEN? !  0 #OUT-LINES !  0 #OUT ! ;
-: OUT-CLOSE ( -- )   OUT-OPEN? @ IF  OUT-FID @ CLOSE-FILE DROP  FALSE OUT-OPEN? !  THEN ;
+  NIP NIP OUT-FID !  OUT-OPEN? ON!  0 #OUT-LINES !  0 #OUT ! ;
+: OUT-CLOSE ( -- )   OUT-OPEN? @ IF  OUT-FID @ CLOSE-FILE DROP  OUT-OPEN? OFF!  THEN ;
 
 : UP-TO ( a -- )   \ the text of LINE from COPIED up to a into OUTBUF
   COPIED @ SWAP OVER - +OUT ;
@@ -748,7 +748,7 @@ VARIABLE #WRONG
   FOR-NAME C@ 0= IF  S" PICK-WRITE: " S" PICK-FOR is missing" FAIL  THEN
   CHECK-ARCHIVES  RENAMES  CR ." the copies:" CR  WRITE-ALL  CHECK-WRITTEN ;
 : CASED ( xt -- )   \ run xt; names compared with the case; the files closed after an error
-  CASE-SENSE @ >R  TRUE CASE-SENSE !
+  CASE-SENSE @ >R  CASE-SENSE ON!
   CATCH  CLOSE  OUT-CLOSE  R> CASE-SENSE !  THROW ;
 
 PUBLIC

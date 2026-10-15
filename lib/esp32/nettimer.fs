@@ -14,14 +14,18 @@
 \                      restart the program calls it again (TIMERS);
 \                      foreground control in IDLE
 \   NET-STOP ( -- )    no more steps in the background
+\   NET-RUNNING? ( -- f )   the steps run in the background (NET-START)
 \
 \ On the board, in ucf term, after our TCP/IP (lib/net/tcpip.fs lists
 \ the packages):  #include lib/esp32/nettimer.fs
 
 PACKAGE NET-TIMER  ALSO TIMERS  ALSO NETIF ALSO IDLE   \ lib/package.fs
 
+VARIABLE RUNNING
+
 PUBLIC
-: NET-START ( -- )   ['] NET-CONTROL IDLE+ ['] NET-STEP 1 EVERY ;
-: NET-STOP ( -- )    ['] NET-STEP 0 EVERY ['] NET-CONTROL IDLE- ;
+: NET-START ( -- )   ['] NET-CONTROL IDLE+ ['] NET-STEP 1 EVERY  RUNNING ON! ;
+: NET-STOP ( -- )    ['] NET-STEP 0 EVERY ['] NET-CONTROL IDLE-  RUNNING OFF! ;
+: NET-RUNNING? ( -- f )   RUNNING @ ;
 
 END-PACKAGE

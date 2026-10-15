@@ -911,7 +911,7 @@ T{ W1 -> HERE 2 + }T
 T{ VARIABLE V2 V2 @ -> 0 }T
 T{ V2 DATA? -> <TRUE> }T
 
-\ ==== Data: VALUE TO BUFFER: DEFER IS ====
+\ ==== Data: VALUE TO BUFFER: DEFER IS ON! OFF! ====
 
 T{ 111 VALUE VAL1 -> }T
 T{ VAL1 -> 111 }T
@@ -920,6 +920,9 @@ T{ : VD1 TO VAL1 ; -> }T                  \ TO in a definition
 T{ 333 VD1 VAL1 -> 333 }T
 T{ -1 VALUE VAL2 VAL2 -> -1 }T
 T{ VAL1 VAL2 -> 333 -1 }T
+
+T{ V2 ON!  V2 @ -> <TRUE> }T
+T{ V2 OFF!  V2 @ -> <FALSE> }T
 
 T{ 5 BUFFER: BUF1 -> }T
 T{ 5 BUFFER: BUF2 -> }T
@@ -1138,7 +1141,7 @@ T{ IN-DEL 5 IN{ ABUF 16 ACCEPT }IN ABUF SWAP S" a" S= -> <TRUE> }T
 T{ ABUF 16 0 FILL  IN-LONG 6 IN{ ABUF 3 ACCEPT }IN  ABUF 2 + C@  ABUF 3 + C@ -> 3 'c' 0 }T
 T{ IN-LF 2 IN{ ABUF 16 ACCEPT }IN -> 1 }T
 \ ECHO: a b, Backspace as BS SPACE BS, c, and a space at the end of the line
-T{ TRUE ECHO !  IN-BS 5 IN{ OUT{ ABUF 16 ACCEPT }OUT }IN  ECHO0 ECHO !  NIP -> 2 7 }T
+T{ ECHO ON!  IN-BS 5 IN{ OUT{ ABUF 16 ACCEPT }OUT }IN  ECHO0 ECHO !  NIP -> 2 7 }T
 
 \ ==== Search order: VOCABULARY ALSO ONLY PREVIOUS DEFINITIONS FORTH ORDER WORDS VOCS ====
 
@@ -1283,7 +1286,8 @@ T{ S" FL1" FIND-NAME IMMEDIATE? -> <TRUE> }T
 T{ S" DUP" FIND-NAME NAME>XT -> ' DUP }T
 T{ ' DUP >NAME  S" DUP" FIND-NAME = -> <TRUE> }T
 T{ HERE >NAME -> 0 }T
-T{ OUT{ ' DUP .NAME HERE .NAME }OUT S" DUP?" S= -> <TRUE> }T
+T{ OUT{ ' DUP .NAME HERE .NAME }OUT DROP 4 S" DUP?" S= -> <TRUE> }T
+T{ OUT{ HERE .NAME }OUT NIP -> CELL 2* 1+ }T   \ without a name: ? and the xt in hex
 T{ S" DUP" WL-FORTH WL-FIND NIP NIP  S" DUP" FIND-NAME = -> <TRUE> }T
 T{ S" DUP" WL-INTERNALS WL-FIND NIP NIP -> 0 }T
 T{ S" LIT" WL-INTERNALS WL-FIND NIP NIP 0<> -> <TRUE> }T

@@ -45,6 +45,7 @@
 
 PACKAGE IR  ALSO RMT  ALSO GPIO  ALSO INTR   \ lib/package.fs
 
+PROTECTED                           \ for IR-QUEUE (lib/esp32/esp32/irqueue.fs) and the board tests
 1 CONSTANT TX                       \ the sending channel of the RMT
 4 CONSTANT RX                       \ the receiving channel, with 4 blocks
 400 CONSTANT #TIMES
@@ -55,6 +56,7 @@ VARIABLE LEVEL                      \ the level of the last time
 #PULSES CELLS BUFFER: PULSES          \ the pulse words to send
 VARIABLE N-PULSES   VARIABLE HALF   VARIABLE PENDING
 VARIABLE LISTENER                   \ the word of IR-LISTEN, or 0
+PRIVATE
 
 \ ---- times into pulse words
 : PULSE, ( x -- )
@@ -62,14 +64,16 @@ VARIABLE LISTENER                   \ the word of IR-LISTEN, or 0
   N-PULSES @ CELLS PULSES + !  1 N-PULSES +! ;
 : HALF, ( t level -- )   \ a time and its level: one half of a pulse word
   IF $8000 OR THEN
-  HALF @ IF  16 LSHIFT PENDING @ OR PULSE,  FALSE HALF !  ELSE  PENDING !  TRUE HALF !  THEN ;
+  HALF @ IF  16 LSHIFT PENDING @ OR PULSE,  HALF OFF!  ELSE  PENDING !  HALF ON!  THEN ;
 : TIME, ( t level -- )   \ a time of any length, in pieces of at most 32767 us
   OVER 0= IF 2DROP EXIT THEN
   >R  BEGIN DUP 32767 > WHILE  32767 R@ HALF,  32767 -  REPEAT  R> HALF, ;
+PROTECTED
 : >PULSES ( a n -- )   \ n times at a as pulse words
-  0 N-PULSES !  FALSE HALF !
+  0 N-PULSES !  HALF OFF!
   1 SWAP 0 ?DO  OVER I CELLS + @ OVER TIME,  1 XOR  LOOP  2DROP
   HALF @ IF PENDING @ PULSE, THEN ;                  \ the other half is 0: the end
+PRIVATE
 
 \ ---- pulse words into times
 : TIME+ ( t level -- )   \ the next time; with the level of the last one it adds to it
@@ -77,9 +81,11 @@ VARIABLE LISTENER                   \ the word of IR-LISTEN, or 0
   #FRAME @ IF  DUP LEVEL @ = IF  DROP  #FRAME @ 1- CELLS TIMES + +!  EXIT  THEN  THEN
   LEVEL !  #FRAME @ #TIMES < IF  #FRAME @ CELLS TIMES + !  1 #FRAME +!
   ELSE DROP -450 THROW THEN ;
+PROTECTED
 : HALF+ ( t level -- f )   \ a half of a pulse word; false: the end of the frame
   OVER 0= IF  2DROP #FRAME @ 0= EXIT  THEN          \ an end before the first time is old
   TIME+ TRUE ;
+PRIVATE
 : >TIMES ( n -- )   \ the n pulse words in the RAM of the receiving channel as times
   0 #FRAME !  RX RMT-RAM SWAP 0 ?DO                  ( a )
     DUP @  DUP $7FFF AND  OVER 15 RSHIFT 1 AND  HALF+ 0= IF DROP LEAVE THEN

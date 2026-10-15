@@ -49,7 +49,7 @@ VARIABLE BAD                         \ true: a field has a value that the instru
 : BIT? ( n -- f )   INSN @ SWAP RSHIFT 1 AND 0<> ;
 : SIGNED ( u n -- x )   \ u, a number of n bits, with its sign
   1 SWAP 1- LSHIFT  2DUP AND IF  2* -  ELSE  DROP  THEN ;
-: BAD! ( -- )   TRUE BAD ! ;
+: BAD! ( -- )   BAD ON! ;
 : RD# ( -- n )   0 5 FIELD ;
 : RN# ( -- n )   5 5 FIELD ;
 : RM# ( -- n )   16 5 FIELD ;
@@ -1421,12 +1421,12 @@ ALIGN
   DUP 80 < IF  +MEMORY EXIT  THEN
   +OTHER ;
 VARIABLE FIRST
-: +SEP ( -- )   FIRST @ IF  S"  " +T  FALSE FIRST !  ELSE  S" , " +T  THEN ;
+: +SEP ( -- )   FIRST @ IF  S"  " +T  FIRST OFF!  ELSE  S" , " +T  THEN ;
 : +INSN ( e -- )
   DUP 0 KIND  DUP 130 140 WITHIN IF  +WHOLE DROP EXIT  THEN  DROP
   DUP NAME +T
   6 0 DO  DUP I KIND  DUP 120 130 WITHIN IF +MODIFIER ELSE DROP THEN  LOOP
-  TRUE FIRST !
+  FIRST ON!
   6 0 DO  DUP I KIND  ?DUP IF
     DUP 120 130 WITHIN IF DROP ELSE  +SEP +OPERAND  THEN
   THEN  LOOP  DROP ;
@@ -1441,7 +1441,7 @@ VARIABLE FIRST
   TXT-START  S" .inst 0x" +T
   8 0 DO  INSN @ 28 I 4 * - RSHIFT 15 AND  DUP 10 < IF '0' ELSE 'a' 10 - THEN + +C  LOOP ;
 : A64-DECODE ( a -- a' )
-  DUP PC !  INSN@ INSN !  TXT-START  FALSE BAD !
+  DUP PC !  INSN@ INSN !  TXT-START  BAD OFF!
   FIND-INSN ?DUP IF +INSN ELSE BAD! THEN
   BAD @ IF +INST THEN
   PC @ 4 + ;

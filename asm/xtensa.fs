@@ -126,12 +126,12 @@ PUBLIC
   #JUMPS 0 DO  I JUMP @ ?DUP IF UNPLACED THEN  LOOP ;
 : ORG ( ta -- )   \ new code in TARGET; its first byte goes to the target address ta
   TARGET 0= IF  ALIGN HERE TARGET-SIZE ALLOT TO TARGET  THEN
-  TORG !  TDP0 'TDP !  0 TDP0 !  TARGET TBASE !  TARGET-SIZE TLIMIT !  FALSE PLACED !
+  TORG !  TDP0 'TDP !  0 TDP0 !  TARGET TBASE !  TARGET-SIZE TLIMIT !  PLACED OFF!
   TARGET TARGET-SIZE 0 FILL  JUMPS #JUMPS 2* CELLS 0 FILL  NEW-SCOPE ;
 : IN-PLACE ( ta a limit -- )   \ new code in this system, where it runs
   \ The next byte goes to the address in the counter at a (the dictionary
   \ pointer), below limit; the CPU sees the byte at address x at ta + x.
-  TLIMIT !  'TDP !  TORG !  0 TBASE !  TRUE PLACED !
+  TLIMIT !  'TDP !  TORG !  0 TBASE !  PLACED ON!
   JUMPS #JUMPS 2* CELLS 0 FILL  NEW-SCOPE ;
 
 \ ==== Offsets of jumps ==================================================

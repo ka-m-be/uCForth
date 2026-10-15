@@ -55,7 +55,7 @@ CREATE LNAME 64 ALLOT    VARIABLE LNAME#   \ the name of the file
   63 MIN DUP LNAME# !  LNAME SWAP MOVE
   LNAME LNAME# @ R/O OPEN-FILE ?DUP IF
     ."   cannot read " LNAME LNAME# @ TYPE CR  1 (BYE)
-  THEN  LFID !  0 CPOS !  0 CLEN !  FALSE LEOF !  0 LNO ! ;
+  THEN  LFID !  0 CPOS !  0 CLEN !  LEOF OFF!  0 LNO ! ;
 : L-CLOSE ( -- )   LFID @ CLOSE-FILE DROP ;
 : GETC ( -- c | -1 )
   CPOS @ CLEN @ = IF
@@ -64,11 +64,11 @@ CREATE LNAME 64 ALLOT    VARIABLE LNAME#   \ the name of the file
   THEN  CHUNK CPOS @ + C@  1 CPOS +! ;
 : L-NEXT ( -- f )   \ the next line into LBUF LLEN; false after the last one
   LEOF @ IF FALSE EXIT THEN
-  0 LLEN !  FALSE LLONG !  1 LNO +!
+  0 LLEN !  LLONG OFF!  1 LNO +!
   BEGIN  GETC DUP 10 <> OVER -1 <> AND  WHILE
-    LLEN @ 256 < IF LBUF LLEN @ + C!  1 LLEN +! ELSE DROP TRUE LLONG ! THEN
+    LLEN @ 256 < IF LBUF LLEN @ + C!  1 LLEN +! ELSE DROP LLONG ON! THEN
   REPEAT
-  -1 = IF TRUE LEOF ! THEN
+  -1 = IF LEOF ON! THEN
   LLEN @ IF  LBUF LLEN @ + 1- C@ 13 = IF -1 LLEN +! THEN  THEN  TRUE ;
 
 \ ==== Errors ============================================================
@@ -106,7 +106,7 @@ CREATE NKEY 32 ALLOT   VARIABLE KN   VARIABLE ANYCASE
 : OLDEST ( twl -- tnt | 0 )   \ the oldest word NKEY in a wordlist
   0 SWAP T@ BEGIN ?DUP WHILE DUP NKEY? IF NIP DUP THEN T@ REPEAT ;
 : SYSXT ( a u -- txt | 0 )   \ the oldest word with exactly this name
-  FALSE ANYCASE !  KEY!
+  ANYCASE OFF!  KEY!
   FW OLDEST ?DUP 0= IF IW OLDEST THEN  DUP IF TXT THEN ;
 
 VARIABLE BEST   VARIABLE X
@@ -254,13 +254,13 @@ VARIABLE XT-CATCH   VARIABLE GSKIP   VARIABLE GSKIPF
 VARIABLE NEG   VARIABLE NB   VARIABLE NV   VARIABLE OVFL
 : ACC ( d -- )   \ NV = NV * NB + d; OVFL if it does not fit a cell
   OVFL @ IF DROP EXIT THEN
-  NV @ NB @ UM* IF 2DROP TRUE OVFL ! EXIT THEN
-  UM+ IF DROP TRUE OVFL ! EXIT THEN  NV ! ;
+  NV @ NB @ UM* IF 2DROP OVFL ON! EXIT THEN
+  UM+ IF DROP OVFL ON! EXIT THEN  NV ! ;
 : G-NUMBER? ( -- n true | false )   \ the word WA WN as a number (section 4)
   WA @ WN @
   DUP 3 = IF OVER C@ 39 = IF OVER 2 + C@ 39 = IF DROP 1+ C@ TRUE EXIT THEN THEN THEN
-  FALSE NEG !  BASE T@ NB !  0 NV !  FALSE OVFL !
-  DUP 1 > IF OVER C@ 45 = IF OVER 1+ C@ PREFIX IF SKIP1 TRUE NEG ! THEN THEN THEN
+  NEG OFF!  BASE T@ NB !  0 NV !  OVFL OFF!
+  DUP 1 > IF OVER C@ 45 = IF OVER 1+ C@ PREFIX IF SKIP1 NEG ON! THEN THEN THEN
   DUP IF OVER C@ PREFIX ?DUP IF NB ! SKIP1 THEN THEN
   DUP IF OVER C@ 45 = IF SKIP1 NEG @ 0= NEG ! THEN THEN
   DUP 0=  NB @ 2 < OR  NB @ 36 > OR IF 2DROP FALSE EXIT THEN
@@ -273,14 +273,14 @@ VARIABLE NEG   VARIABLE NB   VARIABLE NV   VARIABLE OVFL
 : G-SKIP ( -- )   \ "?:" skips a definition up to ";"
   WA @ WN @ S" \" SAME$ IF #TIB T@ >IN T! EXIT THEN
   WA @ WN @ S" (" SAME$ IF 41 G-PARSE EXIT THEN
-  WA @ WN @ S" ;" SAME$ IF FALSE GSKIP !  TRUE GSKIPF ! THEN ;
+  WA @ WN @ S" ;" SAME$ IF GSKIP OFF!  GSKIPF ON! THEN ;
 : FLAG-WORD? ( -- f )   \ a flag after a skipped definition
   WA @ WN @ S" IMMEDIATE" SAME-CI$
   WA @ WN @ S" UNCHECKED" SAME-CI$ OR
   WA @ WN @ S" COMPILE-ONLY" SAME-CI$ OR ;
 : G-?: ( -- )
   >IN T@ >R  G-PARSE-NAME  PN @ 0= IF -16 G-FAIL THEN
-  PA @ T PN @ G-KEY  T-FIND IF R> DROP TRUE GSKIP ! EXIT THEN
+  PA @ T PN @ G-KEY  T-FIND IF R> DROP GSKIP ON! EXIT THEN
   R> >IN T!  S" :" G-KEY T-FIND TXT G-EXEC ;
 : G-DO ( tnt -- )   \ execute or compile a word that the target has
   DUP TXT SWAP CELL+ TC@                             ( txt flags )
@@ -289,7 +289,7 @@ VARIABLE NEG   VARIABLE NB   VARIABLE NV   VARIABLE OVFL
   ELSE  DROP T,  THEN ;
 : G-WORD ( -- )   \ one word of core.fs: WA WN
   GSKIP @ IF G-SKIP EXIT THEN
-  GSKIPF @ IF FLAG-WORD? IF EXIT THEN  FALSE GSKIPF ! THEN
+  GSKIPF @ IF FLAG-WORD? IF EXIT THEN  GSKIPF OFF! THEN
   WA @ WN @ S" ?:" SAME$ IF G-?: EXIT THEN
   WA @ WN @ G-KEY T-FIND ?DUP IF G-DO EXIT THEN
   WA @ WN @ S" \" SAME$ IF #TIB T@ >IN T! EXIT THEN   \ comments until core.fs has them
@@ -392,7 +392,7 @@ VARIABLE XT-REFILL   VARIABLE REFILL-END
 : G-TX ( c -- )
   255 AND  DUP 10 = IF
     DROP  OBUF OLEN @ TYPE CR
-    OBUF OLEN @ S" error:" HAS$ IF TRUE ERRSEEN ! THEN  0 OLEN !  EXIT
+    OBUF OLEN @ S" error:" HAS$ IF ERRSEEN ON! THEN  0 OLEN !  EXIT
   THEN
   DUP 13 = OVER 0= OR  OLEN @ 255 = OR IF DROP EXIT THEN
   OBUF OLEN @ + C!  1 OLEN +! ;

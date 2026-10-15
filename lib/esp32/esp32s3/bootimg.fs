@@ -140,7 +140,7 @@ VARIABLE XPOS
   DIGEST-START  XFLASH 64 + R@ FALSE HASH  DIGEST-END
   BUF 64 0 FILL  MARK BUF !  R> BUF CELL+ !  PSRAM-ADDR BUF 2 CELLS + !
   BUF 16 + 32 MOVE  BUF 64 XFLASH FLASH-WRITE THROW ;
-: SAME? ( a1 a2 u -- f )   \ u bytes, a multiple of 4
+: WORDS= ( a1 a2 u -- f )   \ the same u bytes, a multiple of 4, in cells
   0 ?DO  OVER I + @  OVER I + @  <> IF 2DROP FALSE UNLOOP EXIT THEN  4 +LOOP  2DROP TRUE ;
 
 : (SAVE) ( entry -- )
@@ -158,6 +158,6 @@ PUBLIC
   0= IF DROP ." no saved data for the PSRAM" CR EXIT THEN
   >R  R@ XLOAD
   DIGEST-START  PSRAM-ADDR R> DIGEST-ADD  DIGEST-END
-  BUF 16 + 32 SAME? 0= IF ." the saved data for the PSRAM are damaged" CR THEN ;
+  BUF 16 + 32 WORDS= 0= IF ." the saved data for the PSRAM are damaged" CR THEN ;
 
 END-PACKAGE

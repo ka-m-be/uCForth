@@ -90,11 +90,11 @@ VARIABLE NEW-LINE                   \ true: the next register starts a new line
 
 PUBLIC
 : IMAGE! ( a -- )   THE-IMAGE ! ;
-: /LINE ( -- )   TRUE NEW-LINE ! ;
+: /LINE ( -- )   NEW-LINE ON! ;
 : REGISTER: ( size offset "name" -- )
   REG-COUNT @ #REGS < 0= ABORT" MONITOR: too many registers"
   REG-COUNT @ ENTRY >R
-  R@ 12 + C!  R@ 13 + C!  NEW-LINE @ R@ 14 + C!  FALSE NEW-LINE !
+  R@ 12 + C!  R@ 13 + C!  NEW-LINE @ R@ 14 + C!  NEW-LINE OFF!
   PARSE-NAME 11 MIN  DUP R@ C!  R> 1+ SWAP MOVE
   1 REG-COUNT +! ;
 DEFER .FLAGS ( -- )   ' CR IS .FLAGS
