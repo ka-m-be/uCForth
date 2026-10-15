@@ -290,9 +290,11 @@ bridge on the WROOM".
 ## Memory
 
 Measured on the WROOM with all of the bridge in the flash (15.10.):
-free are 3 968 bytes of dictionary, 41 272 bytes of RAM data, 131 516
-bytes of RAM data behind the frozen part (XDATA), and 72 956 bytes for
-`CODE` words (targets/esp32/README.md, "Memory"). The XDATA reaches up
+free are 3 164 bytes of dictionary, 41 244 bytes of RAM data, 132 320
+bytes of RAM data behind the frozen part (XDATA), and 72 892 bytes for
+`CODE` words (targets/esp32/README.md, "Memory"). The bridge runs on
+core 0; it does not load MULTICORE (the second core, lib/esp32/README.md),
+which the bridge does not need. The XDATA reaches up
 to the end of the frozen part: a bigger dictionary gives it more. The
 loader keeps no headers for the `PRIVATE` words (`TEMP-HEADS ON!`,
 lib/package.fs): that gives the dictionary about 17 KB, and the XDATA

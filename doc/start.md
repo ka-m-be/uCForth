@@ -99,7 +99,7 @@ words of a package.
 This takes about 20 s. `</dev/null` gives the bootstrap VM an empty
 keyboard: without it, the bootstrap VM waits for keys after the last
 file. With `-32` (32-bit cells, before `host/files.fs`), more packages
-run their tests: `all: 12186 tests, 0 errors`.
+run their tests: `all: 12210 tests, 0 errors`.
 
 ## 4 A program for your computer
 
@@ -144,7 +144,7 @@ The program runs all tests in about 0.4 s:
 
     $ echo "ALSO FILES  INCLUDE tools/test.fs" | build/ucf-macos-a64
     ...
-    all: 12186 tests, 0 errors
+    all: 12210 tests, 0 errors
 
 On macOS and Linux, the program also has the network: TCP, UDP and
 names over DNS (lib/net/README.md). Our own TCP/IP in Forth, for a

@@ -150,9 +150,9 @@ bits, on its kernel with 64 bits (start QEMU without `readonly=on`: the
 tests write files):
 
     localhost:/mnt# echo "ALSO FILES  INCLUDE tools/test.fs" | ./build/ucf-linux-i386 | tail -1
-    all: 12186 tests, 0 errors
+    all: 12210 tests, 0 errors
     localhost:/mnt# echo "ALSO FILES  INCLUDE tools/test.fs" | ./build/ucf-linux-x64 | tail -1
-    all: 12186 tests, 0 errors
+    all: 12210 tests, 0 errors
 
 So a real Linux kernel checks the signals and the calls of the system,
 which QEMU in Docker only emulates.

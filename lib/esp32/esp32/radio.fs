@@ -110,7 +110,7 @@ $FF800000 CONSTANT CTRL-TYPES    \ bits 23 to 31: a scan lets none of them pass 
 28 CONSTANT RX-HEAD              \ the header of the MAC before each frame
 $80 CONSTANT BEACON              \ the first byte of a beacon: type 0 (management), subtype 8
 
-$3FFE4400 CONSTANT DESCS         \ SRAM1: the descriptors, 3 cells each (targets/esp32/README.md, "Memory")
+$3FFF8600 CONSTANT DESCS         \ SRAM1: the descriptors, 3 cells each (targets/esp32/README.md, "Memory")
 8 CONSTANT #RX                   \ the descriptors, each with a buffer
 1600 CONSTANT BUF-SIZE           \ the bytes of a buffer (the reference: at least 1 600)
 DESCS #RX 3 CELLS * + CONSTANT BUFS   \ the buffers, after the descriptors

@@ -127,7 +127,7 @@ processor, or a Mac with Intel. uCForth writes only to the stick (step
 
        ok> ALSO FILES  INCLUDE tools/test.fs
 
-   Expected, at the end: `all: 12186 tests, 0 errors`. Then the tests
+   Expected, at the end: `all: 12210 tests, 0 errors`. Then the tests
    end uCForth with `BYE`, and the firmware comes back: start from the
    stick again.
 6. `FREEZE` and a new start:
@@ -179,7 +179,7 @@ terminal. Then:
 
     ok> ALSO FILES  INCLUDE tools/test.fs
 
-The output ends with `all: 12186 tests, 0 errors`, after about 8 s (in
+The output ends with `all: 12210 tests, 0 errors`, after about 8 s (in
 Docker on a Mac with M4; the start of the firmware takes 2 s more).
 Ctrl-A X ends QEMU. For `FREEZE`, take a disk
 image with FAT32 instead of the folder (`-drive format=raw,file=...`):

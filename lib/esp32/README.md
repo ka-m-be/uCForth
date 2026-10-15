@@ -45,13 +45,15 @@ itself differs, each chip has its own file in its folder.
 | File | Runs on | Contents |
 | --- | --- | --- |
 | `rom.fs` | board | package ROM: the headers of the HAL words `SYSCALL` (a function of the ROM) and `>CHIP` (the chip address of a VM address) |
-| `intr.fs` | board | package INTR: handlers of interrupts (`INT!`, `INT@`, `INT-ON`, `INT-OFF`, `+INT`, `-INT`): Forth words at the next NEXT, `CODE` words at once (level 2); an error stops only its handler, and its message comes when the console waits (`INT-STOPPED`); the message of an error of the CPU (-9 with the address and the PC); needs CHIP and IDLE; `FAULT-REGS`: the HAL writes all registers of the last error of the CPU there (the monitor shows them, `asm/monitor/README.md`); `DEBUG-HOOK`: the code of the monitor for a debug exception |
+| `intr.fs` | board | package INTR: handlers of interrupts (`INT!`, `INT@`, `INT-ON`, `INT-OFF`, `+INT`, `-INT`): Forth words at the next NEXT, `CODE` words at once (level 2); an error stops only its handler, and its message comes when the console waits (`INT-STOPPED`); the message of an error of the CPU (-9 with the address and the PC); needs CHIP and IDLE; `FAULT-REGS`: the HAL writes all registers of the last error of the CPU there (the monitor shows them, `asm/monitor/README.md`); `DEBUG-HOOK`: the code of the monitor for a debug exception; `i INTR-FOR`: a core that starts takes its own interrupt matrix (MULTICORE) |
 | `gpio.fs` | board | package GPIO: the base of the drivers: `BITS!` (bits in a register), `SRAM-ALLOT` and `SRAM-BUFFER:` (RAM inside the chip, also when the RAM data are in the PSRAM), GPIO (`OUTPUT INPUT PULLUP PULLDOWN OPEN-DRAIN HIGH LOW PIN@ PIN! TOGGLE DRIVE`), the GPIO matrix (`SIGNAL>PIN`, `PIN>SIGNAL`), interrupts of the pins (`PIN-INT!`); needs CHIP and INTR |
-| `timers.fs` | board | package TIMERS: `EVERY`, `AFTER`, `.TIMERS`: Forth words that run later, or every n ms; an error stops only its word; needs CHIP and INTR |
+| `timers.fs` | board | package TIMERS: `EVERY`, `AFTER`, `.TIMERS`: Forth words that run later, or every n ms; an error stops only its word; `i TIMERS-FOR`: a core that starts takes its own timer (timer i of timer group 1; MULTICORE); needs CHIP and INTR |
 | `nettimer.fs` | board | package NET-TIMER: our TCP/IP in the background, a step every 1 ms in a timer, and its foreground work in IDLE (`NET-START`, `NET-STOP`, `NET-RUNNING?`); needs TIMERS, IDLE and our TCP/IP (`lib/net/`) |
 | `tcpip.fs` | `ucf term` | loads our TCP/IP and NET-TIMER with one `#require` (the board version of `lib/net/tcpip.fs`) |
 | `flpair.fs` | board | package FLASH-PAIR: a record of at most 68 bytes in two sectors of the flash, written in turn, so that a power loss keeps the record of before (`PAIR`, `PAIR-WRITE`, `PAIR-READ`, `PAIR-ERASE`): the WLAN profile (WLSAVE) and the broker of the IR bridge; needs FLASH, SHA1 and BYTES |
-| `flash.fs` | board | package FLASH: the SPI flash over the ROM (`FLASH-READ`, `FLASH-WRITE`, `FLASH-ERASE`), with `FLASH-SYSCALL` of the layer of the chip (on the ESP32 the cache is off meanwhile); buffers only inside the chip; needs CHIP and ROM |
+| `flash.fs` | board | package FLASH: the SPI flash over the ROM (`FLASH-READ`, `FLASH-WRITE`, `FLASH-ERASE`), with `FLASH-SYSCALL` of the layer of the chip (on the ESP32 the cache is off meanwhile); buffers only inside the chip; `'FLASH-HOLD` and `'FLASH-FREE`: MULTICORE stops the other cores there around each call of the ROM; needs CHIP and ROM |
+| `multicore.fs` | board | package MULTICORE: the other cores of the chip, each a Forth computer (`CORES`, `CORE#`, `CORE-RUN`, `CORE-STOP`, `CORE?`, `.CORE`; section "Two cores: MULTICORE"); needs FLASH and the part of the chip; not in the image |
+| `cores.fs` | `ucf term` | loads MULTICORE: the part of the chip (`#when`), then `multicore.fs` |
 | `ir.fs` | board | package IR: frames of IR remote controls as times in us over the RMT: `IR-PINS`, `IR-SEND`, `IR-FRAME?`, `IR-LISTEN`; made for the IR transceiver of Adafruit (product 5990); needs RMT and GPIO; the frames themselves (the codes of the remote controls) are in `lib/irremote/` |
 | `ws2812.fs` | board | package WS2812: an RGB LED over channel 0 of the RMT (`RGB-PIN`, `RGB!`); needs RMT |
 | `clink.fs` | board | package CLINK: links code of C that is written as `CODE` words (the quarry `blob/esp32`): cells that get the address of a name (`SYMBOL`, `SYMBOL!`), names outside (`EXTERN`), `LINK-SYMBOLS`, `.UNRESOLVED`, `UNRESOLVED?`, the data of C (`DATA:`, `INIT`), `CALL-C`, `FPU-ON`; needs TEXT, XTENSA, ROM and ASM; not in the image: ESP32-PHY loads it only for the link |
@@ -64,6 +66,7 @@ itself differs, each chip has its own file in its folder.
 | `test/mock.fs` | host | ROM and ASM on the host, for tests of `CODE` words of the ESP32: `CODE` assembles as on the chip and shows the code; `QUIET` hides it |
 | `test/phyhost.fs` | host | the test of ESP32-PHY on the host (section "The radio of the ESP32: ESP32-PHY") |
 | `test/radiohost.fs` | host | the test of ESP32-RADIO on the host (section "The radio of the ESP32: ESP32-RADIO"); the tests of WLAN-BACK, SETUP-AP and IR-QUEUE: section "The WLAN of the WROOM", "Tests" |
+| `test/cores.fs` | host | the test of MULTICORE on the host, with a mock of the part of the chip |
 
 `lib/idle.fs` (package IDLE: the chain of words that run while the
 console waits, and `NO-BREAK`, for which Ctrl-C waits) comes before
@@ -108,7 +111,8 @@ README: "Build").
 | `ircap.fs` | package IR-CAPTURE: the IR receiver into 4 raw slots by a CODE handler; for IR-QUEUE |
 | `irqueue.fs` | package IR-QUEUE: IR in the background for the bridge: the received frames in a ring of the program, sending after 15 ms without light with a check of the echo (`IR-Q-START`, `IR-Q-SEND`, `IR-Q-FRAME?`; section "IR for the bridge on the WROOM"); needs IR-CAPTURE |
 | `diymore/wroom-n4.fs` | package DIYMORE-WROOM-N4: the board ESP-WROOM-32 N4 of diymore: `LED` (2), `BUTTON` (0), `LED-ON`, `LED-OFF`; then `BOARD` |
-| `test/` | the tests of INTR, GPIO, RMT, IR and ASM on this chip (GPIO 25, without wires); `phy.fs`, the test of ESP32-PHY; `radio.fs`, the test of ESP32-RADIO (it needs an access point near the board); `irqueue.fs`, `irqbusy.fs`: IR-QUEUE; `airping.fs`, `airsock.fs`, `airtime.fs`, `aphttp.fs`: the WLAN (section "The WLAN of the WROOM") |
+| `cores.fs` | package ESP32-CORES: the part of the chip for MULTICORE: core 1 (APP_CPU) on and off over DPORT, its cache and MMU, its clock (timer 1 of timer group 0), its CPU interrupt for the requests of core 0, the headers of HAL 106 to 108 (`THIS-CORE`, `CORE-ENTRY`, `CORE-PARK`), and the two words for FLASH (`CORES-HOLD`, `CORES-FREE`); then `CHIP-CORES` |
+| `test/` | the tests of INTR, GPIO, RMT, IR and ASM on this chip (GPIO 25, without wires); `phy.fs`, the test of ESP32-PHY; `radio.fs`, the test of ESP32-RADIO (it needs an access point near the board); `irqueue.fs`, `irqbusy.fs`: IR-QUEUE; `airping.fs`, `airsock.fs`, `airtime.fs`, `aphttp.fs`: the WLAN (section "The WLAN of the WROOM"); `cores.fs`: MULTICORE (section "Two cores: MULTICORE") |
 
 IDLE, ROM, ESP32, INTR, GPIO, TIMERS, FLASH, CLOCK and BOOTIMG are in the
 image that `targets/esp32/build.fs` makes, in this order (its README:
@@ -527,14 +531,16 @@ with PICK, not edited by hand.
 
 These sizes were measured on the WROOM after the Forth MAC start and
 the RX-credit guard. The TX descriptor and buffer reserve
-1 612 more bytes of SRAM1: `$3FFE_7660` to `$3FFE_7CAB` (since 09.10.;
-before, the reception started at `$3FFE_8000`).
+1 612 more bytes of SRAM1: `$3FFF_B860` to `$3FFF_BEAB`. Since 15.10. all
+of it lies in the lower part of the stack of the ROM (`$3FFF_8600` on):
+the ROM writes `$3FFE_4350`-`$3FFE_522F` when the second core starts
+(targets/esp32/README.md, "Memory").
 
 | | Dictionary | RAM data | SRAM1 |
 | --- | --- | --- | --- |
 | BYTES | 160 bytes | 24 bytes | |
 | ESP32-MAC | 2 668 bytes | 24 bytes | |
-| ESP32-RADIO | 8 724 bytes | 112 bytes | RX 12 896 bytes, TX 1 612 bytes, from `$3FFE_4400` up to `$3FFE_7CAB` |
+| ESP32-RADIO | 8 724 bytes | 112 bytes | RX 12 896 bytes, TX 1 612 bytes, from `$3FFF_8600` up to `$3FFF_BEAB` |
 | WIFI | 2 340 bytes | 1 616 bytes | |
 | free after PHY, BYTES, MAC, RADIO and WIFI | 74 920 bytes | 58 240 bytes | the free figures include the small measurement words; measured with the old map of 192 KB, the standard map has 65 536 bytes more dictionary |
 
@@ -820,7 +826,7 @@ in the flash:
 
 | | |
 | --- | --- |
-| free: dictionary, RAM data, RAM behind the frozen part (XDATA) | 3 968, 41 272, 131 516 bytes (15.10.) |
+| free: dictionary, RAM data, RAM behind the frozen part (XDATA) | 3 164, 41 244, 132 320 bytes (15.10.) |
 | the packet RAM of the LINKs (`RADIO-POOL`) | 14 880 bytes in SRAM1 from `$3FFE_0500` (up to the data of the ROM); WIFI-LINK takes 11 392, AP-LINK 8 168 |
 | `WBACK-START` to `WBACK-READY?`, the access point near | 2.1 s |
 | ping to the router | 5 to 15 ms |
@@ -932,6 +938,88 @@ with the image of `apps/irbridge/app.fs`, `esp32/test/irqueue.fs` and then
 `esp32/test/irqbusy.fs` (GPIO 25, a loop inside the chip, no light).
 Measured: the CODE handler at most 5 038 CPU cycles (21 us), a step of
 the timer word at most 353 us (a frame of the remote control, 371 times).
+
+## Two cores: MULTICORE
+
+Each core of the chip runs Forth with its own state: its stacks, TIB
+and PAD, its SYS and the RAM data of the base image (`BASE`, `HANDLER`,
+the number output, `'EMIT`, its handlers of interrupts, its timers, its
+chain of IDLE). The dictionary and the other RAM data are the same for
+all cores. Core 0 has the console and gives the other cores words to
+run. MULTICORE is an option for applications: the image of `build.fs`
+does not load it, and the IR bridge does not need it. How the HAL does
+it: `targets/esp32/README.md`, "Two cores". The words (package
+MULTICORE, `multicore.fs`); the number of a core is on top of the
+stack:
+
+| Word | Effect |
+| --- | --- |
+| `CORES ( -- n )` | the cores of the chip; the ESP32 has 2 |
+| `CORE# ( -- i )` | the core that runs this word: 0 to `CORES` - 1 |
+| `xt i CORE-RUN ( -- )` | core i starts with a fresh state and runs xt. When xt ends or throws, core i waits for its reset, and `.CORE` shows the code |
+| `i CORE-STOP ( -- )` | core i stops: -28 in its `CATCH`; after 100 ms at most it is in reset |
+| `i CORE? ( -- f )` | core i runs its word |
+| `i .CORE ( -- )` | its state and the code of its word |
+| `xt i ON-CORE ( -- )` | core i runs xt once, in its chain of IDLE; it waits at most 1 s until core i takes it |
+| `CORE-SERVE ( -- )` | a word for `CORE-RUN`: the chain of IDLE again and again, with 1 ms of rest, so `ON-CORE` works |
+| `n CHANNEL name ( -- )` | a channel with room for n cells; `name ( -- ch )` |
+| `x ch CH-PUT ( -- f )` | x into the channel; false: it is full |
+| `ch CH-TAKE ( -- x true \| false )` | the next x, or false: it is empty |
+
+A channel is a ring of cells with one writer and one reader, on two
+cores or on one: the writer moves only its own place, the reader only
+its own, so they need no lock. The output of another core (`EMIT`,
+`TYPE`, `.`) goes into its own channel; core 0 writes it at the console
+while it waits for a key (in its chain of IDLE). While that channel is
+full, the other core waits. Only core 0 starts and stops cores (else an
+error). An example at the console:
+
+    board ok> #require MULTICORE lib/esp32/cores.fs
+    board ok> ALSO TIMERS
+    board ok> VARIABLE N  : COUNTER ( -- )  BEGIN  1 N +!  AGAIN ;
+    board ok> 0 N !  ' COUNTER 1 CORE-RUN  N @ .  100 MS  N @ .
+    117 151479
+    board ok> 1 CORE-STOP  1 .CORE
+    core 1 stops, code -28
+    board ok> ' CORE-SERVE 1 CORE-RUN
+    board ok> : HELLO ( -- )  ." hello from core " CORE# . CR ;
+    board ok> ' HELLO 1 ON-CORE
+    hello from core 1
+    board ok> : BEAT ( -- )  1 N +! ;  : BEATS ( -- )  ['] BEAT 100 EVERY ;
+    board ok> 0 N !  ' BEATS 1 ON-CORE  1000 MS  N @ .
+    10
+    board ok> 1 CORE-STOP
+
+`BEATS` runs on core 1: its `EVERY` takes the timer of core 1, and
+`BEAT` runs there every 100 ms, while core 0 waits.
+
+**The rules.** A word on another core must not change the dictionary
+(`:`, `CREATE`, `VARIABLE`, `ALLOT`), write the flash, wait for a key,
+or call the words of a package whose state and registers belong to core
+0 (the network, IR, the bridge). It may compute, use `CATCH` and
+`THROW`, `BASE` and the number output, `MS` and `MILLIS` (its own clock,
+with the time of core 0; `MS` sleeps), its own handlers (INTR), timers
+(TIMERS) and chain of IDLE, the registers of the chip, channels and the
+RAM data, for example variables that core 0 reads. Source 25 (FROM_CPU
+1) belongs to MULTICORE. While another core is on, FLASH stops it
+around each call of the ROM (`'FLASH-HOLD`, `'FLASH-FREE`), and `FREEZE`
+refuses: `CORE-STOP` first. Ctrl-C at the console stops only core 0.
+
+**Memory.** MULTICORE and ESP32-CORES take 3 800 bytes of dictionary on
+the board when they load with `TEMP-HEADS ON` (as an application loads
+them), and about 1.1 KB of RAM data: the state of the cores and the two
+channels of core 1 (its output, 256 cells; the words of `ON-CORE`, 4).
+Core 1 uses its own parts of SRAM1 and SRAM2 (`targets/esp32/README.md`,
+"Memory").
+
+**Tests.** On the host: `test/cores.fs`, `cores: 24 tests, 0 errors`
+(with a mock of ESP32-CORES, FLASH, IDLE, INTR and TIMERS, whose core
+1 does what the test asks). On the board: `esp32/test/cores.fs`,
+`cores: 21 tests, 0 errors` (`targets/esp32/README.md`, "Test"). With a
+frozen dictionary (15.10.): core 1 searches it in the flash (3 964
+times in 100 ms, none missed), runs a timer (50 beats in 500 ms) and
+writes at the console through `ON-CORE`, also while core 0 erases and
+writes a sector of the flash.
 
 ## A new driver
 

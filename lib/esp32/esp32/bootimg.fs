@@ -183,6 +183,7 @@ VARIABLE SRC   VARIABLE LEFT
   BUF PAD# 1+ 4ALIGNED  FBASE SIZE + FLASH-WRITE THROW ;
 
 : (SAVE) ( entry -- )
+  'FLASH-HOLD @ ABORT" FREEZE: another core runs (CORE-STOP first)"   \ package FLASH: it reads the flash
   DICT>FLASH
   XDATA-END @ IF  FLASH-END RAM-BASE + XDATA-END !  THEN
   FBASE SIZE + PAD# + 1+  DICT-FLASH $10000 +  U> ABORT" FREEZE: the boot image is too big"

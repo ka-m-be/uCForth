@@ -16,7 +16,12 @@
 \ The calls go through FLASH-SYSCALL of the layer of the chip: on the
 \ ESP32 it switches the cache of the flash off meanwhile (the frozen
 \ part of the dictionary lies in the flash, targets/esp32/README.md,
-\ "Memory"); on the ESP32-S3 it is SYSCALL.
+\ "Memory"); on the ESP32-S3 it is SYSCALL. Another core reads the
+\ flash through its own cache; so the package MULTICORE stops it around
+\ each call (lib/esp32/cores.fs), with two vectors:
+\   'FLASH-HOLD ( -- a )   0, or an xt that runs before each call
+\   'FLASH-FREE ( -- a )   0, or an xt that runs after it
+\ They are not 0 exactly while another core runs (FREEZE looks at it).
 \
 \ The function of the ROM for a write counts the pages of 256 bytes in 8
 \ bits: with more than 255 pages in one call it does not stop at the end
@@ -40,6 +45,12 @@
 PACKAGE FLASH  ALSO CHIP  ALSO ROM   \ lib/package.fs
 
 4096 CONSTANT SECTOR
+PUBLIC
+VARIABLE 'FLASH-HOLD                \ see above
+VARIABLE 'FLASH-FREE
+PRIVATE
+: ROM-FLASH ( x1 .. xn n a -- x )   \ FLASH-SYSCALL; the other cores wait meanwhile
+  'FLASH-HOLD @ ?DUP IF EXECUTE THEN  FLASH-SYSCALL  'FLASH-FREE @ ?DUP IF EXECUTE THEN ;
 : IOR ( r -- ior )   IF -37 ELSE 0 THEN ;   \ r: 0 done, 1 error, 2 time-out
 : PARAMS ( -- )   \ the size of the flash, of its blocks, sectors and pages
   0 FLASH-SIZE $10000 SECTOR 256 $FFFF 6 'FLASH-PARAMS SYSCALL DROP ;
@@ -49,21 +60,21 @@ PACKAGE FLASH  ALSO CHIP  ALSO ROM   \ lib/package.fs
 VARIABLE NEXT                       \ the next sector to erase
 : ERASE1 ( end -- ior )   \ a block of 64 KB when it fits, else a sector
   NEXT @ 15 AND 0=  OVER NEXT @ - 16 < 0= AND IF
-    DROP  NEXT @ 16 / 1 'FLASH-ERASE-BLOCK FLASH-SYSCALL IOR  16 NEXT +!  EXIT
-  THEN  DROP  NEXT @ 1 'FLASH-ERASE FLASH-SYSCALL IOR  1 NEXT +! ;
+    DROP  NEXT @ 16 / 1 'FLASH-ERASE-BLOCK ROM-FLASH IOR  16 NEXT +!  EXIT
+  THEN  DROP  NEXT @ 1 'FLASH-ERASE ROM-FLASH IOR  1 NEXT +! ;
 32768 CONSTANT /PART                \ the bytes of one write of the ROM: 128 pages
 VARIABLE PART-A   VARIABLE PART-U   VARIABLE PART-F   \ the buffer, the bytes left, the flash address
 : WRITE-PART ( -- ior )   \ the next part, at most /PART bytes
-  PART-F @  PART-A @  PART-U @ /PART MIN  DUP >R  3 'FLASH-WRITE FLASH-SYSCALL IOR
+  PART-F @  PART-A @  PART-U @ /PART MIN  DUP >R  3 'FLASH-WRITE ROM-FLASH IOR
   R@ PART-A +!  R@ PART-F +!  R> NEGATE PART-U +! ;
 
 PUBLIC
-: FLASH-READ ( faddr a u -- ior )   PARAMS  SWAP INSIDE SWAP  3 'FLASH-READ FLASH-SYSCALL IOR ;
+: FLASH-READ ( faddr a u -- ior )   PARAMS  SWAP INSIDE SWAP  3 'FLASH-READ ROM-FLASH IOR ;
 : FLASH-WRITE ( a u faddr -- ior )   \ in parts of 32 KB
   PARAMS  PART-F !  PART-U !  INSIDE PART-A !
   BEGIN PART-U @ WHILE  WRITE-PART ?DUP IF EXIT THEN  REPEAT  0 ;
 : FLASH-ERASE ( faddr u -- ior )   \ blocks of 64 KB where they fit: faster than sectors
-  PARAMS  'FLASH-UNLOCK IF  0 'FLASH-UNLOCK FLASH-SYSCALL IF 2DROP -37 EXIT THEN  THEN
+  PARAMS  'FLASH-UNLOCK IF  0 'FLASH-UNLOCK ROM-FLASH IF 2DROP -37 EXIT THEN  THEN
   OVER + SECTOR 1- + SECTOR /  SWAP SECTOR / NEXT !   ( sector-end )
   BEGIN DUP NEXT @ > WHILE  DUP ERASE1 IF DROP -37 EXIT THEN  REPEAT  DROP 0 ;
 

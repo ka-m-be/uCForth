@@ -113,7 +113,7 @@ Then open `http://localhost:8000/build/ucf-web.html?args=tools/test.fs`.
 The page takes the files from the server and loads `tools/test.fs`
 after the image. The output ends with:
 
-    all: 12186 tests, 0 errors
+    all: 12210 tests, 0 errors
 
     [the end, exit status 0]
 

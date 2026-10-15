@@ -249,7 +249,7 @@ files, for example all tests:
     ...
       RADIO-LINK: LINK-MAC is also in AP-LINK
     ...
-    all: 12186 tests, 0 errors
+    all: 12210 tests, 0 errors
 
 These two show on purpose: LINK-NET wraps the words of UDP and TCP in
 words with the same name (`: (TCP-CONNECT) ['] (TCP-CONNECT) LOCKED ;`),

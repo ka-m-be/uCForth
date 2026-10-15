@@ -75,7 +75,7 @@ A double click on the file opens a console window with the prompt too.
 
     C:\ucf>echo ALSO FILES  INCLUDE tools/test.fs | build\ucf-win32
     ...
-    all: 12186 tests, 0 errors
+    all: 12210 tests, 0 errors
     C:\ucf>echo %ERRORLEVEL%
     0
 
@@ -104,7 +104,7 @@ Then, in the folder `ucf`:
     docker run --rm --platform linux/386 -v "$PWD":/u -w /u ucf-wine386 \
       sh -c 'echo "ALSO FILES  INCLUDE tools/test.fs" | wine build/ucf-win32.exe'
 
-The output ends with `all: 12186 tests, 0 errors`, after about 9 s:
+The output ends with `all: 12210 tests, 0 errors`, after about 9 s:
 first Wine makes its folder in the new container and writes some
 messages of its own; the tests themselves take about 2 s. A serial line
 in Wine: `socat` makes two connected pseudo terminals, and a link in

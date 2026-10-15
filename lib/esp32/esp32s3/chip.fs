@@ -20,7 +20,9 @@
 \   PIN-INT-CPU            the bit in GPIO_PINn: the interrupt goes to the CPU
 \   GPIO-SOURCE            the interrupt source of the GPIO unit
 \   INTR-MAP INTR-STATUS #SOURCES   the interrupt matrix (TRM chapter 9)
+\   i CORE-INTR-MAP i CORE-INTR-STATUS ( -- a )   the same of core i
 \   TG1 TG1-SOURCE         timer group 1 and the source of its timer 0
+\   i CORE-TG1 i CORE-TG1-SOURCE   the timer of TIMERS on core i, its source
 \   TG-INT-ENA TG-INT-CLR  offsets of the interrupt registers of a timer group
 \   TG-1MHZ ( -- x )       the configuration of a timer: on, up, reload,
 \                          alarm, 1 MHz
@@ -57,12 +59,16 @@ $2000 CONSTANT PIN-INT-CPU            \ GPIO_PINn: INT_ENA, bit 13
 $600C2000 CONSTANT INTR-MAP           \ a register for each source: its CPU interrupt
 $600C218C CONSTANT INTR-STATUS        \ 4 registers: the sources that ask, 32 in each
 99 CONSTANT #SOURCES
+: CORE-INTR-MAP ( i -- a )   ABORT" ESP32S3: only core 0 so far"  INTR-MAP ;
+: CORE-INTR-STATUS ( i -- a )   ABORT" ESP32S3: only core 0 so far"  INTR-STATUS ;
 
 \ ---- timer group 1 (TRM chapter 12)
 $60020000 CONSTANT TG1                \ timer 0 at 0
 53 CONSTANT TG1-SOURCE                \ its timer 0
 $70 CONSTANT TG-INT-ENA
 $7C CONSTANT TG-INT-CLR
+: CORE-TG1 ( i -- a )   ABORT" ESP32S3: only core 0 so far"  TG1 ;
+: CORE-TG1-SOURCE ( i -- n )   ABORT" ESP32S3: only core 0 so far"  TG1-SOURCE ;
 $E0000000 40 13 LSHIFT OR $600 OR CONSTANT TG-1MHZ   \ on, up, reload; the crystal / 40; alarm
 
 \ ---- the SPI flash over the ROM

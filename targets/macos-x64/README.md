@@ -71,7 +71,7 @@ outside the program (for example `$7FFFFFF0 @`) is the error -9
 
     $ echo "ALSO FILES  INCLUDE tools/test.fs" | build/ucf-macos-x64
     ...
-    all: 12186 tests, 0 errors
+    all: 12210 tests, 0 errors
 
 With Rosetta on a Mac with Apple silicon this takes 4.2 s
 (`arch -x86_64` in front).
@@ -113,7 +113,7 @@ or build them on this Mac with a bootstrap VM (section "Build").
 
        $ echo "ALSO FILES  INCLUDE tools/test.fs" | build/ucf-macos-x64
        ...
-       all: 12186 tests, 0 errors
+       all: 12210 tests, 0 errors
 
 4. With an ESP32-S3 board at a USB port (`ls /dev/cu.*` shows its name;
    `lsof` on it shows no other program):

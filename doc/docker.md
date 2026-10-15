@@ -106,7 +106,7 @@ runs in each Linux container for arm64. All tests:
 
 The output ends with:
 
-    all: 12186 tests, 0 errors
+    all: 12210 tests, 0 errors
 
 The tests write files, and the folder of the Mac is read only in the
 container. So the command first copies the folder to `/tmp/u`. With

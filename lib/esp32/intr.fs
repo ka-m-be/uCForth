@@ -36,6 +36,13 @@
 \   xt n INT-STOPPED ( -- )   the handler xt stopped with the error n: its
 \                       message comes later (also inside a handler)
 \
+\ Each core has its own handlers, on its own interrupt matrix (the state
+\ of INTR is in the RAM data of the base image: each core has a copy,
+\ targets/esp32/README.md, "Two cores"). A core that starts takes its
+\ matrix, with no handler yet:
+\
+\   i INTR-FOR ( -- )   this core is core i (lib/esp32/multicore.fs)
+\
 \ Ctrl-C stops the word that runs, not the handlers; it waits until a
 \ handler ends. Ctrl-C twice within 1 s also switches the handlers off
 \ (as -INT), and so does Ctrl-C while another one waits: it stops a
@@ -66,8 +73,8 @@
 
 PACKAGE INTR  ALSO CHIP  ALSO IDLE   \ lib/package.fs
 
-INTR-MAP CONSTANT MAP           \ core 0: a register for each source, its CPU interrupt
-INTR-STATUS CONSTANT STATUS     \ registers: the sources that ask, 32 in each
+INTR-MAP VALUE MAP              \ the matrix of this core: a register for each source, its CPU interrupt
+INTR-STATUS VALUE STATUS        \ registers: the sources that ask, 32 in each
 1 CONSTANT CPU-INT              \ the CPU interrupt of the Forth handlers: level 1, by level
 6 CONSTANT NOWHERE              \ a CPU interrupt that no source reaches (as ESP-IDF)
 66 CONSTANT DOCODE               \ the code field of a CODE word (doc/vm.md, section 7)
@@ -173,5 +180,9 @@ PUBLIC
   6 = IF  2DROP -10  ELSE  SWAP +HEX  S"  at pc " +REPORT  +HEX  -9  THEN   \ 6: IntegerDivideByZero
   REPORT #REPORT @ ROT  HANDLER @ IF NAME-THROW THEN
   >R  ERRMSG CELL+ !  ERRMSG !  R> .ERROR  QUIT ;   \ no CATCH waits: the message, then QUIT
+: INTR-FOR ( i -- )   \ this core is core i: its matrix, no handler, no message yet
+  DUP CORE-INTR-MAP TO MAP  CORE-INTR-STATUS TO STATUS
+  HANDLERS #SOURCES CELLS 0 FILL  CPU #SOURCES CPU-INT FILL  0 #ON !
+  STOPS-IN @ STOPS-OUT !  0 STOPS-LOST !  BROKE OFF! ;
 
 END-PACKAGE

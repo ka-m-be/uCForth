@@ -442,11 +442,29 @@ $2B0000 B3: OEQ.S,   $4B0000 B3: OLT.S,   $6B0000 B3: OLE.S,
 \ for each xt), -BASE, the reverse (DOCOL); >CHIP, also reads from S0
 \ to FE in the flash. >CHIP!, is >CHIP, before a store: from S0 to FE
 \ the code jumps to ro instead (the kernel: -9).
+\
+\ PER-CORE? is true on the ESP32 (the same two places set it, with
+\ FLASH-DICT?): each core of the chip runs the VM with its own SYS and
+\ RAM data of the base image, and its own TIB, PAD and stacks. Three
+\ special registers of each core hold the bases (the HAL sets them at
+\ the start of the core: targets/esp32/hal.fs, "Cores"):
+\   MISC1   the chip address of VM address 0 for SYS and the RAM data of
+\           the base image (VM addresses below PE)
+\   MISC2   the chip address of VM address 0 for TIB, PAD and the stacks
+\           (VM addresses $10000 up to S0)
+\   MISC3   PE, the end of the RAM data of the base image; $10000 on core
+\           0, which has its own part and the common part at one place
+\ The other RAM data (from PE up to $FFFF) and the dictionary are the
+\ same for all cores: on another core a cell there costs two jumps more.
+\ MISC0 holds the variables of the HAL of the core.
+\ SYS+, gives a cell of SYS the chip address of this core, STACKS, the
+\ base of its stacks (SP@, SP!, RP@, RP!).
 
 A10 CONSTANT MEM   A11 CONSTANT TBL   A12 CONSTANT IP   A13 CONSTANT W
 A14 CONSTANT SP    A15 CONSTANT RP
 VARIABLE DATA-OFF                   \ 0, or a multiple of 256 (see above)
 VARIABLE FLASH-DICT?                \ true: the frozen part can lie in the flash (see above)
+VARIABLE PER-CORE?                  \ true: each core has its own SYS, base RAM data and stacks (see above)
 120 CELLS CONSTANT FE-SLOT   121 CELLS CONSTANT FM-SLOT   122 CELLS CONSTANT S0-SLOT
 PRIVATE
 VARIABLE B-D   VARIABLE B-A   VARIABLE B-S   VARIABLE B-T
@@ -471,18 +489,26 @@ PUBLIC
 : TOS!, ( reg -- )  SP 0 S32I.N, ;
 PRIVATE
 VARIABLE C-REG   VARIABLE C-RO
-: FROZEN>CHIP, ( reg ro -- )   \ SPLIT>CHIP, with FLASH-DICT?; 36 bytes, the jumps inside
+: FROZEN>CHIP, ( reg ro -- )   \ SPLIT>CHIP, with FLASH-DICT? and PER-CORE?; 57 bytes, the jumps inside
+  PER-CORE? @ 0= ABORT" FLASH-DICT? needs PER-CORE?"
   C-RO !  C-REG !
   A9 C-REG @ 16 16 EXTUI,             \ a9: the block of 64 KB
-  A9 4 THERE 33 + BGEUI,              \ from $40000: a chip address, as it is
-  A8 DATA-OFF @ 8 RSHIFT MOVI,  A8 A8 8 SLLI,  A8 A8 MEM ADD.N,   \ below $10000: + MEM + DATA-OFF
-  A9 THERE 20 + BEQZ,
+  A9 4 THERE 54 + BGEUI,              \ from $40000: a chip address, as it is
+  A9 THERE 40 + BEQZ,                 \ below $10000: SYS and the RAM data
   A8 MEM MOV.N,                       \ the RAM: + MEM
   A9 TBL FE-SLOT L32I,
-  C-REG @ A9 THERE 12 + BGEU,         \ from FE on
+  C-REG @ A9 THERE 41 + BGEU,         \ from FE on
   A9 TBL S0-SLOT L32I,
-  C-REG @ A9 THERE 6 + BLTU,          \ below S0: TIB, PAD, the stacks
+  C-REG @ A9 THERE 9 + BGEU,          \ S0 to FE: the flash
+  A8 MISC2 RSR,                       \ below S0: TIB, PAD, the stacks of this core
+  THERE 29 + J,
   C-RO @ ?DUP IF  J,  ELSE  A8 TBL FM-SLOT L32I,  THEN   \ S0 to FE: + FM, the flash; a store: to ro
+  THERE 23 + J,
+  A8 DATA-OFF @ 8 RSHIFT MOVI,  A8 A8 8 SLLI,  A8 A8 MEM ADD.N,   \ from PE on: + MEM + DATA-OFF
+  THERE 12 + J,
+  A8 MISC3 RSR,                       \ below $10000: PE of this core ($10000 on core 0)
+  C-REG @ A8 THERE -14 + BGEU,        \ from PE on: the RAM data of all cores
+  A8 MISC1 RSR,                       \ below PE: SYS and the RAM data of the base image of this core
   C-REG @ DUP A8 ADD.N, ;
 : SPLIT>CHIP, ( reg -- )   \ >CHIP, with DATA-OFF; 21 bytes, the jumps inside
   DATA-OFF @ 255 AND ABORT" DATA-OFF must be a multiple of 256"
@@ -504,5 +530,10 @@ PUBLIC
   DUP 0= ABORT" >CHIP!, needs the address of the code for the error"  (>CHIP), ;
 : CONST, ( reg x -- )   \ reg = x: L32R, after a jump over the constant
   THERE 6 + -4 AND 4 + J,  TALIGN  THERE >R  T,  R> L32R, ;
+: SYS+, ( reg tmp -- )   \ reg: a VM address of SYS or of the RAM data of the base image; then its chip address
+  PER-CORE? @ IF  DUP MISC1 RSR,  >R DUP R> ADD.N,  EXIT THEN   \ this core (tmp: free)
+  DROP  DUP MEM ADD.N, ;                                     \ the literal holds + DATA-OFF (SYSVAR, of the kernel)
+: STACKS, ( reg -- reg' )   \ reg' holds the chip address of VM address 0 for TIB, PAD and the stacks
+  PER-CORE? @ IF  DUP MISC2 RSR,  EXIT THEN  DROP MEM ;      \ this core: reg; else MEM
 
 END-PACKAGE

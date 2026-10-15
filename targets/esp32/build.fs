@@ -20,8 +20,10 @@
 \    SRAM1; VM addresses $10000 to $3FFFF (TIB, PAD, the stacks, the
 \    dictionary) at RAM-ADDR + a, in SRAM2. The map stays the standard
 \    map of doc/vm.md, section 3. DATA-OFF tells the assembler (>CHIP,)
-\    and the kernel. At the end: the checksum, then the SHA-256 digest of
-\    all bytes before it.
+\    and the kernel. Each core has its own SYS, RAM data of the base image
+\    and stacks (PER-CORE?, asm/xtensa.fs; targets/esp32/hal.fs, "Cores"):
+\    the HAL gets PE, the end of the RAM data of this image. At the end:
+\    the checksum, then the SHA-256 digest of all bytes before it.
 \
 \ The image goes to the flash at $1000: "ucf flash PORT build/esp32.bin
 \ 0x1000". "ucf run PORT build/esp32.bin" loads it into the RAM and
@@ -43,6 +45,7 @@ $60000 CONSTANT DICT-FLASH          \ the same in the flash: DICT-FLASH + VM add
 0 CONSTANT >DRAM                    \ the code is read where it is
 DATA-ADDR RAM-ADDR - DATA-OFF !     \ for >CHIP, and the kernel (asm/xtensa.fs)
 FLASH-DICT? ON!                    \ the frozen part of the dictionary can lie in the flash
+PER-CORE? ON!                      \ each core has its own SYS, RAM data of the base image and stacks
 : VM>CHIP ( a -- a' )   DUP $10000 U< IF DATA-ADDR ELSE RAM-ADDR THEN + ;
 
 \ ==== The code ==========================================================
@@ -133,9 +136,11 @@ VARIABLE SEG-POS   VARIABLE SEG-LO   VARIABLE SEG-LEN
   CHECK-FLASH
   IMAGE-OPEN  ON-BOOT? ?DUP IF BOOT-XT ! THEN  BOOT-XT @ XT-BOOT T!  QUIT-XT @ XT-QUIT T!  THROW-XT @ XT-THROW T!
   IMAGE-CLOSE  RANGES
+  D-END @ 4ALIGNED  DUP PE-MAX U> ABORT" the RAM data of the base image do not fit for core 1 (PE-MAX, hal.fs)"
+  PE!                                              \ PE: each core has its own copy up to here
   SAVER XT-SAVE T!  TDP @ 4ALIGNED CODE-LEN T!  START ENTRY-A T!
   ISR-XT XT-ISR T!  FAULT-XT XT-FAULT T!  FAULT-REGS-AT FREGS-A T!
-  OUT DATA-OFF @ + OUT-V T!  HOLD-ADDR HOLD-V T!   \ OUT: the code adds MEM
+  OUT OUT-V T!  HOLD-ADDR HOLD-V T!                \ OUT: SYS+, gives it the base of the core
   S" build/esp32.bin" WRITE-START  ['] SUM-PUT IS ON-PUT  $EF SUM !  SUMMING OFF!
   SHA-START
   START HEADER

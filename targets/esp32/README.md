@@ -66,14 +66,14 @@ In the folder `ucf`, with a bootstrap VM with 32-bit cells:
 The output ends with:
 
       saved: ucf.hex
-      code: 10166 bytes at $40080000, start at $400818D0
-      image: $100-$00000B38 at $3FFE8100, $00010A00-$000197B0 at $3FFB0A00
+      code: 10232 bytes at $40080000, start at $40081B18
+      image: $100-$00000B54 at $3FFE8100, $00010A00-$00019AD4 at $3FFB0A00
       start word: ON-BOOT
       dictionary: up to $0003FFF0 (DICT-END)
       FREEZE on the board: yes
       interrupts: yes
       Ctrl-C waits for NO-BREAK: yes
-      written: build/esp32.bin (49152 bytes)
+      written: build/esp32.bin (50048 bytes)
 
 1. `lib/package.fs` comes first: the packages for the board
    (`PACKAGE` ... `END-PACKAGE`) need it on the board too. Then
@@ -130,8 +130,8 @@ and `FREEZE` work as after a start from the flash:
 
     $ build/ucf run /dev/cu.usbserial-110 build/esp32.bin
     connecting .. ok
-    loading build/esp32.bin: 10168 bytes at $40080000 2560 bytes at $3FFE8100 34400 bytes at $3FFB0A00
-    started at $400818D0
+    loading build/esp32.bin: 10232 bytes at $40080000 2644 bytes at $3FFE8100 37076 bytes at $3FFB0A00
+    started at $40081B18
     term on /dev/cu.usbserial-110: #help shows the commands
     board ok>
 
@@ -508,6 +508,25 @@ errors` after about 18 s, most of them for the loading over `ucf term`
 timer, 100 000 times a second; GPIO 25 toggles). The monitor has its
 own test (`asm/monitor/README.md`, "Test").
 
+The test of the second core (section "Two cores") follows, with the
+package MULTICORE:
+
+    board ok> #include forth/test/tester.fs
+    board ok> #require MULTICORE lib/esp32/cores.fs
+    board ok> #include lib/esp32/esp32/test/cores.fs
+
+Expected: `cores: 21 tests, 0 errors`: the numbers of
+the cores, a word on core 1 that ends, a counter and its stop (-28),
+THROW (-5) and an exception (-9) on core 1, its clock, the number
+output and `CATCH` with `THROW` on both cores at the same time (100 000
+times each), a read of the flash while core 1 counts, `FREEZE`, which
+refuses meanwhile, the output of core 1 in its channel, 100 000 cells
+through a channel from core 1 to core 0, `ON-CORE`, a chain of IDLE, a
+timer (`EVERY`) and a handler on core 1, beside a timer on core 0. Then
+measurements, no tests: the speed of core 0 with a counter on core 1 and
+while core 1 sleeps in `CORE-SERVE`, and the reads of the APB on core 1
+while core 0 reads DPORT.
+
 The same tests give the same results when the image of the section
 "Build" ran `FREEZE` first and started again: then the kernel reads
 the base from the flash (section "Memory").
@@ -554,6 +573,78 @@ QEMU has no GPIO and no RMT, and the Forth handlers of interrupts do
 not run there (doc/qemu.md): so the tests of `lib/esp32/esp32/test/`
 and of TIMERS do not run in QEMU.
 
+## Two cores
+
+The chip has two cores: core 0 (PRO_CPU) runs the console, core 1
+(APP_CPU) runs the words that core 0 gives it. The package MULTICORE
+starts and stops it (`lib/esp32/README.md`, "Two cores: MULTICORE";
+orga/016). It is an option for applications: the image of `build.fs`
+does not load it, and the IR bridge does not need it. Each core runs the
+VM with its own state; the dictionary and the other RAM data are the
+same for both:
+
+| | Core 0 | Core 1 |
+| --- | --- | --- |
+| SYS and the RAM data of the image of `build.fs` (VM `$100` up to PE, now `$B54`) | from `$3FFE_8100` (SRAM1) | its own copy from `$3FFA_E800` (SRAM2) |
+| TIB, PAD and the stacks (VM `$10000` to `$109FF`) | `$3FFB_0000` | `$3FFA_F600` |
+| the variables of the HAL, the two tables for TBL | `$3FFF_8000`, `$3FFF_8200` | `$3FFE_5400`, `$3FFE_5600` |
+| the stack for the functions of the ROM | from `$3FFF_FFC0` down | from `$3FFE_7FC0` down |
+| the clock (`MILLIS`, `MS`, `US`) | timer 0 of timer group 0 | timer 1 of timer group 0 |
+| the timers of TIMERS (`EVERY`, `AFTER`) | timer 0 of timer group 1 (source 18) | timer 1 of timer group 1 (source 19) |
+| the interrupt matrix of INTR | `$3FF0_0104` | `$3FF0_0218` |
+| the cache of the flash | POOL0 | POOL1 |
+| CPU interrupts | as in section "Interrupts and errors of the CPU" | the same for its own handlers, and 23 for the requests of core 0 (FROM_CPU 1), 6 for its sleep in `MS` |
+
+So each core has its own `BASE`, `HANDLER`, number output, `'EMIT`,
+search order, handlers (INTR), timers (TIMERS) and chain of IDLE: their
+state is in the RAM data of the base image. A core that starts takes
+its own hardware with `INTR-FOR` and `TIMERS-FOR` and starts with an
+empty chain (`IDLE-CLEAR`). The RAM data after PE (the packages that
+load after the base) and XDATA are the same for both cores. The special
+registers MISC0 to MISC3 of each core hold its bases (`asm/xtensa.fs`,
+PER-CORE?); START sets them on core 0, START1 on core 1 (`hal.fs`,
+"Cores").
+
+- **The start of core 1:** core 0 sets up the MMU and the cache of core
+  1 as for itself (`CORE-SETUP`). Its MMU needs a pulse on
+  `APP_CACHE_MMU_IA_CLR` too, as in ESP-IDF; without it the first read
+  of core 1 from the flash hangs (Befund 108). Then its clock (timer 1
+  counts on from timer 0), its interrupt, the xt (`CORE-ENTRY`), and the
+  start over `APPCPU_CTRL_A` to `_D`. The ROM of core 1 writes
+  `$3FFE_3F20` to `$3FFE_522F` and its frames above `$3FFE_7DC0` before
+  START1 runs (Befund 107: so ESP32-RADIO keeps its buffers at
+  `$3FFF_8600`). START1 copies SYS and the RAM data of the base image of
+  core 0 into its own.
+- **The stop:** a request over FROM_CPU 1 gives a break on core 1, as
+  Ctrl-C does on core 0 (section "Interrupts and errors of the CPU"): -28
+  in its `CATCH`; the second request does not wait for `NO-BREAK`. Then
+  core 1 waits (`CORE-PARK`), and core 0 puts it into reset. Ctrl-C at
+  the console stops only core 0.
+- **`MS` and `US` on core 1** sleep while more than 200 us are left
+  (`WAITI`): its CPU timer (CCOMPARE0, CPU interrupt 6) wakes it after
+  24 000 cycles (0.1 ms at 240 MHz), and so does any other interrupt.
+  Core 0 waits in a loop, as before.
+- **The flash:** FLASH stops core 1 (RUNSTALL) and switches its cache
+  off around each call of the ROM; `FREEZE` refuses while core 1 is on.
+- **DPORT:** ESP-IDF reads the registers of DPORT with a precaution
+  while both cores run (`dport_access.h`): a read of the APB on the other
+  core could give a wrong value. Measured on the WROOM (rev. 3.1):
+  970 779 reads of the APB on core 1 while core 0 read DPORT 3 million
+  times, none wrong. So the words read DPORT without it.
+- **The speed:** both cores fetch their code from SRAM0. While core 1
+  computes in Forth, `DO LOOP` on core 0 needs 182 ms instead of 150 ms
+  (+21 %); while core 1 waits in `CORE-SERVE` (it sleeps in `MS`), 156
+  ms. The state of each core costs core 0 little (in ms for 1 000 000
+  runs, before and after: a variable 466 and 484, `BASE @` 466 and 483,
+  `HERE C@ DROP` 850 and 854, a table made with `CREATE` 504 and 492,
+  `PAD @` 504 and 500; `DO LOOP`, a call and FIND-NAME stay the same). A
+  cell of the RAM data after PE costs core 1 two jumps more.
+- **The resources of core 1:** timer 1 of timer group 0 (the tests
+  `intr.fs` and `asm.fs` use it while core 1 is in reset), timer 1 of
+  timer group 1 (source 19), FROM_CPU 1 (source 25), its CPU interrupts
+  6 and 23, the parts of the memory in section "Memory". The test of
+  MULTICORE uses FROM_CPU 2 (source 26) for a handler on core 1.
+
 ## The primitives of the HAL
 
 The kernel `kernels/xtensa.fs` has the primitives of doc/vm.md, section
@@ -568,7 +659,7 @@ dictionary.
 | 30 | `TX!` | `( c -- )` | a byte to UART0; it waits while the FIFO is full | Genesis (INTERNALS) |
 | 31 | `!IO` | `( -- )` | nothing: the ROM has set up UART0, START adds its interrupt | Genesis (INTERNALS) |
 | 66 | `DOCODE` | a code field | a `CODE` word: its machine code is in SRAM0, at the address in the cell after the code field (section "CODE words"); the 66 of the kernel would run code in the dictionary | the package ASM |
-| 80 | `MILLIS` | `( -- u )` | ms since the start: timer 0 of group 0 (1 MHz) / 1000 | Genesis |
+| 80 | `MILLIS` | `( -- u )` | ms since the start: the clock of the core (timer 0 of group 0 for core 0, timer 1 for core 1; 1 MHz) / 1000 | Genesis |
 | 81 | `MS` | `( u -- )` | wait u ms; Forth handlers and Ctrl-C come meanwhile | Genesis |
 | 82 | `US` | `( u -- )` | wait u microseconds, the same | Genesis |
 | 83 | `BIS!` | `( mask a -- )` | set the bits of mask in the cell at a | Genesis |
@@ -583,6 +674,9 @@ dictionary.
 | 103 | `-INT` | `( -- )` | the Forth handlers off | INTR |
 | 104 | `CODE-INT!` | `( xt n -- )` | the `CODE` word xt handles CPU interrupt n (19 to 21); xt 0: none | INTR (internal) |
 | 105 | `FLASH-SYSCALL` | `( x1 .. xn n a -- x )` | as `SYSCALL`, for the functions of the ROM that read, write or erase the flash: the cache of the flash is off and the interrupts of level 1 and 2 wait meanwhile; then the cache is flushed and on again | ESP32 (`lib/esp32/esp32/chip.fs`) |
+| 106 | `THIS-CORE` | `( -- i )` | the core that runs it: 0 or 1 (bit 13 of the register PRID) | ESP32-CORES (`lib/esp32/esp32/cores.fs`) |
+| 107 | `CORE-ENTRY` | `( xt i -- a )` | core i (1) runs xt after its start; a is START1, the address for its start (section "Two cores"); -24 for another i | ESP32-CORES |
+| 108 | `CORE-PARK` | `( -- )` | the core waits for its reset (`WAITI 15`); it runs no NEXT any more | ESP32-CORES |
 | 126 | - | `( lo hi -- )` | no name: the code field in the cell V-WAIT of the HAL; `MS` and `US` wait on with it after a break | none |
 | 127 | `HALT` | `( -- )` | the code field in the cells of HALT (VM `$3FFF0`, doc/vm.md section 3): the end of a Forth handler, IP and W come back from the return stack | none |
 
@@ -632,27 +726,32 @@ bytes.
 | `$4000_0000`-`$4005_FFFF` | 384 KB | ROM 0: the code of the ROM (the bootloader, the functions for the flash, the cache, the UART, `ets_...`) | `SYSCALL` calls functions there | also the code of C of ESP32-PHY (7 functions) |
 | `$3FF9_0000`-`$3FF9_FFFF` | 64 KB | ROM 1: the data of the ROM | read only | read only |
 | `$4007_0000`-`$4007_7FFF` | 32 KB | SRAM0, POOL0: the cache of the flash for the CPU | in use (START switches it on) | in use |
-| `$4007_8000`-`$4007_FFFF` | 32 KB | SRAM0, POOL1: the cache of the second core | free: the second core does not run (as RAM of the instruction bus: cells only) | free |
-| `$4008_0000`-`$4008_27B7` | 10 168 | SRAM0: the code of the kernel and of the HAL: the table of the primitives, constants, the break table, at the next 1 KB the vectors | in use | in use |
-| `$4008_27B8`-`$4009_FFFF` | 120 904 | SRAM0: the code of the `CODE` words (`CODE-START` up to `CODE-HERE`) | free | 47 948 in use (ESP32-PHY 47 484, IR-CAPTURE), 72 956 free |
+| `$4007_8000`-`$4007_FFFF` | 32 KB | SRAM0, POOL1: the cache of the flash for core 1 (section "Two cores") | in use while core 1 runs | the same |
+| `$4008_0000`-`$4008_27F7` | 10 232 | SRAM0: the code of the kernel and of the HAL: the table of the primitives, constants, the break table, at the next 1 KB the vectors, the table of the cores | in use | in use |
+| `$4008_27F8`-`$4009_FFFF` | 120 840 | SRAM0: the code of the `CODE` words (`CODE-START` up to `CODE-HERE`) | free | 47 948 in use (ESP32-PHY 47 484, IR-CAPTURE), 72 892 free |
 | `$3FFA_E000`-`$3FFA_E6DF` | 1 760 | SRAM2: the data of the ROM | the ROM | the ROM |
-| `$3FFA_E6E0`-`$3FFA_FFFF` | 6 432 | SRAM2 | free (not used) | free |
+| `$3FFA_E6E0`-`$3FFA_E6FF` | 32 | SRAM2 | free | free |
+| `$3FFA_E700`-`$3FFA_F5FF` | 3 840 | SRAM2, core 1: its VM addresses 0 up to `$EFF`: its SYS from `$3FFA_E800`, then its copy of the RAM data of the base image up to PE (`$3FFA_F254`) | in use while core 1 runs | the same |
+| `$3FFA_F600`-`$3FFA_FFFF` | 2 560 | SRAM2, core 1: its TIB, PAD and stacks (VM `$10000`-`$109FF`) | in use while core 1 runs | the same |
 | `$3FFB_0000`-`$3FFB_09FF` | 2 560 | SRAM2, VM `$10000`-`$109FF`: TIB, PAD, the return stack, the data stack | in use | in use |
-| `$3FFB_0A00`-`$3FFD_FFEF` | 194 032 | SRAM2, VM `S0` (`$10A00`) up to `$3FFEF`: the dictionary (the 8 cells of the guard first) | 36 272 in use, 157 760 free; after `FREEZE` the frozen part is in the flash, and 36 240 of its RAM are free for `XDATA-ON` | 190 064 in use, all of it frozen in the flash; 3 968 free; 190 032 of its RAM are RAM data (`XDATA-ON`): 58 516 in use, 131 516 free |
+| `$3FFB_0A00`-`$3FFD_FFEF` | 194 032 | SRAM2, VM `S0` (`$10A00`) up to `$3FFEF`: the dictionary (the 8 cells of the guard first) | 37 076 in use, 156 956 free; after `FREEZE` the frozen part is in the flash, and 37 044 of its RAM are free for `XDATA-ON` | 190 868 in use, all of it frozen in the flash; 3 164 free; 190 836 of its RAM are RAM data (`XDATA-ON`): 58 516 in use, 132 320 free |
 | `$3FFD_FFF0`-`$3FFD_FFFF` | 16 | SRAM2, VM `$3FFF0`: the two cells of HALT, 8 bytes free | in use | in use |
 | `$3FFE_0000`-`$3FFE_043F` | 1 088 | SRAM1: the data of the ROM | the ROM | the ROM |
 | `$3FFE_0440`-`$3FFE_3F1F` | 15 072 | SRAM1: the stack of the ROM during the start, free afterwards | free | `$3FFE_0500`-`$3FFE_3F1F`: the packet RAM of the LINKs (`RADIO-POOL`, 14 880 bytes): WIFI-LINK uses 11 392 of it, AP-LINK 8 168; only one runs |
-| `$3FFE_3F20`-`$3FFE_434F` | 1 072 | SRAM1: the data of the ROM | the ROM | the ROM |
-| `$3FFE_4350`-`$3FFE_43FF` | 176 | SRAM1 | free | free |
-| `$3FFE_4400`-`$3FFE_7CAB` | 14 508 | SRAM1: ESP32-RADIO (`lib/esp32/esp32/radio.fs`): the reception (8 descriptors, 8 buffers of 1 600 bytes, up to `$3FFE_765F`), then a descriptor and a buffer for sending | free | in use |
-| `$3FFE_7CAC`-`$3FFE_7FFF` | 852 | SRAM1 | free | free |
+| `$3FFE_3F20`-`$3FFE_434F` | 1 072 | SRAM1: the data of the ROM for core 1 (APP_CPU) | the ROM | the ROM |
+| `$3FFE_4350`-`$3FFE_522F` | 3 808 | SRAM1: the ROM writes it at each start of core 1 (measured, 15.10.) | the ROM of core 1 | the same |
+| `$3FFE_5230`-`$3FFE_53FF` | 464 | SRAM1 | free | free |
+| `$3FFE_5400`-`$3FFE_59FF` | 1 536 | SRAM1, core 1: its variables of the HAL (392 of 512 bytes), then the copies of its two tables for TBL | in use while core 1 runs | the same |
+| `$3FFE_5A00`-`$3FFE_7FBF` | 9 664 | SRAM1, core 1: its stack for the functions of the ROM; it grows down from `$3FFE_7FC0`. The ROM of core 1 writes `$3FFE_7DC0`-`$3FFE_7E03` at its start (its own frames) | in use while core 1 runs | the same |
+| `$3FFE_7FC0`-`$3FFE_7FFF` | 64 | SRAM1, core 1: the first frame of this stack (START1) | in use while core 1 runs | the same |
 | `$3FFE_8000`-`$3FFE_80FF` | 256 | SRAM1, VM `$0`-`$FF` | not used by the VM | not used |
 | `$3FFE_8100`-`$3FFE_83FF` | 768 | SRAM1, VM `$100`-`$3FF`: SYS, the system variables | in use | in use |
-| `$3FFE_8400`-`$3FFF_7FFF` | 64 512 | SRAM1, VM `$400`-`$FFFF`: DATA, the RAM data (`VP`) | 1 848 in use, 62 664 free | 23 240 in use, 41 272 free |
-| `$3FFF_8000`-`$3FFF_816B` | 364 | SRAM1: the variables of the HAL, with the buffer of UART0 | in use | in use |
-| `$3FFF_816C`-`$3FFF_81FF` | 148 | SRAM1 | free | free |
+| `$3FFE_8400`-`$3FFF_7FFF` | 64 512 | SRAM1, VM `$400`-`$FFFF`: DATA, the RAM data (`VP`); up to PE (`$B54`) each core has its own (section "Two cores") | 1 876 in use, 62 636 free | 23 268 in use, 41 244 free |
+| `$3FFF_8000`-`$3FFF_8187` | 392 | SRAM1: the variables of the HAL of core 0, with the buffer of UART0 | in use | in use |
+| `$3FFF_8188`-`$3FFF_81FF` | 120 | SRAM1 | free | free |
 | `$3FFF_8200`-`$3FFF_85FF` | 1 024 | SRAM1: the copies of the table of the primitives and of the break table: TBL points to them (START makes them; the CPU reads SRAM0 on the data bus 8 cycles slower) | in use | in use |
-| `$3FFF_8600`-`$3FFF_FFBF` | 31 168 | SRAM1: the stack of the functions of the ROM (`SYSCALL`); it grows down from `$3FFF_FFC0` | at most 176 in use (`FREEZE`) | at most 1 200 in use (the calibration of the radio, a scan) |
+| `$3FFF_8600`-`$3FFF_BEAB` | 14 508 | SRAM1: ESP32-RADIO (`lib/esp32/esp32/radio.fs`): the reception (8 descriptors, 8 buffers of 1 600 bytes, up to `$3FFF_B85F`), then a descriptor and a buffer for sending | free | in use |
+| `$3FFF_BEAC`-`$3FFF_FFBF` | 16 660 | SRAM1: the stack of the functions of the ROM (`SYSCALL`); it grows down from `$3FFF_FFC0` | at most 176 in use (`FREEZE`) | at most 1 200 in use (the calibration of the radio, a scan) |
 | `$3FFF_FFC0`-`$3FFF_FFFF` | 64 | SRAM1: the first frame of this stack (START) | in use | in use |
 | `$3FF8_0000`-`$3FF8_1FFF` | 8 KB | RTC FAST memory | not used | not used |
 | `$5000_0000`-`$5000_1FFF` | 8 KB | RTC SLOW memory | not used | not used |
@@ -662,20 +761,22 @@ bytes.
 | `$400C_2000`-`$40BF_FFFF` | | code in the flash through the cache (IROM) | not used | not used |
 
 The SRAM of the chip is 520 KB: SRAM0 192 KB, SRAM2 200 KB, SRAM1
-128 KB. Free without Wi-Fi: 157 760 bytes of dictionary and 62 664
-bytes of RAM data for Forth, 120 904 bytes for the code of `CODE`
+128 KB. Free without Wi-Fi: 156 956 bytes of dictionary and 62 636
+bytes of RAM data for Forth, 120 840 bytes for the code of `CODE`
 words. Besides, uCForth leaves about 99 KB unused without Wi-Fi and
-about 73 KB with the IR bridge: POOL1 (32 KB), most of the stack of the ROM
-(about 30 KB), the gaps in SRAM1 and SRAM2, and without Wi-Fi the
-places of ESP32-RADIO and WIFI-LINK.
+about 73 KB with the IR bridge, while core 1 is in reset: POOL1 (32
+KB), the parts of core 1 in SRAM1 and SRAM2 (about 21 KB), most of the
+stack of the ROM (about 15 KB), the gaps in SRAM1, and without Wi-Fi
+the places of ESP32-RADIO and WIFI-LINK. While core 1 runs, POOL1 and
+its parts are in use.
 
 **In the flash** (4 MB):
 
 | Flash address | Size | Contents | Without Wi-Fi | With the IR bridge |
 | --- | --- | --- | --- | --- |
 | `$0_0000`-`$0_0FFF` | 4 KB | not used: the ROM reads the image at `$1000` | | |
-| `$0_1000`-`$6_FFFF` | 444 KB | the boot image (section "The image format of the ROM bootloader"): the code of the kernel and of the `CODE` words, the RAM data, the dictionary after `FLASH-END` (0 to 3 bytes), with `XDATA-ON` the RAM data behind the frozen part. `FREEZE` checks that it ends before `$7_0000` | the image of `build.fs`: 49 152 (all of its dictionary in it); after `FREEZE` 12 784 (code 10 168, RAM data 2 560) | after `FREEZE` 140 640 and the headers: code 58 116, RAM data 24 008, the RAM data behind the frozen part 58 516 |
-| `$7_0000`-`$9_FFFF` | 192 KB | the frozen part of the dictionary: VM address a at `$6_0000` + a (`DICT-FLASH` of BOOTIMG and `build.fs`), from `$7_0A00` | 36 272 after `FREEZE` | 190 064 after `FREEZE` |
+| `$0_1000`-`$6_FFFF` | 444 KB | the boot image (section "The image format of the ROM bootloader"): the code of the kernel and of the `CODE` words, the RAM data, the dictionary after `FLASH-END` (0 to 3 bytes), with `XDATA-ON` the RAM data behind the frozen part. `FREEZE` checks that it ends before `$7_0000` | the image of `build.fs`: 50 048 (all of its dictionary in it); after `FREEZE` the code (10 232) and the RAM data (2 644) | after `FREEZE` 140 732 and the headers: code 58 180, RAM data 24 036, the RAM data behind the frozen part 58 516 |
+| `$7_0000`-`$9_FFFF` | 192 KB | the frozen part of the dictionary: VM address a at `$6_0000` + a (`DICT-FLASH` of BOOTIMG and `build.fs`), from `$7_0A00` | 37 076 after `FREEZE` | 190 868 after `FREEZE` |
 | `$A_0000`-`$3F_BFFF` | 3 440 KB | free for the package FLASH. It can still hold old bytes, for example of the factory firmware: erase before a write | free | free |
 | `$3F_C000`-`$3F_DFFF` | 8 KB | the broker of the IR bridge (BRIDGE-SETTINGS, apps/irbridge/settings.fs), in two sectors | free | in use when saved |
 | `$3F_E000`-`$3F_FFFF` | 8 KB | the profile of the network (WLSAVE), in the last two sectors | | in use when saved |
@@ -745,12 +846,12 @@ functions remain selected. The production start uses Forth; the old
 comparison setup remains in git commit `9b67376`.
 
 RX keeps 12 896 bytes of SRAM1; the TX descriptor and buffer reserve
-1 612 more, up to `$3FFE_7CAB` (the table above). Servicing the receive
+1 612 more, up to `$3FFF_BEAB` (the table above). Servicing the receive
 list remains necessary even when waiting for a TX ACK.
 
-With the IR bridge (`apps/irbridge/app.fs`, 15.10.) 3 968 bytes of
-dictionary and 41 272 bytes of RAM data are free, and 131 516 of the
-190 032 bytes of RAM below `FLASH-END`. The loader keeps no headers for the `PRIVATE`
+With the IR bridge (`apps/irbridge/app.fs`, 15.10.) 3 164 bytes of
+dictionary and 41 244 bytes of RAM data are free, and 132 320 of the
+190 836 bytes of RAM below `FLASH-END`. The loader keeps no headers for the `PRIVATE`
 words (`TEMP-HEADS ON!`, lib/package.fs): the frozen part is about
 17 KB smaller, and so is the RAM behind it.
 

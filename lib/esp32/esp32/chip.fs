@@ -15,6 +15,8 @@
 \   MICROS ( -- u )        the time in us, from the clock of the HAL (timer 0
 \                          of timer group 0); only the ESP32 has it so far
 \
+\ Core 0 is the PRO_CPU, core 1 the APP_CPU (lib/esp32/multicore.fs).
+\
 \ The GPIO numbers are 0 to 39, without 20, 24 and 28 to 31; 34 to 39
 \ are inputs only, without pull resistors. The IO MUX has its registers
 \ not in the order of the pins: >MUX takes them from a table and stops at
@@ -75,6 +77,8 @@ $8000 CONSTANT PIN-INT-CPU            \ GPIO_PINn: INT_ENA, the PRO CPU (bit 15)
 $3FF00104 CONSTANT INTR-MAP           \ a register for each source: its CPU interrupt
 $3FF000EC CONSTANT INTR-STATUS        \ 3 registers: the sources that ask, 32 in each
 69 CONSTANT #SOURCES
+: CORE-INTR-MAP ( i -- a )   IF $3FF00218 ELSE INTR-MAP THEN ;         \ core 1: DPORT_APP_MAC_INTR_MAP_REG
+: CORE-INTR-STATUS ( i -- a )   IF $3FF000F8 ELSE INTR-STATUS THEN ;   \ core 1: DPORT_APP_INTR_STATUS_0_REG
 
 \ ---- timer group 0: its timer 0 is the clock of the HAL (MS, US, MILLIS), 1 MHz
 $3FF5F000 CONSTANT TG0                \ timer 0 at 0
@@ -87,6 +91,8 @@ $3FF60000 CONSTANT TG1                \ timer 0 at 0
 18 CONSTANT TG1-SOURCE                \ its timer 0, by level
 $98 CONSTANT TG-INT-ENA
 $A4 CONSTANT TG-INT-CLR
+: CORE-TG1 ( i -- a )   $24 * TG1 + ;                \ timer i of timer group 1: TIMERS on core i
+: CORE-TG1-SOURCE ( i -- n )   TG1-SOURCE + ;        \ its source: 18 + i
 : TG-1MHZ ( -- x )   \ on, up, reload, alarm, interrupt by level; the APB clock / APB-MHZ
   $E0000C00  APB-MHZ 13 LSHIFT OR ;
 

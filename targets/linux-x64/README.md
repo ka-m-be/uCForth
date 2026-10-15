@@ -121,7 +121,7 @@ platform `linux/amd64` with Rosetta):
     docker run --rm --platform linux/amd64 -v "$PWD":/u -w /u debian:trixie-slim \
       sh -c 'echo "ALSO FILES  INCLUDE tools/test.fs" | ./build/ucf-linux-x64'
 
-The output ends with `all: 12186 tests, 0 errors`, after less than a
+The output ends with `all: 12210 tests, 0 errors`, after less than a
 second.
 
 **Tested (2026):** in Docker (Debian, amd64 with Rosetta on the Mac):
@@ -161,7 +161,7 @@ necessary.
 
        $ echo "ALSO FILES  INCLUDE tools/test.fs" | build/ucf-linux-x64
        ...
-       all: 12186 tests, 0 errors
+       all: 12210 tests, 0 errors
 
 4. With an ESP32-S3 board at a USB port (section "Serial lines": the
    name of the port and the group `dialout`):

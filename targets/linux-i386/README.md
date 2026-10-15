@@ -121,7 +121,7 @@ in QEMU):
     docker run --rm --platform linux/386 -v "$PWD":/u -w /u debian:bookworm-slim \
       sh -c 'echo "ALSO FILES  INCLUDE tools/test.fs" | ./build/ucf-linux-i386'
 
-The output ends with `all: 12186 tests, 0 errors`, after about 2 s.
+The output ends with `all: 12210 tests, 0 errors`, after about 2 s.
 
 **Tested (2026):** in Docker (Debian 12, i386, QEMU on the Mac): all
 tests; `ARG`; the exit status; the end of the input; `MS`; Ctrl-C at a

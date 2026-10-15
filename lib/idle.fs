@@ -15,6 +15,8 @@
 \   xt IDLE- ( -- )        not any more
 \   IDLE-RUN ( -- )        each word of the chain once (KEY does it)
 \   .IDLE ( -- )           show the words of the chain
+\   IDLE-CLEAR ( -- )      the chain empty: another core starts with a copy of
+\                          the state of core 0 (lib/esp32/multicore.fs)
 \   xt n .STOPPED ( -- )   the message for the word xt, which stopped with
 \                          the error n (also for the handlers of a board)
 \   -BREAK ( -- )          Ctrl-C waits from now on, until +BREAK
@@ -95,5 +97,6 @@ PUBLIC
   0 PLACE-OF  DUP 0= ABORT" IDLE: 12 words in the chain already"  ! ;
 : IDLE- ( xt -- )   ?DUP IF  PLACE-OF ?DUP IF 0 SWAP ! THEN  THEN ;
 : .IDLE ( -- )   #CHAIN 0 DO  I CELLS CHAIN + @ ?DUP IF .NAME SPACE THEN  LOOP  CR ;
+: IDLE-CLEAR ( -- )   CHAIN #CHAIN CELLS 0 FILL  0 RUNNING !  0 NO-BREAK ! ;
 
 END-PACKAGE

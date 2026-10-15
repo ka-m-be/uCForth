@@ -42,6 +42,7 @@ PACKAGE ASM  ALSO XTENSA  ALSO ROM  ALSO BOOTIMG   \ lib/package.fs
 \ NEXT, and >CHIP, read its end from the table of the primitives.
 0 >CHIP  $10000 >CHIP $10000 -  -  DATA-OFF !
 FLASH-DICT? ON!
+PER-CORE? ON!                       \ each core has its own SYS, base RAM data and stacks (asm/xtensa.fs)
 
 66 CONSTANT DOCODE                  \ the code field of a CODE word
 $400A0000 CONSTANT SRAM0-END        \ the end of SRAM0 on the instruction bus

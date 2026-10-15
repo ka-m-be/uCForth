@@ -16,6 +16,9 @@
 \ the handler of a CPU interrupt (package INTR, lib/esp32/intr.fs);
 \ FLASH-SYSCALL (105) is SYSCALL for the functions of the ROM for the
 \ flash (package FLASH, through the layer of the chip).
+\ THIS-CORE (106), CORE-ENTRY (107) and CORE-PARK (108) serve the other
+\ core (packages ESP32-CORES and MULTICORE, lib/esp32/esp32/cores.fs): each
+\ core runs the VM with its own state (see "Cores").
 \ SAVE-IMAGE (85) runs the word (SAVE-IMAGE) of the image, if the image
 \ has one (lib/esp32/esp32/bootimg.fs). The CPU runs no code in the RAM
 \ for data: the machine code of a CODE word lies in SRAM0, and this HAL
@@ -67,8 +70,16 @@
 \ ==== Constants for L32R ================================================
 
 TALIGN
-$3FFF8000 CONSTANT VARS-ADDR        \ the variables of the HAL: in the RAM for data (SRAM1)
-VARS-ADDR 512 + CONSTANT TABLES-ADDR   \ the copies of the two tables for TBL (SRAM1), 512 bytes each
+$3FFF8000 CONSTANT VARS-ADDR        \ core 0: the variables of the HAL, in the RAM for data (SRAM1)
+VARS-ADDR 512 + CONSTANT TABLES-ADDR   \ core 0: the copies of the two tables for TBL (SRAM1), 512 bytes each
+$3FFFFFC0 CONSTANT ROM-SP0          \ core 0: a1, the stack for the functions of the ROM, at the top of SRAM1
+$3FFE5400 CONSTANT VARS1-ADDR       \ core 1: the same in its part of SRAM1 (see "Cores")
+VARS1-ADDR 512 + CONSTANT TABLES1-ADDR
+$3FFE7FC0 CONSTANT ROM-SP1
+$3FFAE700 CONSTANT DATA1-ADDR       \ core 1: VM address 0 of its SYS and RAM data of the base image (SRAM2)
+$3FF9F600 CONSTANT STACKS1-ADDR     \ core 1: VM address 0 of its TIB, PAD and stacks: $10000 at $3FFA_F600
+$0F00 CONSTANT PE-MAX               \ core 1: its copy of VM addresses $100 up to PE ends below $3FFA_F600
+2 CONSTANT #CORES
 LABEL UART0      $3FF40000 T,       \ FIFO at 0 (read), STATUS at $1C, CONF1 at $24, MEM_RX_STATUS at $60
 LABEL UART0-FIFO $60000000 T,       \ the FIFO of UART0 on the AHB bus: the CPU writes it there (as ESP-IDF)
 LABEL RTC-CNTL   $3FF48000 T,
@@ -82,6 +93,7 @@ LABEL BIT23      $00800000 T,       \ also: CPU interrupt 23, level 3
 LABEL CONF1-KEEP $00FFFF80 T,       \ UART_CONF1: the bits that stay
 LABEL CONF1-RX   $82000001 T,       \ RX_TOUT_EN, RX_TOUT_THRHD 2, RXFIFO_FULL_THRHD 1
 LABEL WAIT-START 12000000 T,        \ CPU cycles: 0.3 s at 40 MHz
+LABEL NAP        24000 T,           \ CPU cycles: a sleep of another core in MS (0.1 ms at 240 MHz)
 LABEL TICKS/MS   1000 T,            \ timer 0 of timer group 0: 1 MHz
 LABEL TG0-1MHZ   $C0000000 40 13 LSHIFT OR T,   \ its T0CONFIG: on, up; the APB clock (40 MHz) / 40
 LABEL XT-SAVE    0 T,               \ build.fs: the xt of (SAVE-IMAGE); 0: none
@@ -90,13 +102,14 @@ LABEL ENTRY-A    0 T,               \ build.fs: the address of START
 LABEL XT-ISR     0 T,               \ build.fs: the xt of (ISR) of the package INTR; 0: none
 LABEL XT-FAULT   0 T,               \ build.fs: the xt of (FAULT) of the package INTR; 0: none
 LABEL FREGS-A    0 T,               \ build.fs: the chip address of FAULT-REGS of the package INTR; 0: none
-LABEL OUT-V      0 T,               \ build.fs: the address of OUT + DATA-OFF (the code adds MEM)
+LABEL OUT-V      0 T,               \ build.fs: the VM address of OUT (SYS+, adds the base of the core)
 LABEL HOLD-V     0 T,               \ build.fs: the address of NO-BREAK of the package IDLE; 0: none
 LABEL HALT-V     DICT-END T,        \ HALT-XT: the code field 127, then a thread cell (doc/vm.md 3)
-LABEL ROM-SP     $3FFFFFC0 T,       \ a1: the stack for the functions of the ROM, at the top of SRAM1
 LABEL PS-VM      $00040020 T,       \ PS: register window, user mode, interrupts on
 LABEL PS-EXC     $00040030 T,       \ the same, in an exception (EXCM)
-LABEL VARS-A     VARS-ADDR T,       \ the variables of the HAL
+LABEL PE-V       0 T,               \ build.fs: PE, the end of the RAM data of the base image (see "Cores")
+LABEL CORE-TAB-A 0 T,               \ the table of the cores (set at the end)
+LABEL START1-A   0 T,               \ START1, the start of the other cores (set at the end)
 LABEL CACHE-CTRL $3FF00040 T,       \ DPORT_PRO_CACHE_CTRL_REG: bit 3 the cache on, bit 4 flush, bit 5 flush done
 LABEL CACHE-MASK $3FF00044 T,       \ DPORT_PRO_CACHE_CTRL1_REG: bit 4 masks DROM0 ($3F40_0000 ...)
 LABEL CACHE-DBUG $3FF003F0 T,       \ DPORT_PRO_DCACHE_DBUG0_REG: bits 18-7 are 1 when the cache rests
@@ -108,15 +121,14 @@ LABEL SPI-CLOCK  $40062BC8 T,       \ esp_rom_spiflash_config_clk ( div spi -- r
 LABEL DROM-PAGE  DROM-ADDR $10000 + T,   \ VM address $10000 in the flash, for the CPU
 LABEL DICT-PAGE  DICT-FLASH $10000 + T,  \ VM address $10000 in the flash: the flash address
 LABEL BRKTAB-A   0 T,               \ the break table, in the code (set at the end; read in cells)
-LABEL TBL-A      TABLES-ADDR T,     \ TBL: the copy of the table of the primitives
-LABEL BRK-A      TABLES-ADDR 512 + T,   \ TBL during a break: the copy of the break table
 LABEL VECTORS-A  0 T,               \ VECBASE (set at the end)
 LABEL RECOVER-A  0 T,               \ (set at the end)
-LABEL WAIT-XT    0 T,               \ the cell V-WAIT on the data bus: an xt for primitive 126 (set at the end)
 LABEL OFF-TEXT-A 0 T,               \ the text after Ctrl-C twice, a byte in each cell (set at the end)
 
-\ The variables of the HAL: at VARS-ADDR, in the RAM for data. The bytes 0 to
-\ 255 are the buffer RX; the offsets of the other cells:
+\ The variables of the HAL: each core has its own, in the RAM for data
+\ (core 0 at VARS-ADDR), and its register MISC0 holds their address. The
+\ bytes 0 to 255 are the buffer RX (only core 0 has the console); the
+\ offsets of the other cells:
 256 CONSTANT V-HEAD      \ the next byte from UART0 goes to RX + V-HEAD
 260 CONSTANT V-TAIL      \ the next byte for ?RX is at RX + V-TAIL
 264 CONSTANT V-CTRLC     \ a Ctrl-C that waits: 1; 2 twice within 1 s; 3 while one waited
@@ -134,9 +146,16 @@ LABEL OFF-TEXT-A 0 T,               \ the text after Ctrl-C twice, a byte in eac
 352 CONSTANT V-WAIT      \ 126: a code field; MS and US wait on with it after a break
 356 CONSTANT V-INISR     \ not 0: a Forth handler runs ((ISR), until HALT)
 360 CONSTANT V-LAST      \ the time of the last Ctrl-C, in steps of 2^16 us of the timer (65.5 ms)
-364 CONSTANT #VARS
+364 CONSTANT V-TBL       \ TBL: the copy of the table of the primitives of this core
+368 CONSTANT V-BRK       \ TBL during a break: the copy of the break table
+372 CONSTANT V-ROMSP     \ a1: the stack of this core for the functions of the ROM
+376 CONSTANT V-TIMER     \ its clock: timer 0 (core 0) or 1 (core 1) of timer group 0, 1 MHz
+380 CONSTANT V-ASK       \ core 1: the register FROM_CPU, by which core 0 asks for a break; core 0: 0 (the console)
+384 CONSTANT V-FREGS     \ the chip address of FAULT-REGS (package INTR) of this core, or 0
+388 CONSTANT V-XT        \ core 1: the xt that it runs after its start (CORE-ENTRY)
+392 CONSTANT #VARS
 
-FORWARD BREAK   FORWARD DEADLINE   FORWARD WAIT-UNTIL   FORWARD ROM-CALL
+FORWARD BREAK   FORWARD DEADLINE   FORWARD WAIT-UNTIL   FORWARD ROM-CALL   FORWARD VM-STATE
 
 \ ==== Subroutines: CALL0, the return address in A0 ======================
 
@@ -152,13 +171,13 @@ LABEL L1
   A2 A3 0 S32I,                     \ into the FIFO, on the AHB bus
   RET,
 
-TALIGN LABEL TICKS   \ a2: timer 0 of timer group 0, bits 31-0, a3: bits 63-32 (1 MHz); uses a4 a5
-  A5 3 RSIL,                        \ no interrupt meanwhile: DRAIN reads the timer too
-  A4 TIMG0 L32R,
-  MEMW,  A4 A4 $0C S32I,            \ TIMG_T0UPDATE: any value latches the counter
+TALIGN LABEL TICKS   \ a2: the timer of this core (V-TIMER), bits 31-0, a3: bits 63-32 (1 MHz); uses a4 a5
+  A5 3 RSIL,                        \ no interrupt meanwhile: DRAIN reads the timer of core 0 too
+  A4 MISC0 RSR,  A4 A4 V-TIMER L32I,
+  MEMW,  A4 A4 $0C S32I,            \ TIMG_TnUPDATE: any value latches the counter
   MEMW,
-  A3 A4 8 L32I,                     \ TIMG_T0HI
-  A2 A4 4 L32I,                     \ TIMG_T0LO
+  A3 A4 8 L32I,                     \ TIMG_TnHI
+  A2 A4 4 L32I,                     \ TIMG_TnLO
   A5 PS WSR,  RSYNC,
   RET,
 
@@ -243,7 +262,7 @@ TALIGN LABEL REQUEST   \ a break waits: TBL = BRKTAB, but not while the ROM runs
   A4 L1 BEQZ,
   A4 A2 V-INROM L32I,
   A4 L1 BNEZ,
-  TBL BRK-A L32R,
+  TBL A2 V-BRK L32I,
 LABEL L1
   RET,
 
@@ -251,11 +270,11 @@ LABEL L1
 
 29 CODE ?RX   ( -- c -1 | 0 )       \ from RX; the bytes in the FIFO go to RX first
   A9 3 RSIL,                        \ no interrupt of UART0 meanwhile: the bytes stay in order
-  A2 VARS-A L32R,
+  A2 MISC0 RSR,
   DRAIN CALL0,
   A3 A2 V-CTRLC L32I,
   A3 L1 BEQZ,
-  TBL BRK-A L32R,                   \ Ctrl-C came: the break at the next NEXT
+  TBL A2 V-BRK L32I,                \ Ctrl-C came: the break at the next NEXT
 LABEL L1
   A3 A2 V-TAIL L32I,  A4 A2 V-HEAD L32I,
   A9 PS WSR,  RSYNC,
@@ -316,6 +335,11 @@ LABEL L1
 \ code field V-WAIT (primitive 126), and after the break WAIT-UNTIL goes
 \ on. So MS and US wait as long as asked, also when handlers run. A
 \ Ctrl-C that waited for the end of a word with NO-BREAK comes here too.
+\ Another core than core 0 sleeps meanwhile, while more than 200 us are
+\ left (the two cores fetch their code from SRAM0: a core that waits in a
+\ loop slows the other one down): WAITI until its CPU timer (CCOMPARE0,
+\ CPU interrupt 6, NAP cycles later; LEVEL1 switches it off again) or
+\ another interrupt comes.
 
 TALIGN LABEL DEADLINE   \ a7:a6 ticks of the timer from now: the deadline onto the stack
   TICKS CALL0,
@@ -333,27 +357,37 @@ LABEL WAIT-UNTIL
   A3 A4 L1 BNE,
   A2 A5 L2 BGEU,
 LABEL L1
-  A6 TBL-A L32R,
-  TBL A6 L3 BNE,                    \ a break waits
-  A6 VARS-A L32R,  A6 A6 V-CTRLC L32I,
-  A6 WAIT-UNTIL BEQZ,               \ no Ctrl-C waits: on
+  A6 MISC0 RSR,  A7 A6 V-TBL L32I,
+  TBL A7 L3 BNE,                    \ a break waits
+  A7 A6 V-CTRLC L32I,
+  A7 L3 BNEZ,                       \ a Ctrl-C waits
+  A7 A6 V-ASK L32I,
+  A7 WAIT-UNTIL BEQZ,               \ core 0: on
+  A7 A5 A2 SUB,  A9 200 MOVI,  A7 A9 WAIT-UNTIL BLTU,   \ less than 200 us left: on, without a sleep
+  A8 15 RSIL,                       \ no interrupt between the timer and WAITI
+  A7 CCOUNT RSR,  A9 NAP L32R,  A7 A7 A9 ADD.N,  A7 CCOMPARE0 WSR,
+  A7 INTENABLE RSR,  A9 64 MOVI,  A7 A7 A9 OR,  A7 INTENABLE WSR,  RSYNC,   \ CPU interrupt 6 on
+  0 WAITI,                          \ PS.INTLEVEL 0 again; after the interrupt: on
+  WAIT-UNTIL J,
 LABEL L3
-  W WAIT-XT L32R,  BREAK J,         \ after the break: here again
+  W MISC0 RSR,  A6 V-WAIT MOVI,  W W A6 ADD.N,   \ the cell V-WAIT of this core: an xt for primitive 126
+  BREAK J,                          \ after the break: here again
 LABEL L2
   SP SP 8 ADDI.N,  NEXT,
 
 TALIGN LABEL RESTART   \ a2: true: BOOT, false: QUIT; empty stacks, no handler runs, NO-BREAK 0
-  A3 S0-V L32R,  SP A3 MEM ADD.N,
-  A3 R0-V L32R,  RP A3 MEM ADD.N,
+  W XT-QUIT L32R,  A3 XT-BOOT L32R,  W A3 A2 MOVNEZ,
+LABEL RESTART-W   \ the same with the xt in W (a VM address); START1 comes here
+  A3 S0-V L32R,  A4 MISC2 RSR,  SP A3 A4 ADD.N,     \ the stacks of this core
+  A3 R0-V L32R,  RP A3 A4 ADD.N,
   A4 0 MOVI.N,
-  A3 STATE-V L32R,  A3 A3 MEM ADD.N,  A4 A3 0 S32I,
-  A3 HANDLER-V L32R,  A3 A3 MEM ADD.N,  A4 A3 0 S32I,
-  A3 VARS-A L32R,  A4 A3 V-INISR S32I,
+  A3 STATE-V L32R,  A3 A5 SYS+,  A4 A3 0 S32I,
+  A3 HANDLER-V L32R,  A3 A5 SYS+,  A4 A3 0 S32I,
+  A3 MISC0 RSR,  A4 A3 V-INISR S32I,
   A3 HOLD-V L32R,
   A3 L1 BEQZ,
   A3 >CHIP,  A4 A3 0 S32I,
 LABEL L1
-  W XT-QUIT L32R,  A3 XT-BOOT L32R,  W A3 A2 MOVNEZ,
   W W A3 A4 +BASE,
   DISPATCH,
 
@@ -391,7 +425,7 @@ LABEL ROM-CALL
   A7 SP 0 L32I.N,                   \ a
   A8 SP 4 L32I.N,                   \ n
   SP SP 8 ADDI.N,
-  A9 VARS-A L32R,
+  A9 MISC0 RSR,
   SP A9 V-SP S32I,  RP A9 V-RP S32I,   \ for an exception in the ROM
   A2 1 MOVI.N,  A2 A9 V-INROM S32I,
   A2 MEM MOV.N,  A3 TBL MOV.N,  A4 IP MOV.N,  A6 RP MOV.N,
@@ -422,10 +456,10 @@ LABEL L2
   A0 L5 BEQZ,
   A3 A0 MOV.N,  CACHE-ON CALL0,  A3 PS WSR,  RSYNC,      \ FLASH-SYSCALL: the cache on, the interrupts as before
 LABEL L5
-  A2 VARS-A L32R,  A3 0 MOVI.N,  A3 A2 V-INROM S32I,
+  A2 MISC0 RSR,  A3 0 MOVI.N,  A3 A2 V-INROM S32I,
   A3 A2 V-CTRLC L32I,  A4 A2 V-INTREQ L32I,  A3 A3 A4 OR,
   A3 L3 BEQZ,
-  TBL BRK-A L32R,                   \ a break came during the call
+  TBL A2 V-BRK L32I,                \ a break came during the call
 LABEL L3
   A9 PUSH,  NEXT,
 101 CODE >CHIP   ( a -- a' )         \ the chip address of a VM address; any other stays
@@ -433,13 +467,13 @@ LABEL L3
 102 CODE +INT   ( -- )              \ the handlers on; -21 without the package INTR
   A2 XT-ISR L32R,
   A2 L1 BEQZ,
-  A2 VARS-A L32R,  A3 1 MOVI.N,  A3 A2 V-INTON S32I,
+  A2 MISC0 RSR,  A3 1 MOVI.N,  A3 A2 V-INTON S32I,
   A2 A2 V-INTMASK L32I,  A3 0 MOVI.N,  INTEN CALL0,
   NEXT,
 LABEL L1
   A2 -21 MOVI,  KTHROW J,
 103 CODE -INT   ( -- )              \ the handlers off
-  A2 VARS-A L32R,  HANDLERS-OFF CALL0,
+  A2 MISC0 RSR,  HANDLERS-OFF CALL0,
   NEXT,
 104 CODE CODE-INT!   ( xt n -- )    \ the CODE word xt handles CPU interrupt n (19 to 21); xt 0: none
   A3 POP,  A2 POP,
@@ -447,7 +481,7 @@ LABEL L1
   A2 -24 MOVI,  KTHROW J,
 LABEL L2
   A5 1 MOVI.N,  A3 SSL,  A5 A5 SLL,         \ its bit in INTENABLE
-  A6 VARS-A L32R,  A7 A4 A6 ADDX4,
+  A6 MISC0 RSR,  A7 A4 A6 ADDX4,
   A8 A6 V-INTMASK L32I,  A3 0 MOVI.N,
   A2 L1 BEQZ,
   A2 A2 A9 A0 +BASE,  A2 A2 4 L32I,         \ its machine code: the address after the code field (DOCODE)
@@ -460,6 +494,20 @@ LABEL L1
   A2 A7 V-CODE S32I,                        \ xt 0: none, CPU interrupt n off
   A8 A8 A5 OR,  A8 A8 A5 XOR,  A8 A6 V-INTMASK S32I,
   A3 A5 MOV.N,  INTEN CALL0,  NEXT,
+106 CODE THIS-CORE   ( -- i )       \ the number of this core: bit 13 of PRID (see "Cores")
+  A2 PRID RSR,  A2 A2 13 1 EXTUI,  A2 PUSH,  NEXT,
+107 CODE CORE-ENTRY   ( xt i -- a ) \ core i (1 to #CORES - 1) runs xt after its start; a: START1, for the chip
+  A3 POP,
+  A4 A3 -1 ADDI.N,  A5 #CORES 1- MOVI,  A4 A5 L1 BGEU,
+  A2 TOS@,
+  A4 CORE-TAB-A L32R,  A5 A3 5 SLLI,  A4 A4 A5 ADD.N,
+  A4 A4 0 L32I,  A2 A4 V-XT S32I,          \ V-XT in the variables of core i
+  A2 START1-A L32R,  A2 TOS!,  NEXT,
+LABEL L1
+  A2 -24 MOVI,  KTHROW J,
+108 CODE CORE-PARK   ( -- )         \ this core waits for its reset; it runs no NEXT any more
+LABEL L1
+  15 WAITI,  L1 J,
 
 \ ==== CODE words ==========================================================
 \ The ESP32 runs no code in the RAM for data, where the dictionary is. The
@@ -494,8 +542,8 @@ LABEL L1
 \ with NO-BREAK that hangs.
 
 TALIGN LABEL BREAK   \ W: the xt that runs next (a chip address)
-  TBL TBL-A L32R,
-  A2 VARS-A L32R,
+  A2 MISC0 RSR,
+  TBL A2 V-TBL L32I,
   A3 A2 V-CTRLC L32I,
   A3 3 L3 BNEI,
   L5 J,                             \ Ctrl-C while one waited: at once
@@ -530,9 +578,10 @@ LABEL L5   \ Ctrl-C now: its kind in a6
   A4 >CHIP,  A3 A4 0 S32I,          \ NO-BREAK 0: the words with NO-BREAK end now
 LABEL L6
   A3 A2 V-HEAD L32I,  A3 A2 V-TAIL S32I,    \ the input before Ctrl-C is gone
+  A3 A2 V-ASK L32I,  A3 L7 BNEZ,             \ another core: nothing on the console
   A2 10 MOVI,  TX CALL0,                     \ a new line: column 0
   A6 2 L7 BLTI,
-  A2 VARS-A L32R,  A3 0 MOVI.N,  A3 A2 V-INTREQ S32I,
+  A2 MISC0 RSR,  A3 0 MOVI.N,  A3 A2 V-INTREQ S32I,
   HANDLERS-OFF CALL0,                        \ twice: the handlers off
   A7 OFF-TEXT-A L32R,
 LABEL L8                                     \ "  handlers off", a new line: a byte in each cell
@@ -542,8 +591,8 @@ LABEL L8                                     \ "  handlers off", a new line: a b
   A7 A7 4 ADDI.N,
   L8 J,
 LABEL L7
-  A2 0 MOVI.N,  A3 OUT-V L32R,  A3 A3 MEM ADD.N,  A2 A3 0 S32I,
-  A3 HANDLER-V L32R,  A3 A3 MEM ADD.N,  A3 A3 0 L32I,
+  A2 0 MOVI.N,  A3 OUT-V L32R,  A3 A4 SYS+,  A2 A3 0 S32I,
+  A3 HANDLER-V L32R,  A3 A4 SYS+,  A3 A3 0 L32I,
   A3 L9 BEQZ,
   A2 -28 MOVI,  KTHROW J,
 LABEL L9
@@ -552,10 +601,10 @@ LABEL L9
 127 CODE HALT   \ the end of (ISR): IP and W from the return stack
   W RP 0 L32I.N,  IP RP 4 L32I.N,  RP RP 8 ADDI.N,
   W W A2 A3 +BASE,  IP IP A2 A3 +BASE,
-  A2 VARS-A L32R,  A3 0 MOVI.N,  A3 A2 V-INISR S32I,
+  A2 MISC0 RSR,  A3 0 MOVI.N,  A3 A2 V-INISR S32I,
   A3 A2 V-CTRLC L32I,
   A3 L1 BEQZ,
-  TBL BRK-A L32R,                   \ a Ctrl-C waited for the end of the handlers
+  TBL A2 V-BRK L32I,                \ a Ctrl-C waited for the end of the handlers
 LABEL L1
   A2 A2 V-INTON L32I,
   A2 L2 BEQZ,
@@ -567,12 +616,13 @@ LABEL L2
 \ The ROM calls START with CALLX8, in the register window of its function
 \ main. START sets its own state: one register window (WINDOWBASE 0,
 \ WINDOWSTART 1), a stack for the functions of the ROM, the own vectors.
-\ The stack: a1 = ROM-SP, at the top of SRAM1; it grows down to the
-\ variables of the HAL (VARS-ADDR, 32 KB below). A call of the ROM with CALLX8 can spill the
+\ The stack: a1 = ROM-SP0, at the top of SRAM1; it grows down to the
+\ buffers of ESP32-RADIO (16 KB below). A call of the ROM with CALLX8 can spill the
 \ window of the VM onto it (window overflow 8). Then the cell at a1 - 12
 \ must hold the stack pointer p of a caller, and a4 to a7 go to the 16
 \ bytes at p - 32. START sets p = a1 + 32, so they go to a1 to a1 + 15.
-\ The same state after an exception (RECOVER).
+\ The same state after an exception (RECOVER). The state of each core
+\ comes from VM-STATE (see "Cores").
 
 TALIGN LABEL START
   A2 0 MOVI.N,
@@ -597,7 +647,7 @@ LABEL L1
   A2 1 MOVI.N,  A2 WINDOWSTART WSR,  RSYNC,
   A2 PS-VM L32R,  A2 PS WSR,  RSYNC,
   A2 VECTORS-A L32R,  A2 VECBASE WSR,  RSYNC,
-  A1 ROM-SP L32R,
+  A2 CORE-TAB-A L32R,  A1 A2 12 L32I,              \ a1: ROM-SP0, for the calls of the ROM below
   A2 A1 32 ADDI,  A3 A1 -16 ADDI,  A2 A3 4 S32I,   \ a1 - 12: a1 + 32
   \ The cache of the flash for the frozen part of the dictionary (the
   \ README, "Memory"), as the bootloader of ESP-IDF does it: the cache
@@ -615,21 +665,7 @@ LABEL L1
   A14 64 MOVI,  A15 3 MOVI.N,  A8 MMU-SET L32R,  A8 CALLX8,
   A2 CACHE-MASK L32R,  A3 A2 0 L32I,  A4 -17 MOVI,  A3 A3 A4 AND,  MEMW,  A3 A2 0 S32I,
   CACHE-ON CALL0,
-  A2 VARS-A L32R,  A3 0 MOVI.N,
-  A3 A2 V-HEAD S32I,  A3 A2 V-TAIL S32I,  A3 A2 V-CTRLC S32I,
-  A3 A2 V-INTREQ S32I,  A3 A2 V-INTON S32I,  A3 A2 V-INROM S32I,
-  A3 A2 V-CODE S32I,  A3 A2 V-CODE 4 + S32I,  A3 A2 V-CODE 8 + S32I,
-  A3 A2 V-INISR S32I,
-  A3 2 MOVI.N,  A3 A2 V-INTMASK S32I,     \ CPU interrupt 1
-  A3 126 MOVI,  A3 A2 V-WAIT S32I,        \ the code field for WAIT-UNTIL
-  A3 -1000 MOVI,  A3 A2 V-LAST S32I,      \ the last Ctrl-C: long ago
-  A2 TABLE-A L32R,  A3 TBL-A L32R,  COPY-TABLE CALL0,   \ the two tables to SRAM1 (see COPY-TABLE)
-  A2 BRKTAB-A L32R,  COPY-TABLE CALL0,
-  A2 TBL-A L32R,  A3 BRK-A L32R,                       \ the break table: slots 120 to 122 of the table
-  A4 A2 FE-SLOT L32I,  A4 A3 FE-SLOT S32I,
-  A4 A2 FM-SLOT L32I,  A4 A3 FM-SLOT S32I,
-  A4 A2 S0-SLOT L32I,  A4 A3 S0-SLOT S32I,
-  MEM VM-BASE L32R,  TBL TBL-A L32R,
+  A2 CORE-TAB-A L32R,  VM-STATE CALL0,             \ core 0: row 0 of the table of the cores
   A2 HALT-V L32R,  A3 A2 MEM ADD.N,
   A4 127 MOVI,  A4 A3 0 S32I,  A2 A3 4 S32I,        \ the HALT cells
   A3 UART0 L32R,                    \ UART0: an interrupt for more than 1 byte, or after a rest
@@ -640,6 +676,95 @@ LABEL L1
   MEMW,
   A2 BIT23 L32R,  A2 INTENABLE WSR,  RSYNC,         \ CPU interrupt 23 on
   A2 1 MOVI.N,  RESTART J,          \ BOOT
+
+\ ==== Cores ===============================================================
+\ Each core of the chip runs the VM with its own state (016 §7): its
+\ variables of the HAL (register MISC0), its SYS and RAM data of the
+\ base image (MISC1: VM addresses below PE), its TIB, PAD and stacks
+\ (MISC2), its two tables for TBL and its stack for the functions of
+\ the ROM; MISC3 holds PE (asm/xtensa.fs, PER-CORE?). The dictionary
+\ and the other RAM data are the same for all cores. CORE-TAB has a row
+\ of 8 cells for each core: the address of its variables of the HAL,
+\ the bases for MISC1 and MISC2, its a1, its tables, its clock (V-TIMER),
+\ V-ASK and MISC3. Core 0 is the console; its MISC3 is $10000, as its
+\ own part and the common part of the RAM data lie at one place (one
+\ jump less for each cell there). Core 1 (targets/esp32/README.md,
+\ "Memory"): its variables and tables at $3FFE_5400 (512 bytes each),
+\ its stack from $3FFE_7FC0 down; its SYS and RAM data of the base image
+\ in the gap of SRAM2 (VM address $100 at $3FFA_E800, up to PE), its
+\ TIB, PAD and stacks at $3FFA_F600 to $3FFA_FFFF; its clock is timer
+\ 1 of timer group 0. The ROM of core 1 writes $3FFE_3F20 to $3FFE_522F
+\ and the bytes above $3FFE_7DC0 before START1 runs (Befund 107).
+\
+\ START1 is the start of core i, 1 to #CORES - 1. Core 0 prepares it
+\ (package MULTICORE, lib/esp32/cores.fs): CORE-ENTRY (HAL 107) puts the
+\ xt for core i into its V-XT and gives the address of START1; the chip
+\ starts core i there (its ROM calls START1 with CALLX8). START1 sets the
+\ state of the core (VM-STATE), copies SYS and the RAM data of the base
+\ image of core 0 into its own (VM addresses $100 up to PE), switches on
+\ CPU interrupt 23 for the requests of core 0 (LEVEL3), and runs the xt
+\ on empty stacks (RESTART-W). THIS-CORE (HAL 106) gives the number of
+\ the core, CORE-PARK (HAL 108) lets the core wait for its reset.
+
+TALIGN LABEL CORE-TAB   \ for each core: VARS, MISC1, MISC2, a1, the tables, V-TIMER, V-ASK, MISC3
+  VARS-ADDR T,   DATA-ADDR T,   RAM-ADDR T,      ROM-SP0 T,  TABLES-ADDR T,   $3FF5F000 T,  0 T,           $10000 T,
+  VARS1-ADDR T,  DATA1-ADDR T,  STACKS1-ADDR T,  ROM-SP1 T,  TABLES1-ADDR T,  $3FF5F024 T,  $3FF000E0 T,   0 T,
+: PE! ( pe -- )   \ build.fs: PE for START1 and MISC3 of core 1
+  DUP PE-V T!  CORE-TAB 32 + 28 + T! ;
+
+TALIGN LABEL VM-STATE   \ a2: the row of this core in CORE-TAB; its state, MEM and TBL; uses a0, a2 to a7 (CALL0)
+  A7 A0 MOV.N,                      \ the return address: COPY-TABLE needs a0
+  A3 A2 0 L32I,  A3 MISC0 WSR,      \ the variables of the HAL of this core
+  A4 0 MOVI.N,
+  A4 A3 V-HEAD S32I,  A4 A3 V-TAIL S32I,  A4 A3 V-CTRLC S32I,
+  A4 A3 V-INTREQ S32I,  A4 A3 V-INTON S32I,  A4 A3 V-INROM S32I,
+  A4 A3 V-CODE S32I,  A4 A3 V-CODE 4 + S32I,  A4 A3 V-CODE 8 + S32I,
+  A4 A3 V-INISR S32I,
+  A4 2 MOVI.N,  A4 A3 V-INTMASK S32I,     \ CPU interrupt 1
+  A4 126 MOVI,  A4 A3 V-WAIT S32I,        \ the code field for WAIT-UNTIL
+  A4 -1000 MOVI,  A4 A3 V-LAST S32I,      \ the last Ctrl-C: long ago
+  A4 A2 12 L32I,  A4 A3 V-ROMSP S32I,
+  A4 A2 20 L32I,  A4 A3 V-TIMER S32I,
+  A4 A2 24 L32I,  A4 A3 V-ASK S32I,
+  A4 FREGS-A L32R,                        \ FAULT-REGS: in the RAM data of the base image, so each core has its own
+  A4 L1 BEQZ,
+  A5 CORE-TAB-A L32R,  A5 A5 4 L32I,  A4 A4 A5 SUB,  A5 A2 4 L32I,  A4 A4 A5 ADD.N,
+LABEL L1
+  A4 A3 V-FREGS S32I,
+  A4 A2 4 L32I,  A4 MISC1 WSR,            \ SYS and the RAM data of the base image
+  A4 A2 8 L32I,  A4 MISC2 WSR,            \ TIB, PAD and the stacks
+  A4 A2 28 L32I,  A4 MISC3 WSR,           \ PE, or $10000 (core 0)
+  A1 A2 12 L32I,                          \ the stack for the functions of the ROM (see START)
+  A4 A1 32 ADDI,  A5 A1 -16 ADDI,  A4 A5 4 S32I,   \ a1 - 12: a1 + 32
+  A6 A2 16 L32I,  A6 A3 V-TBL S32I,       \ the two tables (see COPY-TABLE)
+  A4 A6 512 ADDMI,  A4 A3 V-BRK S32I,
+  A2 TABLE-A L32R,  A3 A6 MOV.N,  COPY-TABLE CALL0,
+  A2 BRKTAB-A L32R,  COPY-TABLE CALL0,
+  A3 A6 512 ADDMI,                        \ the break table: slots 120 to 122 of the table
+  A4 A6 FE-SLOT L32I,  A4 A3 FE-SLOT S32I,
+  A4 A6 FM-SLOT L32I,  A4 A3 FM-SLOT S32I,
+  A4 A6 S0-SLOT L32I,  A4 A3 S0-SLOT S32I,
+  MEM VM-BASE L32R,  TBL A6 MOV.N,
+  A0 A7 MOV.N,  RET,
+
+TALIGN LABEL START1   \ core i, 1 to #CORES - 1: its ROM calls it with CALLX8, in its window
+  A2 0 MOVI.N,  A2 INTENABLE WSR,  RSYNC,         \ no interrupts
+  A2 0 MOVI.N,  A2 WINDOWBASE WSR,  RSYNC,        \ as START: one register window
+  A2 1 MOVI.N,  A2 WINDOWSTART WSR,  RSYNC,
+  A2 PS-VM L32R,  A2 PS WSR,  RSYNC,
+  A2 VECTORS-A L32R,  A2 VECBASE WSR,  RSYNC,     \ the vectors of this HAL
+  A2 PRID RSR,  A2 A2 13 1 EXTUI,                 \ the row of this core
+  A2 A2 5 SLLI,  A3 CORE-TAB-A L32R,  A2 A2 A3 ADD.N,
+  VM-STATE CALL0,
+  A3 CORE-TAB-A L32R,  A3 A3 4 L32I,              \ SYS and the RAM data of the base image of core 0
+  A4 MISC1 RSR,  A5 PE-V L32R,  A6 256 MOVI,      \ to this core: VM addresses $100 up to PE
+LABEL L1
+  A7 A3 A6 ADD.N,  A7 A7 0 L32I,  A8 A4 A6 ADD.N,  A7 A8 0 S32I,
+  A6 A6 4 ADDI.N,  A6 A5 L1 BLTU,
+  MEMW,
+  A2 BIT23 L32R,  A2 INTENABLE WSR,  RSYNC,       \ CPU interrupt 23: the requests of core 0 (LEVEL3)
+  A2 MISC0 RSR,  W A2 V-XT L32I,
+  RESTART-W J,
 
 \ ==== Data: the break table, the variables ================================
 
@@ -711,10 +836,14 @@ $400 VECTOR
 \ (REQUEST): TBL = BRKTAB, but not while a function of the ROM runs (TBL
 \ is in a3 of SYSCALL then, and a11 belongs to the ROM).
 
-LABEL LEVEL1   \ CPU interrupt 1: a source for the Forth handlers; off until HALT
-  A2 VARS-A L32R,
+LABEL LEVEL1   \ CPU interrupt 1: a source for the Forth handlers; off until HALT. CPU interrupt 6: see WAIT-UNTIL
+  A2 MISC0 RSR,
   A0 A2 V-SAVE S32I,  A3 A2 V-SAVE 4 + S32I,  A4 A2 V-SAVE 8 + S32I,  A5 A2 V-SAVE 12 + S32I,
   A3 INTERRUPT RSR,  A4 INTENABLE RSR,  A3 A3 A4 AND,
+  A3 6 L2 BBCI,                     \ the CPU timer of a sleep in MS: off; a write of CCOMPARE0 clears it
+  A5 -65 MOVI,  A4 A4 A5 AND,  A4 INTENABLE WSR,
+  A5 CCOMPARE0 RSR,  A5 CCOMPARE0 WSR,
+LABEL L2
   A3 1 L1 BBCI,
   A5 -3 MOVI,  A4 A4 A5 AND,  A4 INTENABLE WSR,
   A4 1 MOVI.N,  A4 A2 V-INTREQ S32I,
@@ -726,7 +855,7 @@ LABEL L1
 
 LABEL LEVEL2   \ CPU interrupts 19 to 21: the CODE word of the highest one, with CALLX0
   \ The CODE word may use a0 and a2 to a9, and SAR; it ends with RET.
-  A2 VARS-A L32R,
+  A2 MISC0 RSR,
   A0 A2 V-SAVE S32I,       A3 A2 V-SAVE 4 + S32I,   A4 A2 V-SAVE 8 + S32I,
   A5 A2 V-SAVE 12 + S32I,  A6 A2 V-SAVE 16 + S32I,  A7 A2 V-SAVE 20 + S32I,
   A8 A2 V-SAVE 24 + S32I,  A9 A2 V-SAVE 28 + S32I,
@@ -743,7 +872,7 @@ LABEL L8                            \ no CODE word: this CPU interrupt off
   A5 1 MOVI.N,  A4 SSL,  A5 A5 SLL,
   A6 INTENABLE RSR,  A6 A6 A5 OR,  A6 A6 A5 XOR,  A6 INTENABLE WSR,
 LABEL L9
-  A2 VARS-A L32R,
+  A2 MISC0 RSR,
   A3 A2 V-SAVE 32 + L32I,  A3 SAR WSR,
   A0 A2 V-SAVE L32I,       A3 A2 V-SAVE 4 + L32I,   A4 A2 V-SAVE 8 + L32I,
   A5 A2 V-SAVE 12 + L32I,  A6 A2 V-SAVE 16 + L32I,  A7 A2 V-SAVE 20 + L32I,
@@ -751,11 +880,18 @@ LABEL L9
   A2 EXCSAVE2 RSR,
   2 RFI,
 
-LABEL LEVEL3   \ CPU interrupt 23, UART0: the bytes into RX; Ctrl-C twice switches the handlers off at once
-  A2 VARS-A L32R,
+LABEL LEVEL3   \ CPU interrupt 23. Core 0: UART0, the bytes into RX; Ctrl-C twice switches the handlers off at once
+  \ Another core: core 0 asks for a break (FROM_CPU, V-ASK): V-CTRLC 1, or 3 when one waits already
+  A2 MISC0 RSR,
   A0 A2 V-SAVE S32I,       A3 A2 V-SAVE 4 + S32I,   A4 A2 V-SAVE 8 + S32I,
   A5 A2 V-SAVE 12 + S32I,  A6 A2 V-SAVE 16 + S32I,  A7 A2 V-SAVE 20 + S32I,
   A8 A2 V-SAVE 24 + S32I,
+  A4 A2 V-ASK L32I,
+  A4 L2 BEQZ,                                \ core 0: the console
+  A5 0 MOVI.N,  MEMW,  A5 A4 0 S32I,         \ the request is taken
+  A4 A2 V-CTRLC L32I,  A5 1 MOVI.N,  A6 3 MOVI.N,  A5 A6 A4 MOVNEZ,  A5 A2 V-CTRLC S32I,
+  L1 J,
+LABEL L2
   DRAIN CALL0,
   A4 A2 V-CTRLC L32I,
   A4 2 L1 BLTI,
@@ -790,7 +926,7 @@ LABEL L1
 : L8-HERE ( -- )   ['] L8 >BODY RESOLVE ;   \ LABEL L8, inside a word (LABEL parses)
 : SAVE-REGS, ( pc save debug? -- )   \ a2 is in the register save: the registers into FAULT-REGS
   >R  SWAP >R >R                      \ R: debug? pc save
-  A2 FREGS-A L32R,
+  A2 MISC0 RSR,  A2 A2 V-FREGS L32I,  \ FAULT-REGS of this core
   A2 L8 BEQZ,
   A0 A2 20 S32I,   A1 A2 24 S32I,   A3 A2 32 S32I,   A4 A2 36 S32I,
   A5 A2 40 S32I,   A6 A2 44 S32I,   A7 A2 48 S32I,   A8 A2 52 S32I,
@@ -810,27 +946,27 @@ LABEL L1
 FORWARD FAULT-GO
 LABEL FAULT   \ a2 is in EXCSAVE1
   EPC1 EXCSAVE1 FALSE SAVE-REGS,
-  A2 VARS-A L32R,
+  A2 MISC0 RSR,
   A3 EXCCAUSE RSR,  A3 A2 V-CAUSE S32I,
   A3 EPC1 RSR,
   FAULT-GO J,
 LABEL DOUBLE   \ an error in a handler, or in FAULT: the handlers off; a2 is in EXCSAVE1
   DEPC EXCSAVE1 FALSE SAVE-REGS,
-  A2 VARS-A L32R,
+  A2 MISC0 RSR,
   A3 EXCCAUSE RSR,  A3 A2 V-CAUSE S32I,
   A3 0 MOVI.N,  A3 A2 V-INTON S32I,
   A3 A2 V-INTMASK L32I,  A4 INTENABLE RSR,  A4 A4 A3 OR,  A4 A4 A3 XOR,  A4 INTENABLE WSR,
   A3 DEPC RSR,
   FAULT-GO J,
 LABEL DEBUG   \ the cause: 64 (EXCCAUSE has no number for it); a2 is in EXCSAVE6
-  A2 FREGS-A L32R,                         \ DEBUG-HOOK of INTR (FAULT-REGS + 108): the monitor
+  A2 MISC0 RSR,  A2 A2 V-FREGS L32I,       \ DEBUG-HOOK of INTR (FAULT-REGS + 108): the monitor
   A2 L7 BEQZ,
   A2 A2 108 L32I,
   A2 L7 BEQZ,
   A2 JX,                                   \ to the hook: a2 in EXCSAVE6, all else as at the exception
 LABEL L7
   EPC6 EXCSAVE6 TRUE SAVE-REGS,
-  A2 VARS-A L32R,
+  A2 MISC0 RSR,
   A3 64 MOVI,  A3 A2 V-CAUSE S32I,
   A3 EPC6 RSR,
 LABEL FAULT-GO   \ a2: VARS, a3: the PC
@@ -849,30 +985,31 @@ LABEL L1
   RFE,
 
 LABEL RECOVER   \ level 0 again, not in an exception
-  A1 ROM-SP L32R,
+  A2 MISC0 RSR,
+  A1 A2 V-ROMSP L32I,
   MEM VM-BASE L32R,
-  A2 VARS-A L32R,
+  A5 MISC2 RSR,                     \ the base of the stacks of this core
   SP A2 V-SP L32I,                  \ the data stack: R0 to S0 (doc/vm.md 3)
-  A3 SP MEM SUB,  A4 R0-V L32R,  A3 A3 A4 SUB,
+  A3 SP A5 SUB,  A4 R0-V L32R,  A3 A3 A4 SUB,
   A4 $401 MOVI,  A3 A4 L1 BLTU,
-  A3 S0-V L32R,  SP A3 MEM ADD.N,
+  A3 S0-V L32R,  SP A3 A5 ADD.N,
 LABEL L1
   RP A2 V-RP L32I,                  \ the return stack: R0 - 1024 to R0
-  A3 RP MEM SUB,  A4 R0-V L32R,  A3 A3 A4 SUB,  A3 A3 1024 ADDMI,
+  A3 RP A5 SUB,  A4 R0-V L32R,  A3 A3 A4 SUB,  A3 A3 1024 ADDMI,
   A4 $401 MOVI,  A3 A4 L2 BLTU,
-  A3 R0-V L32R,  RP A3 MEM ADD.N,
+  A3 R0-V L32R,  RP A3 A5 ADD.N,
 LABEL L2
-  TBL TBL-A L32R,
+  TBL A2 V-TBL L32I,
   A3 A2 V-CTRLC L32I,  A4 A2 V-INTREQ L32I,  A3 A3 A4 OR,
   A3 L3 BEQZ,
-  TBL BRK-A L32R,                   \ a break came meanwhile
+  TBL A2 V-BRK L32I,                \ a break came meanwhile
 LABEL L3
   W XT-FAULT L32R,
   W L4 BEQZ,
   A3 A2 V-ADDR L32I,  A3 PUSH,  A3 A2 V-PC L32I,  A3 PUSH,  A3 A2 V-CAUSE L32I,  A3 PUSH,
   W W A3 A4 +BASE,  DISPATCH,
 LABEL L4
-  A3 HANDLER-V L32R,  A3 A3 MEM ADD.N,  A3 A3 0 L32I,
+  A3 HANDLER-V L32R,  A3 A4 SYS+,  A3 A3 0 L32I,
   A3 L5 BEQZ,
   A2 -9 MOVI,  KTHROW J,
 LABEL L5
@@ -886,7 +1023,8 @@ ROOM?
 BRKTAB >DRAM - BRKTAB-A T!
 VECTORS VECTORS-A T!
 RECOVER RECOVER-A T!
-VARS-ADDR V-WAIT + WAIT-XT T!
+CORE-TAB CORE-TAB-A T!
+START1 START1-A T!
 OFF-TEXT OFF-TEXT-A T!
 : FILL-BRKTAB ( -- )   \ BREAK for each number (START puts slots 120 to 122 of the table into the copy)
   128 0 DO  BREAK BRKTAB I CELLS + T!  LOOP ;

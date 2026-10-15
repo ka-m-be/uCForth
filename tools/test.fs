@@ -88,6 +88,7 @@ VARIABLE TA   VARIABLE TU            \ the name of the file: not on the stack (D
     S" lib/esp32/test/setup.fs"  TEST   \ radiohost stahost aphost setup
     S" lib/esp32/test/wlback.fs" TEST
     S" lib/esp32/test/irqueue.fs" TEST
+    S" lib/esp32/test/cores.fs"   TEST   \ MULTICORE, with a mock of the chip
     S" lib/test/heads.fs"        TEST   \ the packages of the host with TEMP-HEADS on
     S" asm/test/xtensa.fs"    TEST
     S" asm/monitor/test/disxt.fs" TEST

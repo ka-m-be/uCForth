@@ -98,7 +98,7 @@ In the folder `ucf`:
     C:\ucf>echo %ERRORLEVEL%
     0
 
-With `-32` before `host\files.fs`: `all: 12186 tests, 0 errors`. The
+With `-32` before `host\files.fs`: `all: 12210 tests, 0 errors`. The
 whole output is the same as for the C bootstrap VM, line for line
 (`bootstrap/c/README.md`, section "Tests"); only the first line
 differs.

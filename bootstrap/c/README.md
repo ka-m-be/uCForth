@@ -293,7 +293,7 @@ Expected, and the exit status 0:
 Between these lines, some tests show messages such as `redefined HD-A`
 or `cannot open host/test/none.tmp`: the tests cause them on purpose.
 The output is the same as the output of the awk bootstrap VM, line for
-line. With `-32`: `all: 12186 tests, 0 errors`.
+line. With `-32`: `all: 12210 tests, 0 errors`.
 
 The fixed point (`tools/README.md`): uCForth builds its reference
 images again, in 1.5 s:

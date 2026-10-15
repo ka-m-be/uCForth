@@ -51,7 +51,7 @@ when `QUIT` waits for the next line:
 
     $ echo "ALSO FILES  INCLUDE tools/test.fs" | build/ucf-linux-a64
     ...
-    all: 12186 tests, 0 errors
+    all: 12210 tests, 0 errors
 
 The terminal works in its normal line mode: it shows what you type and
 sends the line with the return key. Backspace and Ctrl-U correct the
@@ -154,7 +154,7 @@ In Docker on a Mac (Apple silicon), in the folder `ucf`:
       sh -c 'cp -r /ucf /tmp/u && cd /tmp/u && chmod +x build/ucf-linux-a64 &&
              echo "ALSO FILES  INCLUDE tools/test.fs" | build/ucf-linux-a64'
 
-Expected: `all: 12186 tests, 0 errors`; the tests take about 0.3 s. The tool
+Expected: `all: 12210 tests, 0 errors`; the tests take about 0.3 s. The tool
 `tools/genesis.fs` (the reference images, 32 bit) takes 0.5 s.
 
 **Tested (2026):** in Docker (Debian 12, arm64): all tests; `ARG`; the

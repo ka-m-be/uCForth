@@ -27,6 +27,9 @@
 \ (DOCOL, SP@). @ ! C@ C! and the other memory words take an address
 \ below $40000 as a VM address (>CHIP,) and any other as a chip address:
 \ so Forth reaches the registers of the chip ($6000_0000 on) with @ and !.
+\ With PER-CORE? (the ESP32) each core has its own SYS, RAM data of the
+\ base image and stacks: the code takes their bases from the registers
+\ MISC1 and MISC2 of the core (SYS+, STACKS, of asm/xtensa.fs).
 \
 \ Registers (asm/xtensa.fs, "The virtual machine of uCForth", has their
 \ names and the macros NEXT, DISPATCH, PUSH, POP, TOS@, TOS!, >CHIP,):
@@ -42,13 +45,14 @@ NEED-32
 
 \ ==== The table and the constants before the code =======================
 \ L32R reads a constant that lies before the code. The build puts the
-\ xts of the image into XT-BOOT, XT-QUIT and XT-THROW. The code adds MEM
-\ to the address of a system variable; SYSVAR, adds DATA-OFF to it first.
+\ xts of the image into XT-BOOT, XT-QUIT and XT-THROW. The code gives
+\ the address of a system variable its base with SYS+,; without
+\ PER-CORE? that is MEM, and SYSVAR, adds DATA-OFF to it first.
 
 CREATE PRIMS 128 CELLS ALLOT   PRIMS 128 CELLS 0 FILL   \ the code of each primitive
 : CODE ( n "name" -- )   \ the code of primitive n starts here
   TALIGN NEW-SCOPE  THERE SWAP CELLS PRIMS + !  PARSE-NAME 2DROP ;
-: SYSVAR, ( a -- )   DATA-OFF @ + T, ;   \ a VM address below $10000, for "+ MEM"
+: SYSVAR, ( a -- )   PER-CORE? @ 0= IF DATA-OFF @ + THEN T, ;   \ a VM address below $10000, for SYS+,
 
 LABEL TABLE   128 CELLS TDP +!       \ filled at the end
 LABEL TABLE-A      TABLE >DRAM - T,
@@ -161,13 +165,13 @@ LABEL RO-ERROR
 19 CODE R@
   A2 RP 0 L32I.N,  A2 PUSH,  NEXT,
 20 CODE SP@                         \ the address of the top item before SP@
-  A2 SP MEM SUB,  A2 PUSH,  NEXT,
+  A2 SP A3 STACKS, SUB,  A2 PUSH,  NEXT,
 21 CODE SP!
-  SP SP 0 L32I.N,  SP SP MEM ADD.N,  NEXT,
+  SP SP 0 L32I.N,  SP SP A3 STACKS, ADD.N,  NEXT,
 22 CODE RP@
-  A2 RP MEM SUB,  A2 PUSH,  NEXT,
+  A2 RP A3 STACKS, SUB,  A2 PUSH,  NEXT,
 23 CODE RP!
-  RP POP,  RP RP MEM ADD.N,  NEXT,
+  RP POP,  RP RP A3 STACKS, ADD.N,  NEXT,
 24 CODE AND
   A2 POP,  A3 TOS@,  A3 A3 A2 AND,  A3 TOS!,  NEXT,
 25 CODE OR
@@ -307,11 +311,11 @@ LABEL L2
   RP RP -4 ADDI,  IP RP 0 S32I.N,
   A4 0 MOVI.N,
   A3 L9 BEQZ,
-  A5 CASE-SENSE-V L32R,  A5 A5 MEM ADD.N,  IP A5 0 L32I,
-  A5 #ORDER-V L32R,  A5 A5 MEM ADD.N,  A6 A5 0 L32I,
+  A5 CASE-SENSE-V L32R,  A5 A8 SYS+,  IP A5 0 L32I,
+  A5 #ORDER-V L32R,  A5 A8 SYS+,  A6 A5 0 L32I,
 LABEL L1   \ the next wordlist
   A6 L9 BEQZ,  A6 A6 -1 ADDI.N,
-  A5 CONTEXT-V L32R,  A5 A5 MEM ADD.N,  A8 A6 2 SLLI,  A5 A5 A8 ADD.N,
+  A5 CONTEXT-V L32R,  A5 A8 SYS+,  A8 A6 2 SLLI,  A5 A5 A8 ADD.N,
   A7 A5 0 L32I,                     \ the wordlist: a VM address, or a chip address (PSRAM)
   A7 >CHIP,                         \ uses A5 A8 A9
   A7 A7 0 L32I,

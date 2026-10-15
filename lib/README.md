@@ -19,7 +19,7 @@ have at most 8 characters and `.fs`, folder names at most 8 characters
 | `ccm.fs` | package CCM: authenticated encryption, 13-byte nonce and 8-byte tag; needs AES128 and 32-bit cells |
 | `text.fs` | package TEXT: `2SWAP /STRING 1/STRING BOUNDS S= STR= SCAN -LEADING -TRAILING SPLIT PLACE +PLACE N>S FAIL`; `STR=` compares bytes exactly, `S=` as names (`CASE-SENSE`) |
 | `json.fs` | package JSON: an object into a buffer (`JSON-INTO`, `JSON-NUMBER`, `JSON-TEXT`, `JSON-FLAG`, `JSON-NUMBERS`, `JSON-HEX`, `JSON-OBJECT`, `JSON-END`, `JSON-DONE`) and single fields of a text, without a tree (`JSON-CHECK`, `JSON-FIELD`, `JSON>NUMBER`, `JSON>FLAG`, `JSON>TEXT`, `JSON>NUMBERS`, `JSON>HEX`); needs TEXT (section "JSON") |
-| `idle.fs` | package IDLE: words that run while the console waits (`IDLE+`, `IDLE-`, `IDLE-RUN`, `.IDLE`; KEY runs them), `.STOPPED`, and `-BREAK` `+BREAK` `NO-BREAK`: Ctrl-C waits between them (on a board). In the image of the ESP32 boards |
+| `idle.fs` | package IDLE: words that run while the console waits (`IDLE+`, `IDLE-`, `IDLE-RUN`, `.IDLE`; KEY runs them), `.STOPPED`, and `-BREAK` `+BREAK` `NO-BREAK`: Ctrl-C waits between them (on a board); `IDLE-CLEAR`: another core starts with an empty chain (`lib/esp32/multicore.fs`). In the image of the ESP32 boards |
 | `slip.fs` | package SLIP: byte frames after RFC 1055 (for the ROM bootloader of the ESP32) |
 | `md5.fs` | package MD5: the digest MD5 (RFC 1321); 32-bit cells |
 | `font8.fs` | package FONT8: a font of 8 x 8 pixels for the characters 32 to 126 (public domain); `>GLYPH` |

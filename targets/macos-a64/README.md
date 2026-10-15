@@ -64,7 +64,7 @@ not look at them. The tool `build/ucf` is such an application
 
     $ echo "ALSO FILES  INCLUDE tools/test.fs" | build/ucf-macos-a64
     ...
-    all: 12186 tests, 0 errors
+    all: 12210 tests, 0 errors
 
 This takes about 2.8 s. `tools/genesis.fs` (the reference images,
 32 bit) takes 0.4 s.

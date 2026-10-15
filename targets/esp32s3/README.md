@@ -56,12 +56,12 @@ The output ends with:
 
       saved: ucf.hex
       code: 8106 bytes at $40378000, start at $4037917C
-      image: $100-$00001D48 and $00010A00-$0001A094, at $3FC90000 + VM address
+      image: $100-$00001D64 and $00010A00-$0001A3C8, at $3FC90000 + VM address
       start word: ON-BOOT
       FREEZE on the board: yes
       interrupts: yes
       Ctrl-C waits for NO-BREAK: yes
-      written: build/esp32s3.bin (62096 bytes)
+      written: build/esp32s3.bin (62944 bytes)
 
 1. `lib/package.fs` comes first: the packages for the board
    (`PACKAGE` ... `END-PACKAGE`) need it on the board too. Then

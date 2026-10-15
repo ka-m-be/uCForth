@@ -5,7 +5,7 @@
 \ them, so that the words of the list run on the host:
 \
 \ - MOCK-MAC: @ ! C@ C! MOVE FILL BIS! BIC! take the addresses of the board. The 8 KB
-\   of the MAC and 16 KB of SRAM1 from $3FFE4000 are buffers here; the
+\   of the MAC and 16 KB of SRAM1 from $3FFF8000 are buffers here; the
 \   other registers of the chip are one cell. The registers do what they
 \   did on the board (orga/Archiv/002_Plan_bis_Fassung_115.md, section
 \   8.3, N3b-2 and N3b-3): the reset of the MAC sets RX-NEXT to RX-END; a
@@ -32,7 +32,7 @@ ONLY FORTH DEFINITIONS  ALSO FILES
 
 PACKAGE MOCK-MAC
 $3FF73000 CONSTANT MAC   8192 CONSTANT MAC-SIZE
-$3FFE4000 CONSTANT SRAM1   16384 CONSTANT SRAM1-SIZE
+$3FFF8000 CONSTANT SRAM1   16384 CONSTANT SRAM1-SIZE
 MAC-SIZE BUFFER: MAC-MEM     MAC-MEM MAC-SIZE 0 FILL
 SRAM1-SIZE BUFFER: SRAM1-MEM   SRAM1-MEM SRAM1-SIZE 0 FILL
 VARIABLE ELSEWHERE           \ the other registers of the chip
